@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="入力したURLをプロキシ用URLへ変換し、テスターで開くためのツールです。">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+  <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+  <title>URLプロキシ変換＆自動入力ツール</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f6;
+      --panel: #ffffff;
+      --text: #27313a;
+      --muted: #64717d;
+      --blue: #3498db;
+      --blue-dark: #2980b9;
+      --orange: #e67e22;
+      --orange-dark: #d35400;
+      --green: #2ecc71;
+      --green-dark: #27ae60;
+      --gray: #95a5a6;
+      --gray-dark: #7f8c8d;
+      --border: #d7dee3;
+      --focus: #1d70b8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 40px 20px;
+      display: grid;
+      place-items: start center;
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(100%, 600px);
+      padding: 28px;
+      background: var(--panel);
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.10);
+    }
+
+    h1 {
+      margin: 0 0 25px;
+      color: #2c3e50;
+      font-size: clamp(1.35rem, 4vw, 1.65rem);
+      text-align: center;
+    }
+
+    .form-group { margin-bottom: 20px; }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    input[type="url"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #b8c2ca;
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    input[type="url"]:focus-visible,
+    button:focus-visible {
+      outline: 3px solid rgba(29, 112, 184, 0.28);
+      outline-offset: 2px;
+    }
+
+    .hint {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      min-height: 46px;
+      padding: 12px;
+      border: 0;
+      border-radius: 6px;
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.08s;
+    }
+
+    button:active { transform: translateY(1px); }
+    .btn-convert { flex: 2; background: var(--blue); }
+    .btn-convert:hover { background: var(--blue-dark); }
+    .btn-clear { flex: 1; background: var(--gray); }
+    .btn-clear:hover { background: var(--gray-dark); }
+    .btn-link { width: 100%; margin-bottom: 20px; background: var(--orange); }
+    .btn-link:hover { background: var(--orange-dark); }
+    .btn-copy { width: 100%; margin-top: 10px; background: var(--green); }
+    .btn-copy:hover { background: var(--green-dark); }
+
+    .result-box {
+      display: none;
+      margin-top: 25px;
+      padding: 15px;
+      background: #e8f4f8;
+      border-left: 5px solid var(--blue);
+      border-radius: 6px;
+    }
+
+    .result-box.visible { display: block; }
+
+    .result-url {
+      min-height: 45px;
+      margin-top: 5px;
+      padding: 12px;
+      overflow-wrap: anywhere;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+      user-select: all;
+    }
+
+    .toast {
+      min-height: 1.2em;
+      margin-top: 7px;
+      color: var(--green-dark);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-align: center;
+      visibility: hidden;
+    }
+
+    .toast.visible { visibility: visible; }
+
+    @media (max-width: 480px) {
+      body { padding: 18px 12px; }
+      main { padding: 21px 16px; }
+      .btn-group { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>URLプロキシ変換ツール</h1>
+
+    <form id="converterForm" novalidate>
+      <div class="form-group">
+        <label for="inputUrl">元のURLを入力してください:</label>
+        <input
+          type="url"
+          id="inputUrl"
+          inputmode="url"
+          autocomplete="url"
+          placeholder="https://arena.site"
+          aria-describedby="urlHint"
+          required
+          autofocus
+        >
+        <p id="urlHint" class="hint">http:// または https:// から始まるURLを入力してください。</p>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-convert" type="submit">URLを変換する</button>
+        <button class="btn-clear" type="button" id="clearButton">クリア</button>
+      </div>
+    </form>
+
+    <button class="btn-link" type="button" id="openButton">URLを開く</button>
+
+    <section id="resultBox" class="result-box" aria-live="polite">
+      <label>変換後のURL:</label>
+      <div id="resultUrl" class="result-url"></div>
+      <button class="btn-copy" type="button" id="copyButton">URLをコピーする</button>
+      <div id="toastMessage" class="toast" role="status">コピーしました！</div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const PROXY_BASE = "https://renderproxy-pre1.onrender.com/";
+    const TESTER_BASE = "https://iframetester.knj48.deno.net/";
+
+    const input = document.getElementById("inputUrl");
+    const form = document.getElementById("converterForm");
+    const resultBox = document.getElementById("resultBox");
+    const resultUrl = document.getElementById("resultUrl");
+    const toast = document.getElementById("toastMessage");
+    let generatedUrl = "";
+    let toastTimer;
+
+    function normalizeUrl(value) {
+      const parsed = new URL(value);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("unsupported protocol");
+      }
+      return parsed.href;
+    }
+
+    function utf8ToBase64(text) {
+      const bytes = new TextEncoder().encode(text);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function convertUrl(showAlert = true) {
+      const rawUrl = input.value.trim();
+      hideToast();
+
+      if (!rawUrl) {
+        if (showAlert) alert("URLを入力してください。");
+        input.focus();
+        return false;
+      }
+
+      try {
+        const normalizedUrl = normalizeUrl(rawUrl);
+        generatedUrl = PROXY_BASE + utf8ToBase64(normalizedUrl);
+        resultUrl.textContent = generatedUrl;
+        resultBox.classList.add("visible");
+        return true;
+      } catch (error) {
+        generatedUrl = "";
+        resultBox.classList.remove("visible");
+        if (showAlert) alert("正しいURLを http:// または https:// から入力してください。");
+        input.focus();
+        return false;
+      }
+    }
+
+    function openTesterWithUrl() {
+      if (!generatedUrl && !convertUrl(true)) return;
+
+      const targetSite = TESTER_BASE + "?url=" + encodeURIComponent(generatedUrl);
+      const link = document.createElement("a");
+      link.href = targetSite;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    function clearAll() {
+      generatedUrl = "";
+      input.value = "";
+      resultUrl.textContent = "";
+      resultBox.classList.remove("visible");
+      hideToast();
+      input.focus();
+    }
+
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.classList.add("visible");
+      toastTimer = setTimeout(hideToast, 3000);
+    }
+
+    function hideToast() {
+      toast.classList.remove("visible");
+    }
+
+    async function copyToClipboard() {
+      if (!generatedUrl) return;
+
+      try {
+        await navigator.clipboard.writeText(generatedUrl);
+        showToast("コピーしました！");
+      } catch (error) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(resultUrl);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        showToast("URLを選択しました。手動でコピーしてください。");
+      }
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      convertUrl(true);
+    });
+    document.getElementById("clearButton").addEventListener("click", clearAll);
+    document.getElementById("openButton").addEventListener("click", openTesterWithUrl);
+    document.getElementById("copyButton").addEventListener("click", copyToClipboard);
+    input.addEventListener("input", () => {
+      if (generatedUrl) {
+        generatedUrl = "";
+        resultBox.classList.remove("visible");
+      }
+    });
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a464ba307f54a9f1',t:'MTc5MTI5MDM1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
