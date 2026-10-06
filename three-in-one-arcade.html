@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>3 in 1 ARCADE</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: 2px 0;
+    }
+
+    /* フラッシュ効果 */
+    .flash-red { animation: flashRed 0.2s ease-in-out; }
+    @keyframes flashRed { 0%, 100% { background-color: #121212; } 50% { background-color: #500; } }
+    .flash-red-panel { animation: flashRedPanel 0.2s ease-in-out; }
+    @keyframes flashRedPanel { 0%, 100% { border-color: #333; } 50% { border-color: #f00; background-color: #300; } }
+
+    /* 設定画面 & リザルト画面 */
+    #start-screen, #result-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      margin-top: 20px;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 12px; color: #00ffff; }
+    .config-group { width: 100%; margin-bottom: 10px; text-align: left; }
+    .config-group label { display: block; font-size: 0.8rem; margin-bottom: 3px; color: #ccc; }
+    .config-group select {
+      width: 100%;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .btn {
+      margin-top: 10px;
+      padding: 8px 20px;
+      background: #00ffff;
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn:hover { background: #00cccc; }
+
+    /* 筐体全体枠 */
+    #cabinet {
+      display: none;
+      flex-direction: column;
+      background: #1a1b24;
+      border: 2px solid #3d4259;
+      border-radius: 8px;
+      padding: 4px 8px;
+      gap: 4px;
+      max-width: 410px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+    }
+
+    /* 上部ヘッダー */
+    .cabinet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 2px 0;
+    }
+    .cabinet-title {
+      color: #00ffaa;
+      font-weight: bold;
+      font-size: 0.95rem;
+      letter-spacing: 1px;
+    }
+    .status-badges {
+      display: flex;
+      gap: 4px;
+    }
+    .badge {
+      background: #111;
+      border: 1px solid #f39c12;
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-size: 0.65rem;
+      font-weight: bold;
+      color: #f39c12;
+      text-align: center;
+      line-height: 1.1;
+    }
+    .badge span { color: #fff; }
+
+    /* 上段：縦長パネル2カラム */
+    .top-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+    .panel {
+      background: #12131a;
+      border: 1px solid #2a2d3d;
+      border-radius: 6px;
+      padding: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .panel-title { font-size: 0.68rem; margin-bottom: 1px; color: #f39c12; font-weight: bold; letter-spacing: 1px; }
+    .panel-score { font-size: 0.62rem; margin-bottom: 2px; color: #ccc; }
+    canvas { background: #000; border: 1px solid #333; display: block; }
+
+    /* キャンバスサイズ維持 */
+    #tPanel canvas { width: 175px; height: 240px; }
+    #bPanel canvas { width: 175px; height: 240px; }
+    #dPanel canvas { width: 356px; height: 100px; }
+
+    /* 中段：恐竜ゲーム（横長） */
+    .middle-row {
+      width: 100%;
+    }
+    #dPanel {
+      width: 100%;
+      align-items: center;
+    }
+
+    /* 下段：コントロールエリア */
+    .controls-row-container {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: #12131a;
+      border: 1px solid #2a2d3d;
+      border-radius: 6px;
+      padding: 4px;
+    }
+    .ctrl-group-row {
+      display: flex;
+      align-items: center;
+      background: #181922;
+      border: 1px solid #252836;
+      border-radius: 4px;
+      padding: 3px 6px;
+      gap: 6px;
+    }
+    .ctrl-label {
+      width: 75px;
+      font-size: 0.62rem;
+      font-weight: bold;
+      color: #f39c12;
+    }
+    .ctrl-buttons {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+    }
+    .ctrl-btn {
+      flex: 1;
+      padding: 4px;
+      background: #2b2e3d;
+      border: 1px solid #484c64;
+      color: #fff;
+      border-radius: 3px;
+      font-size: 0.62rem;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      text-align: center;
+    }
+    .ctrl-btn:active { background: #f39c12; color: #000; }
+    .ctrl-btn.accent {
+      background: #a93226;
+      border-color: #c0392b;
+    }
+    .ctrl-btn.accent:active { background: #e74c3c; color: #fff; }
+
+    /* モグラ叩き用2x2ボタンパッド */
+    .mole-pad {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      flex: 1;
+    }
+    .mole-ctrl-btn {
+      background: #203a43;
+      border: 1px solid #2c5364;
+      color: #fff;
+      border-radius: 3px;
+      font-size: 0.6rem;
+      font-weight: bold;
+      padding: 4px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .mole-ctrl-btn:active { background: #ffcc00; color: #000; }
+  </style>
+</head>
+<body>
+
+  <!-- 設定画面 -->
+  <div id="start-screen">
+    <h1>3 in 1 ARCADE</h1>
+    
+    <div class="config-group">
+      <label>操作端末</label>
+      <select id="deviceSelect">
+        <option value="pc">PC (キーボード操作)</option>
+        <option value="mobile">スマホ (画面ボタン操作)</option>
+      </select>
+    </div>
+
+    <div class="config-group">
+      <label>スピードモード</label>
+      <select id="speedSelect" onchange="toggleSpeedOptions()">
+        <option value="accel">徐々に加速</option>
+        <option value="fixed">固定スピード</option>
+      </select>
+    </div>
+
+    <div id="accelSpeedArea">
+      <div class="config-group">
+        <label>初期スピード</label>
+        <select id="startSpeedSelect">
+          <option value="0.25">0.25x (極低速)</option>
+          <option value="0.5">0.5x (低速)</option>
+          <option value="0.75" selected>0.75x</option>
+          <option value="1.0">1.0x (標準)</option>
+          <option value="1.5">1.5x</option>
+          <option value="2.0">2.0x (高速)</option>
+          <option value="3.0">3.0x</option>
+          <option value="5.0">5.0x (超高速)</option>
+        </select>
+      </div>
+      <div class="config-group">
+        <label>最高スピード</label>
+        <select id="maxSpeedSelect">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1.0">1.0x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2.0">2.0x</option>
+          <option value="3.0" selected>3.0x</option>
+          <option value="5.0">5.0x (超高速)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="fixedSpeedArea" style="display:none;">
+      <div class="config-group">
+        <label>固定スピード倍率</label>
+        <select id="fixedSpeedSelect">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1.0" selected>1.0x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2.0">2.0x</option>
+          <option value="3.0">3.0x</option>
+          <option value="5.0">5.0x</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="config-group">
+      <label>残機 (ライフ)</label>
+      <select id="lifeSelect">
+        <option value="1">1 (一撃死)</option>
+        <option value="3" selected>3</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="inf">無制限 (INF)</option>
+      </select>
+    </div>
+
+    <div class="config-group">
+      <label>制限時間</label>
+      <select id="timeSelect">
+        <option value="30">30秒</option>
+        <option value="60">1分</option>
+        <option value="180">3分</option>
+        <option value="300" selected>5分</option>
+        <option value="600">10分</option>
+        <option value="inf">無制限 (INF)</option>
+      </select>
+    </div>
+
+    <button class="btn" onclick="startGame()">START GAME</button>
+  </div>
+
+  <!-- ゲーム筐体画面 -->
+  <div id="cabinet">
+    <!-- 上部ヘッダー -->
+    <div class="cabinet-header">
+      <div class="cabinet-title">3 in 1 ARCADE</div>
+      <div class="status-badges">
+        <div class="badge">LIFE: <span id="lifeDisp">3</span></div>
+        <div class="badge">TIME: <span id="timeDisp">05:00</span></div>
+        <div class="badge">TOTAL: <span id="totalSc">0</span><br>HI: <span id="hiSc">0</span></div>
+      </div>
+    </div>
+
+    <!-- 上段：MOLE WHACK と BREAKOUT -->
+    <div class="top-row">
+      <div class="panel" id="tPanel">
+        <div class="panel-title">MOLE WHACK</div>
+        <div class="panel-score">SCORE: <span id="mSc">0</span></div>
+        <canvas id="mCanvas" width="175" height="240"></canvas>
+      </div>
+
+      <div class="panel" id="bPanel">
+        <div class="panel-title">BREAKOUT</div>
+        <div class="panel-score">SCORE: <span id="bSc">0</span></div>
+        <canvas id="bCanvas" width="175" height="240"></canvas>
+      </div>
+    </div>
+
+    <!-- 中段：DINO RUN (横長) -->
+    <div class="middle-row">
+      <div class="panel" id="dPanel">
+        <div class="panel-title">DINO RUN</div>
+        <div class="panel-score">SCORE: <span id="dSc">0</span></div>
+        <canvas id="dCanvas" width="356" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- 下段：操作ボタン行 -->
+    <div class="controls-row-container">
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">MOLE WHACK</div>
+        <div class="mole-pad">
+          <button class="mole-ctrl-btn" id="mBtn0">左上 [W]</button>
+          <button class="mole-ctrl-btn" id="mBtn1">右上 [E]</button>
+          <button class="mole-ctrl-btn" id="mBtn2">左下 [S]</button>
+          <button class="mole-ctrl-btn" id="mBtn3">右下 [D]</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">BREAKOUT</div>
+        <div class="ctrl-buttons">
+          <button class="ctrl-btn" id="bLBtn">← 左</button>
+          <button class="ctrl-btn" id="bRBtn">→ 右</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">DINO RUN</div>
+        <div class="ctrl-buttons">
+          <button class="ctrl-btn accent" id="dJumpBtn">SPACE ジャンプ！</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- リザルト画面 -->
+  <div id="result-screen" style="display:none;">
+    <h1 id="resTitle">GAME OVER</h1>
+    <p id="resMsg" style="margin-bottom:10px; color:#ccc; font-size:0.9rem;"></p>
+    <div style="font-size: 1.1rem; margin-bottom: 6px;">FINAL SCORE: <span id="resScore" style="color:#00ffff; font-weight:bold;">0</span></div>
+    <div style="font-size: 0.85rem; margin-bottom: 16px; color:#aaa;">HI-SCORE: <span id="resHi">0</span></div>
+    <button class="btn" onclick="returnToMenu()">MENU</button>
+  </div>
+  <script>
+    let gameSpeed = 1.0;
+    let startSpeed = 1.0;
+    let maxGameSpeed = 3.0;
+    let speedStepPerSec = 0;
+    let isAccelMode = false;
+    let isMobileMode = false;
+    let selectedSpeedConfig = 'accel';
+    let selectedLifeConfig = '3';
+    let selectedTimeConfig = '300';
+
+    let currentLife = 3;
+    let maxLife = 3;
+    let remainingTime = 300;
+    let isTimeInfinite = false;
+    let timerInterval = null;
+    let gameActive = false;
+
+    let currentHiScore = 0;
+
+    function toggleSpeedOptions() {
+      const mode = document.getElementById('speedSelect').value;
+      if (mode === 'accel') {
+        document.getElementById('fixedSpeedArea').style.display = 'none';
+        document.getElementById('accelSpeedArea').style.display = 'block';
+      } else {
+        document.getElementById('fixedSpeedArea').style.display = 'block';
+        document.getElementById('accelSpeedArea').style.display = 'none';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      toggleSpeedOptions();
+    });
+
+    function getStorageKey() {
+      return `arcade_hi_sp_${selectedSpeedConfig}_life_${selectedLifeConfig}_time_${selectedTimeConfig}`;
+    }
+
+    function loadHiScore() {
+      let key = getStorageKey();
+      currentHiScore = parseInt(localStorage.getItem(key)) || 0;
+      document.getElementById('hiSc').innerText = currentHiScore;
+    }
+
+    function startGame() {
+      const dev = document.getElementById('deviceSelect').value;
+      const speedMode = document.getElementById('speedSelect').value;
+      selectedLifeConfig = document.getElementById('lifeSelect').value;
+      selectedTimeConfig = document.getElementById('timeSelect').value;
+
+      if (selectedTimeConfig === 'inf') {
+        isTimeInfinite = true;
+        remainingTime = 600;
+        document.getElementById('timeDisp').innerText = 'INF';
+      } else {
+        isTimeInfinite = false;
+        remainingTime = parseInt(selectedTimeConfig);
+        updateTimeDisplay();
+      }
+
+      let totalDurationSec = (selectedTimeConfig === 'inf') ? 600 : remainingTime;
+
+      if (speedMode === 'accel') {
+        isAccelMode = true;
+        startSpeed = parseFloat(document.getElementById('startSpeedSelect').value);
+        maxGameSpeed = parseFloat(document.getElementById('maxSpeedSelect').value);
+        gameSpeed = startSpeed;
+
+        speedStepPerSec = (maxGameSpeed - startSpeed) / totalDurationSec;
+        selectedSpeedConfig = `accel_${startSpeed}_to_${maxGameSpeed}_in_${totalDurationSec}`;
+      } else {
+        isAccelMode = false;
+        gameSpeed = parseFloat(document.getElementById('fixedSpeedSelect').value);
+        maxGameSpeed = gameSpeed;
+        speedStepPerSec = 0;
+        selectedSpeedConfig = `fixed_${gameSpeed}`;
+      }
+
+      isMobileMode = (dev === 'mobile');
+
+      if (selectedLifeConfig === 'inf') {
+        maxLife = Infinity;
+        currentLife = Infinity;
+        document.getElementById('lifeDisp').innerText = 'INF';
+      } else {
+        maxLife = parseInt(selectedLifeConfig);
+        currentLife = maxLife;
+        document.getElementById('lifeDisp').innerText = currentLife;
+      }
+
+      loadHiScore();
+
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('cabinet').style.display = 'flex';
+
+      mSc = 0; bSc = 0; dSc = 0;
+      document.getElementById('mSc').innerText = 0;
+      document.getElementById('bSc').innerText = 0;
+      document.getElementById('dSc').innerText = 0;
+      updateScores();
+
+      initB();
+      pX = (bC.width - pW) / 2; bX = bC.width / 2; bY = bC.height - 30; bDX = 1.5; bDY = -1.5;
+      obs = []; dY = 60; dDY = 0; isGnd = true; fCount = 0;
+
+      gameActive = true;
+      
+      initM();
+      initGameLoops();
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!gameActive) return;
+
+        if (isAccelMode && gameSpeed < maxGameSpeed) {
+          gameSpeed = Math.min(gameSpeed + speedStepPerSec, maxGameSpeed);
+        }
+
+        if (!isTimeInfinite) {
+          remainingTime--;
+          updateTimeDisplay();
+          if (remainingTime <= 0) {
+            endGame("TIME UP!");
+          }
+        }
+      }, 1000);
+    }
+
+    function updateTimeDisplay() {
+      let m = Math.floor(remainingTime / 60);
+      let s = remainingTime % 60;
+      document.getElementById('timeDisp').innerText = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function loseLife(panelId) {
+      if (!gameActive) return;
+      triggerFailFlash(panelId);
+
+      // モグラ叩き（tPanel）でミスした時にモグラのスコアをリセット
+      if (panelId === 'tPanel') {
+        mSc = 0;
+        document.getElementById('mSc').innerText = 0;
+        updateScores();
+      }
+
+      if (currentLife !== Infinity) {
+        currentLife--;
+        document.getElementById('lifeDisp').innerText = currentLife;
+        if (currentLife <= 0) {
+          endGame("LIFE ZERO");
+        }
+      }
+    }
+
+    function endGame(reason) {
+      if (!gameActive) return;
+      gameActive = false;
+      if (timerInterval) clearInterval(timerInterval);
+      clearTimeout(nextMoleTimeout);
+      clearTimeout(moleTimer);
+
+      let total = mSc + bSc + dSc;
+      document.getElementById('resTitle').innerText = reason;
+      document.getElementById('resMsg').innerText = (reason === "TIME UP!") ? "制限時間が終了しました！" : "ライフがなくなりました！";
+      document.getElementById('resScore').innerText = total;
+      document.getElementById('resHi').innerText = currentHiScore;
+
+      document.getElementById('cabinet').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'flex';
+    }
+
+    function returnToMenu() {
+      document.getElementById('result-screen').style.display = 'none';
+      document.getElementById('start-screen').style.display = 'flex';
+    }
+
+    function updateScores() {
+      let total = mSc + bSc + dSc;
+      document.getElementById('totalSc').innerText = total;
+      if (total > currentHiScore) {
+        currentHiScore = total;
+        localStorage.setItem(getStorageKey(), currentHiScore);
+        document.getElementById('hiSc').innerText = currentHiScore;
+      }
+    }
+
+    function triggerFailFlash(panelId) {
+      const panel = document.getElementById(panelId);
+      panel.classList.add('flash-red-panel');
+      document.body.classList.add('flash-red');
+      setTimeout(() => {
+        panel.classList.remove('flash-red-panel');
+        document.body.classList.remove('flash-red');
+      }, 200);
+    }
+
+    // --- モグラ叩き (MOLE WHACK) ---
+    const mC = document.getElementById('mCanvas');
+    const mCtx = mC.getContext('2d');
+    let mSc = 0;
+    let activeMole = -1; 
+    let moleTimer = null;
+    let nextMoleTimeout = null;
+
+    function initM() {
+      mSc = 0;
+      document.getElementById('mSc').innerText = 0;
+      activeMole = -1;
+      clearTimeout(nextMoleTimeout);
+      clearTimeout(moleTimer);
+      scheduleNextMole(1500);
+    }
+
+    function scheduleNextMole(delay) {
+      if (!gameActive) return;
+      
+      clearTimeout(nextMoleTimeout);
+      let randomDelay = delay + Math.random() * 1200;
+
+      nextMoleTimeout = setTimeout(() => {
+        if (!gameActive) return;
+        
+        activeMole = Math.floor(Math.random() * 4);
+        let duration = 3000 / gameSpeed;
+
+        clearTimeout(moleTimer);
+        moleTimer = setTimeout(() => {
+          if (!gameActive) return;
+          
+          if (activeMole !== -1) {
+            activeMole = -1;
+            loseLife('tPanel');
+            updateScores();
+          }
+          
+          scheduleNextMole(1200);
+
+        }, duration);
+
+      }, randomDelay);
+    }
+
+    function hitMole(index) {
+      if (!gameActive) return;
+      
+      if (activeMole === index) {
+        clearTimeout(moleTimer);
+        activeMole = -1;
+        mSc += 20;
+        document.getElementById('mSc').innerText = mSc;
+        updateScores();
+        
+        clearTimeout(nextMoleTimeout);
+        scheduleNextMole(1200); 
+      } else {
+        loseLife('tPanel');
+        updateScores();
+      }
+    }
+
+    function drawM() {
+      if (!gameActive) return;
+
+      mCtx.fillStyle = '#000';
+      mCtx.fillRect(0, 0, mC.width, mC.height);
+
+      let cols = 2, rows = 2;
+      let cellW = 65, cellH = 80;
+      let startX = 20, startY = 30;
+      let gapX = 5, gapY = 15;
+
+      for(let r=0; r<rows; r++) {
+        for(let c=0; c<cols; c++) {
+          let index = r * 2 + c;
+          let x = startX + c * (cellW + gapX);
+          let y = startY + r * (cellH + gapY);
+
+          mCtx.fillStyle = '#181a24';
+          mCtx.strokeStyle = '#333';
+          mCtx.lineWidth = 2;
+          mCtx.fillRect(x, y, cellW, cellH);
+          mCtx.strokeRect(x, y, cellW, cellH);
+
+          if (activeMole === index) {
+            mCtx.fillStyle = '#ffcc00';
+            mCtx.beginPath();
+            mCtx.arc(x + cellW/2, y + cellH/2 + 5, 20, Math.PI, 0, false);
+            mCtx.fill();
+          } else {
+            mCtx.fillStyle = '#111';
+            mCtx.beginPath();
+            mCtx.arc(x + cellW/2, y + cellH/2 + 10, 18, Math.PI, Math.PI*2, false);
+            mCtx.fill();
+          }
+
+          mCtx.fillStyle = '#888';
+          mCtx.font = 'bold 10px sans-serif';
+          let keyName = (index === 0) ? '[W]' : (index === 1) ? '[E]' : (index === 2) ? '[S]' : '[D]';
+          mCtx.fillText(keyName, x + 6, y + 14);
+        }
+      }
+
+      requestAnimationFrame(drawM);
+    }
+
+    // --- ブロック崩し ---
+    const bC = document.getElementById('bCanvas');
+    const bCtx = bC.getContext('2d');
+    let pW = 34, pH = 5, pX = (bC.width - pW) / 2;
+    let bX = bC.width / 2, bY = bC.height - 30, bDX = 1.5, bDY = -1.5, bR = 3;
+    let bRows = 4, bCols = 4, bw = 32, bh = 8, bPad = 4, bTop = 15, bLeft = 14;
+    let bricks = [], bSc = 0;
+
+    function initB() {
+      bricks = [];
+      for(let c=0; c<bCols; c++) {
+        bricks[c] = [];
+        for(let r=0; r<bRows; r++) {
+          bricks[c][r] = {x:0, y:0, st:1};
+        }
+      }
+    }
+
+    function resetBreakout() {
+      loseLife('bPanel');
+      bSc = 0;
+      document.getElementById('bSc').innerText = bSc;
+      updateScores();
+      initB();
+      pX = (bC.width - pW) / 2;
+      bX = bC.width / 2; 
+      bY = bC.height - 30; 
+      bDY = -1.5;
+    }
+
+    let mL = false, mR = false;
+
+    function drawB() {
+      if(!gameActive) return;
+
+      bCtx.fillStyle = '#000';
+      bCtx.fillRect(0, 0, bC.width, bC.height);
+
+      for(let c=0; c<bCols; c++) {
+        for(let r=0; r<bRows; r++) {
+          if(bricks[c][r].st === 1) {
+            let bx = c * (bw + bPad) + bLeft;
+            let by = r * (bh + bPad) + bTop;
+            bricks[c][r].x = bx; bricks[c][r].y = by;
+            bCtx.fillStyle = `hsl(${r * 70}, 80%, 50%)`;
+            bCtx.fillRect(bx, by, bw, bh);
+          }
+        }
+      }
+
+      bCtx.beginPath();
+      bCtx.arc(bX, bY, bR, 0, Math.PI*2);
+      bCtx.fillStyle = '#fff';
+      bCtx.fill();
+      bCtx.closePath();
+
+      bCtx.fillStyle = '#00ffff';
+      bCtx.fillRect(pX, bC.height - pH - 6, pW, pH);
+
+      let speedFactor = gameSpeed;
+      if(mR && pX < bC.width - pW) pX += 3.2 * speedFactor;
+      if(mL && pX > 0) pX -= 3.2 * speedFactor;
+
+      if(bX + bDX * speedFactor > bC.width - bR || bX + bDX * speedFactor < bR) bDX = -bDX;
+      if(bY + bDY * speedFactor < bR) bDY = -bDY;
+      else if(bY + bDY * speedFactor > bC.height - pH - 6 - bR) {
+        if(bX > pX && bX < pX + pW) {
+          bDY = -bDY;
+        } else if(bY + bDY * speedFactor > bC.height - bR) {
+          resetBreakout();
+        }
+      }
+
+      let allCleared = true;
+      for(let c=0; c<bCols; c++) {
+        for(let r=0; r<bRows; r++) {
+          if(bricks[c][r].st === 1) {
+            allCleared = false;
+            break;
+          }
+        }
+      }
+      if(allCleared) {
+        initB();
+        bX = bC.width / 2;
+        bY = bC.height - 30;
+        bDY = -Math.abs(bDY);
+      }
+
+      for(let c=0; c<bCols; c++) {
+        for(let r=0; r<bRows; r++) {
+          let bk = bricks[c][r];
+          if(bk.st === 1) {
+            if(bX > bk.x && bX < bk.x + bw && bY > bk.y && bY < bk.y + bh) {
+              bDY = -bDY;
+              bk.st = 0;
+              bSc += 10; 
+
+              let rowCleared = true;
+              for(let colCheck = 0; colCheck < bCols; colCheck++) {
+                if(bricks[colCheck][r].st === 1) {
+                  rowCleared = false;
+                  break;
+                }
+              }
+              if(rowCleared) {
+                bSc += 30; 
+              }
+
+              document.getElementById('bSc').innerText = bSc;
+              updateScores();
+            }
+          }
+        }
+      }
+      bX += bDX * speedFactor; 
+      bY += bDY * speedFactor;
+      requestAnimationFrame(drawB);
+    }
+
+    // --- 恐竜ゲーム ---
+    const dC = document.getElementById('dCanvas');
+    const dCtx = dC.getContext('2d');
+    let dY = 60, dDY = 0, isGnd = true;
+    let obs = [], dSc = 0, fCount = 0;
+    const groundY = 78;
+
+    function dJump() {
+      if(!gameActive) return;
+      if(isGnd) {
+        dDY = -6.2;
+        isGnd = false;
+      }
+    }
+
+    function resetDino() {
+      loseLife('dPanel');
+      dSc = 0;
+      document.getElementById('dSc').innerText = dSc;
+      updateScores();
+      obs = [];
+      dY = groundY;
+      dDY = 0;
+      isGnd = true;
+      fCount = 0;
+    }
+
+    function drawD() {
+      if(!gameActive) return;
+
+      dCtx.fillStyle = '#000';
+      dCtx.fillRect(0, 0, dC.width, dC.height);
+
+      dCtx.strokeStyle = '#555';
+      dCtx.lineWidth = 2;
+      dCtx.beginPath();
+      dCtx.moveTo(0, groundY + 14); dCtx.lineTo(dC.width, groundY + 14); dCtx.stroke();
+
+      let speedFactor = gameSpeed;
+      dY += dDY * speedFactor;
+      if(dY < groundY) {
+        dDY += 0.35 * speedFactor;
+      } else {
+        dY = groundY; dDY = 0; isGnd = true;
+      }
+
+      dCtx.fillStyle = '#22cc44';
+      dCtx.fillRect(30, dY, 10, 14);
+      dCtx.fillRect(38, dY - 4, 6, 5);
+      dCtx.fillRect(32, dY + 14, 2, (fCount%10 < 5) ? 3 : 1);
+      dCtx.fillRect(36, dY + 14, 2, (fCount%10 >= 5) ? 3 : 1);
+
+      if(Math.random() < 0.012 * Math.min(speedFactor, 2) && (obs.length === 0 || obs[obs.length-1].x < dC.width - 120)) {
+        obs.push({x: dC.width, w: 9, h: 14});
+      }
+
+      for(let i = obs.length - 1; i >= 0; i--) {
+        obs[i].x -= 3.0 * speedFactor;
+        dCtx.fillStyle = '#cc3333';
+        dCtx.fillRect(obs[i].x, (groundY + 14) - obs[i].h, obs[i].w, obs[i].h);
+
+        if(obs[i].x < 40 && obs[i].x + obs[i].w > 30 && dY + 14 > (groundY + 14) - obs[i].h) {
+          obs.splice(i, 1);
+          resetDino();
+          break;
+        }
+
+        if(obs[i].x < -20) {
+          obs.splice(i, 1);
+          dSc += 10; 
+          document.getElementById('dSc').innerText = dSc;
+          updateScores();
+        }
+      }
+      fCount += speedFactor;
+      requestAnimationFrame(drawD);
+    }
+
+    // --- ゲームループ制御 ---
+    function initGameLoops() {
+      drawM();
+      drawB();
+      drawD();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if(!gameActive) return;
+      if(e.code === 'Space') { e.preventDefault(); dJump(); }
+      if(e.code === 'ArrowLeft') mL = true;
+      if(e.code === 'ArrowRight') mR = true;
+
+      if(e.key === 'w' || e.key === 'W') { e.preventDefault(); hitMole(0); }
+      if(e.key === 'e' || e.key === 'E') { e.preventDefault(); hitMole(1); }
+      if(e.key === 's' || e.key === 'S') { e.preventDefault(); hitMole(2); }
+      if(e.key === 'd' || e.key === 'D') { e.preventDefault(); hitMole(3); }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if(e.code === 'ArrowLeft') mL = false;
+      if(e.code === 'ArrowRight') mR = false;
+    });
+
+    const setupBtn = (id, startAction, endAction) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.onmousedown = startAction;
+      el.onmouseup = endAction;
+      el.ontouchstart = (e) => { e.preventDefault(); startAction(); };
+      el.ontouchend = endAction;
+    };
+
+    setupBtn('bLBtn', () => mL = true, () => mL = false);
+    setupBtn('bRBtn', () => mR = true, () => mR = false);
+
+    document.getElementById('mBtn0').onclick = () => hitMole(0);
+    document.getElementById('mBtn1').onclick = () => hitMole(1);
+    document.getElementById('mBtn2').onclick = () => hitMole(2);
+    document.getElementById('mBtn3').onclick = () => hitMole(3);
+
+    document.getElementById('dJumpBtn').onclick = dJump;
+    dC.addEventListener('touchstart', (e) => { e.preventDefault(); dJump(); });
+  </script>
+</body>
+</html>
