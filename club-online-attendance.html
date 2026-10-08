@@ -404,6 +404,207 @@
             cursor: crosshair;
         }
 
+        /* =========================================
+           1人1枠モード
+           ========================================= */
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+            gap: 8px;
+            width: 100%;
+            height: 100%;
+            align-content: start;
+            overflow-y: auto;
+            padding: 2px;
+            box-sizing: border-box;
+        }
+        .slot {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 6px;
+            min-height: 76px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            min-width: 0;
+        }
+        .slot.me {
+            border-color: var(--primary-color);
+            background: #fffdf6;
+        }
+        .slot-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: #5f6368;
+            border-bottom: 1px dashed #e8eaed;
+            padding-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .slot-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: #202124;
+            word-break: break-all;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .slot-body img {
+            max-width: 100%;
+            max-height: 68px;
+            object-fit: contain;
+            border-radius: 3px;
+        }
+        .slot-body audio {
+            width: 100%;
+            max-width: 140px;
+            height: 26px;
+        }
+        .slot-empty {
+            color: #bdc1c6;
+            font-size: 11px;
+            font-weight: normal;
+        }
+
+        /* =========================================
+           発言禁止（ミュート）告知
+           ========================================= */
+        #mute-banner {
+            display: none;
+            background: #ea4335;
+            color: #fff;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        /* =========================================
+           開発者モード
+           ========================================= */
+        #dev-badge {
+            display: none;
+            background: #202124;
+            color: #fff;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 2px 7px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        #dev-panel {
+            display: none;
+            border-color: #202124 !important;
+            background: #f1f3f4 !important;
+        }
+        #dev-panel h4 { border-bottom-color: #202124 !important; }
+        .dev-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            padding: 5px 2px;
+            border-bottom: 1px solid #e8eaed;
+            cursor: pointer;
+        }
+        .dev-row:last-of-type { border-bottom: none; }
+        .dev-row input { width: auto; cursor: pointer; }
+        .dev-row .dn {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .dev-actions { display: flex; gap: 5px; margin-top: 8px; }
+        .dev-actions button { font-size: 11px; padding: 7px 4px; }
+        .dev-kick { background: #ea4335; }
+        .dev-kick:hover { background: #d33426; }
+        .dev-mute { background: #fbbc04; color: #3c4043; }
+        .dev-mute:hover { background: #e5a800; }
+        .dev-off { background: #6c757d; }
+        .dev-off:hover { background: #5a6268; }
+        #dev-mute-min {
+            width: 100%;
+            padding: 6px;
+            font-size: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            margin-top: 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        /* =========================================
+           認証モーダル
+           ========================================= */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(32,33,36,0.78);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 26px 22px;
+            width: 320px;
+            max-width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+        }
+        .modal-box h3 { margin: 0 0 6px; font-size: 17px; color: #3c4043; }
+        .modal-box p { margin: 0 0 14px; font-size: 12px; color: #5f6368; }
+        .modal-box input {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            font-size: 15px;
+            box-sizing: border-box;
+            text-align: center;
+            letter-spacing: 2px;
+            font-family: inherit;
+        }
+        .modal-err {
+            color: #ea4335;
+            font-size: 12px;
+            font-weight: bold;
+            min-height: 18px;
+            margin-top: 8px;
+        }
+        .modal-btns { display: flex; gap: 8px; margin-top: 4px; }
+        .shake { animation: shake .4s; }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+        #secret-trigger {
+            cursor: default;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         /* --- レスポンシブ（スマホ対応） --- */
         @media (max-width: 880px) {
             .workspace { flex-direction: column-reverse; }
@@ -425,6 +626,12 @@
             .toolbar { padding: 8px 12px; }
             .toolbar-title { font-size: 14px; }
             .room-info { font-size: 12px; }
+            .slot-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+            .slot { min-height: 62px; padding: 5px; }
+            .slot-name { font-size: 10px; }
+            .slot-body { font-size: 11px; }
+            .slot-body img { max-height: 40px; }
+            #dev-panel { flex: 1 1 100%; }
         }
     </style>
 </head>
@@ -466,6 +673,15 @@
             <div id="ws-url-input">
                 <input type="text" id="ws-url" placeholder="wss://あなたのサーバー.onrender.com">
             </div>
+        </div>
+
+        <div class="input-group">
+            <label>スライドの表示モード</label>
+            <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="display-mode" value="latest" checked> 🖼 最新のみ表示</label>
+                <label class="radio-label"><input type="radio" name="display-mode" value="slot"> 👥 1人1枠</label>
+            </div>
+            <div class="conn-note">「1人1枠」にすると、メンバー全員ぶんの枠が並び、各自の最新投稿が枠ごとに表示されます（切り替えは全員に反映されます）。</div>
         </div>
 
         <div class="btn-row">
@@ -532,14 +748,16 @@ server.listen(process.env.PORT || 8080, () =&gt; {
 
     <!-- ============ アプリ画面 ============ -->
     <div id="app-screen">
+        <div id="mute-banner"></div>
         <div class="toolbar">
-            <div class="toolbar-title">📊 部活出席リアルタイムスライド</div>
+            <div class="toolbar-title"><span id="secret-trigger">📊</span> 部活出席リアルタイムスライド<span id="dev-badge">DEV</span></div>
             <div class="room-info">
                 <span class="status-dot" id="status-dot"></span>
                 <span id="display-room-id">--</span>
                 <span class="conn-text" id="conn-text">接続中...</span>
                 <span>｜</span>
                 <span id="display-user-name">--</span>
+                <button type="button" id="mode-btn" class="btn-link btn-mini" onclick="toggleDisplayMode()">👥 1人1枠に切替</button>
                 <button type="button" id="exit-btn" class="btn-secondary" onclick="leaveRoom()">🚪 退出</button>
             </div>
         </div>
@@ -571,6 +789,26 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 <div class="control-section">
                     <h4>🎤 ボイスメッセージ</h4>
                     <button id="record-btn" class="ctrl-btn" style="background:#ea4335;" onclick="toggleRecording()">録音スタート</button>
+                </div>
+
+                <div class="control-section" id="dev-panel">
+                    <h4>🛠 管理者ツール</h4>
+                    <div id="dev-member-list"></div>
+                    <select id="dev-mute-min">
+                        <option value="1">1分</option>
+                        <option value="5" selected>5分</option>
+                        <option value="10">10分</option>
+                        <option value="30">30分</option>
+                        <option value="60">60分</option>
+                    </select>
+                    <div class="dev-actions">
+                        <button type="button" class="dev-kick" onclick="devKick()">追い出す</button>
+                        <button type="button" class="dev-mute" onclick="devMute()">発言禁止</button>
+                    </div>
+                    <div class="dev-actions">
+                        <button type="button" class="dev-mute" onclick="devUnmute()">禁止を解除</button>
+                        <button type="button" class="dev-off" onclick="disableDevMode()">OFF</button>
+                    </div>
                 </div>
 
                 <div class="control-section">
@@ -606,6 +844,19 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         </div>
     </div>
 
+    <div class="modal-overlay" id="pass-modal">
+        <div class="modal-box" id="pass-box">
+            <h3>🔒 認証が必要です</h3>
+            <p>パスワードを入力してください</p>
+            <input type="password" id="pass-input" placeholder="••••••••" autocomplete="new-password">
+            <div class="modal-err" id="pass-err"></div>
+            <div class="modal-btns">
+                <button type="button" class="btn-link btn-mini" onclick="closePassModal()">キャンセル</button>
+                <button type="button" class="btn-mini" onclick="checkPassword()">決定</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         /* =========================================================
            状態
@@ -623,6 +874,12 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         let members = new Map();          // senderId -> {name, location, lastSeen}
         const myId = (crypto.randomUUID ? crypto.randomUUID() : 'u-' + Math.random().toString(36).slice(2));
         let pingTimer = null;
+
+        let oneSlotMode = false;          // 1人1枠モード
+        let userContent = new Map();      // senderId -> 最新の投稿（1人1枠用）
+        let devMode = false;
+        let mutedUntil = 0;
+        let muteTimer = null;
 
         /* =========================================================
            ユーティリティ
@@ -709,7 +966,12 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             seenIds = new Set();
             members = new Map();
             members.set(myId, { name: myName, location: userLoc, lastSeen: Date.now(), me: true });
+            oneSlotMode = document.querySelector('input[name="display-mode"]:checked').value === 'slot';
+            userContent = new Map();
+            mutedUntil = 0;
+            updateMuteBanner();
             renderMembers();
+            updateModeButton();
 
             setStatus('connecting', '接続中...');
             initCanvas();
@@ -837,8 +1099,52 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             if (msg.kind === 'bye') {
                 if (members.has(msg.senderId)) {
                     members.delete(msg.senderId);
+                    userContent.delete(msg.senderId);
                     renderMembers();
                     addSystemLog(msg.sender + ' が退出しました');
+                }
+                return;
+            }
+
+            // 表示モードの切替（全員に反映）
+            if (msg.kind === 'mode') {
+                if (msg.senderId !== myId && typeof msg.slot === 'boolean') {
+                    oneSlotMode = msg.slot;
+                    syncModeRadios();
+                    updateModeButton();
+                    if (oneSlotMode) rerenderAllAreas(); else renderLatestFallback();
+                    addSystemLog('表示モードが「' + (oneSlotMode ? '1人1枠' : '最新のみ') + '」に切り替わりました');
+                }
+                return;
+            }
+
+            // 追い出す
+            if (msg.kind === 'kick') {
+                if (members.has(msg.targetId)) {
+                    members.delete(msg.targetId);
+                    userContent.delete(msg.targetId);
+                    renderMembers();
+                }
+                if (msg.targetId === myId) {
+                    alert('管理者により退出させられました。');
+                    forceLeave();
+                }
+                return;
+            }
+
+            // 発言禁止
+            if (msg.kind === 'mute') {
+                if (msg.targetId === myId) {
+                    mutedUntil = msg.until || (Date.now() + 5 * 60000);
+                    startMuteTimer();
+                    alert((msg.minutes || '') + '分間、発言が禁止されました。');
+                }
+                return;
+            }
+            if (msg.kind === 'unmute') {
+                if (msg.targetId === myId) {
+                    mutedUntil = 0;
+                    updateMuteBanner();
                 }
                 return;
             }
@@ -868,7 +1174,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             let changed = false;
             for (const [id, m] of members) {
                 if (id === myId) continue;
-                if (now - m.lastSeen > 60000) { members.delete(id); changed = true; }
+                if (now - m.lastSeen > 60000) { members.delete(id); userContent.delete(id); changed = true; }
             }
             if (changed) renderMembers();
         }
@@ -884,6 +1190,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 senderId: myId,
                 location: userLoc,
                 time: nowTime(),
+                t: Date.now(),
                 type: type,
                 payload: payload
             };
@@ -895,6 +1202,15 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         }
 
         function sendSlideData(type) {
+            // 発言禁止チェック
+            if (Date.now() < mutedUntil) {
+                const left = mutedUntil - Date.now();
+                const m = Math.floor(left / 60000);
+                const s = Math.floor((left % 60000) / 1000);
+                alert('🔇 発言が禁止されています。（残り ' + m + ':' + String(s).padStart(2, '0') + '）');
+                return;
+            }
+
             let payload = "";
 
             if (type === 'text') {
@@ -1045,6 +1361,14 @@ server.listen(process.env.PORT || 8080, () =&gt; {
            スライドへの描画
            ========================================================= */
         function renderToSlide(msg) {
+            // 1人1枠モード：各自の枠を更新
+            userContent.set(msg.senderId, msg);
+            if (oneSlotMode) {
+                renderArea(msg.location);
+                return;
+            }
+
+            // 通常モード：最新の1件を大きく表示
             const target = (msg.location === 'home')
                 ? document.getElementById('top-content')
                 : document.getElementById('bottom-content');
@@ -1056,32 +1380,162 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             tag.textContent = '👤 ' + msg.sender + '（' + locLabel(msg.location) + '・' + msg.time + '）';
             target.appendChild(tag);
 
+            appendContent(target, msg, true);
+        }
+
+        // 要素にコンテンツを差し込む（slot=true で枠内用小さい表示）
+        function appendContent(parent, msg, big) {
             if (msg.type === 'text') {
                 const d = document.createElement('div');
                 d.className = 'text-display';
                 d.textContent = msg.payload;             // 文字列はテキストとして安全に格納
-                target.appendChild(d);
+                parent.appendChild(d);
             } else if (msg.type === 'image' || msg.type === 'draw') {
                 const img = document.createElement('img');
-                img.className = 'image-display';
+                img.className = big ? 'image-display' : '';
                 img.src = msg.payload;
                 img.alt = '共有画像';
-                target.appendChild(img);
+                parent.appendChild(img);
             } else if (msg.type === 'audio') {
                 const d = document.createElement('div');
                 d.className = 'text-display';
-                d.style.fontSize = '16px';
+                d.style.fontSize = big ? '16px' : '12px';
                 d.textContent = '📢 ボイスメッセージ';
-                target.appendChild(d);
+                parent.appendChild(d);
 
                 const a = document.createElement('audio');
-                a.className = 'audio-display';
+                a.className = big ? 'audio-display' : '';
                 a.src = msg.payload;
                 a.controls = true;
-                a.autoplay = true;
-                target.appendChild(a);
-                a.play().catch(() => { /* 自動再生がブロックされた場合は手動再生 */ });
+                if (big) {
+                    a.autoplay = true;
+                    a.play().catch(() => { /* 自動再生がブロックされた場合は手動再生 */ });
+                }
+                parent.appendChild(a);
             }
+        }
+
+        /* --- 1人1枠モードの描画 --- */
+        function renderArea(location) {
+            const target = (location === 'home')
+                ? document.getElementById('top-content')
+                : document.getElementById('bottom-content');
+
+            target.textContent = '';
+
+            const ids = [];
+            for (const [id, m] of members) {
+                if (m.location === location) ids.push(id);
+            }
+            if (userLoc === location && !ids.includes(myId)) ids.unshift(myId);
+
+            if (ids.length === 0) {
+                const p = document.createElement('div');
+                p.className = 'text-display';
+                p.style.color = '#aaa';
+                p.style.fontSize = '14px';
+                p.textContent = 'このエリアにはまだ参加者がいません';
+                target.appendChild(p);
+                return;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'slot-grid';
+
+            for (const id of ids) {
+                const m = members.get(id) || { name: myName, location: location };
+                const isMe = (id === myId);
+
+                const slot = document.createElement('div');
+                slot.className = 'slot' + (isMe ? ' me' : '');
+
+                const nm = document.createElement('div');
+                nm.className = 'slot-name';
+                nm.textContent = (isMe ? '★ ' : '') + locIcon(m.location) + ' ' + m.name + (isMe && devMode ? ' 🛠' : '');
+                slot.appendChild(nm);
+
+                const body = document.createElement('div');
+                body.className = 'slot-body';
+                const c = userContent.get(id);
+                if (c) {
+                    appendContent(body, c, false);
+                } else {
+                    const e = document.createElement('div');
+                    e.className = 'slot-empty';
+                    e.textContent = '未投稿';
+                    body.appendChild(e);
+                }
+                slot.appendChild(body);
+                grid.appendChild(slot);
+            }
+            target.appendChild(grid);
+        }
+
+        function rerenderAllAreas() {
+            if (!oneSlotMode) return;
+            renderArea('home');
+            renderArea('club');
+        }
+
+        // 通常モードに戻したとき、各自の最新投稿から復元する
+        function renderLatestFallback() {
+            ['home', 'club'].forEach((loc) => {
+                const target = (loc === 'home')
+                    ? document.getElementById('top-content')
+                    : document.getElementById('bottom-content');
+                let latest = null;
+                for (const c of userContent.values()) {
+                    if (c.location === loc && (!latest || (c.t || 0) > (latest.t || 0))) latest = c;
+                }
+                if (latest) {
+                    renderToSlide(latest);
+                } else {
+                    target.textContent = '';
+                    const p = document.createElement('div');
+                    p.className = 'text-display';
+                    p.style.color = '#aaa';
+                    p.style.fontSize = '16px';
+                    p.textContent = loc === 'home'
+                        ? 'ここに自宅からの入力がリアルタイムで出ます'
+                        : 'ここに部室からの入力がリアルタイムで出ます';
+                    target.appendChild(p);
+                }
+            });
+        }
+
+        /* =========================================================
+           表示モード切替
+           ========================================================= */
+        function toggleDisplayMode() {
+            setDisplayMode(!oneSlotMode, true);
+        }
+
+        function setDisplayMode(slot, broadcast) {
+            oneSlotMode = slot;
+            syncModeRadios();
+            updateModeButton();
+            if (slot) {
+                rerenderAllAreas();
+            } else {
+                renderLatestFallback();
+            }
+            if (broadcast) {
+                sendRaw({
+                    id: uid(), kind: 'mode', sender: myName, senderId: myId,
+                    location: userLoc, time: nowTime(), slot: slot
+                });
+            }
+        }
+
+        function syncModeRadios() {
+            const r = document.querySelector('input[name="display-mode"][value="' + (oneSlotMode ? 'slot' : 'latest') + '"]');
+            if (r) r.checked = true;
+        }
+
+        function updateModeButton() {
+            const b = document.getElementById('mode-btn');
+            if (!b) return;
+            b.textContent = oneSlotMode ? '🖼 最新のみに切替' : '👥 1人1枠に切替';
         }
 
         /* =========================================================
@@ -1142,6 +1596,154 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 wrap.appendChild(chip);
             }
             document.getElementById('member-count').textContent = '(' + n + '人)';
+            if (oneSlotMode) rerenderAllAreas();
+            if (devMode) renderDevMembers();
+        }
+
+        /* =========================================================
+           発言禁止（ミュート）
+           ========================================================= */
+        function startMuteTimer() {
+            updateMuteBanner();
+            clearInterval(muteTimer);
+            muteTimer = setInterval(updateMuteBanner, 1000);
+        }
+
+        function updateMuteBanner() {
+            const b = document.getElementById('mute-banner');
+            const left = mutedUntil - Date.now();
+            if (left <= 0) {
+                mutedUntil = 0;
+                b.style.display = 'none';
+                clearInterval(muteTimer);
+                return;
+            }
+            const m = Math.floor(left / 60000);
+            const s = Math.floor((left % 60000) / 1000);
+            b.textContent = '🔇 発言が禁止されています（残り ' + m + ':' + String(s).padStart(2, '0') + '）';
+            b.style.display = 'block';
+        }
+
+        /* =========================================================
+           認証・管理者ツール
+           ========================================================= */
+        function openPassModal() {
+            document.getElementById('pass-modal').classList.add('show');
+            const inp = document.getElementById('pass-input');
+            inp.value = '';
+            document.getElementById('pass-err').textContent = '';
+            setTimeout(() => inp.focus(), 60);
+        }
+
+        function closePassModal() {
+            document.getElementById('pass-modal').classList.remove('show');
+        }
+
+        function checkPassword() {
+            const inp = document.getElementById('pass-input');
+            const err = document.getElementById('pass-err');
+            const box = document.getElementById('pass-box');
+
+            if (inp.value === 'Riddler1239') {
+                closePassModal();
+                enableDevMode();
+            } else {
+                err.textContent = 'パスワードが正しくありません';
+                box.classList.remove('shake');
+                void box.offsetWidth;      // 連続クリックでも再アニメーション
+                box.classList.add('shake');
+                inp.value = '';
+                inp.focus();
+            }
+        }
+
+        function enableDevMode() {
+            devMode = true;
+            document.getElementById('dev-panel').style.display = 'block';
+            document.getElementById('dev-badge').style.display = 'inline-block';
+            renderMembers();
+            addSystemLog('管理者ツールが有効になりました');
+        }
+
+        function disableDevMode() {
+            devMode = false;
+            document.getElementById('dev-panel').style.display = 'none';
+            document.getElementById('dev-badge').style.display = 'none';
+            renderMembers();
+        }
+
+        function devSelected() {
+            const r = document.querySelector('input[name="dev-target"]:checked');
+            return r ? r.value : null;
+        }
+
+        function renderDevMembers() {
+            const wrap = document.getElementById('dev-member-list');
+            wrap.textContent = '';
+
+            let n = 0;
+            for (const [id, m] of members) {
+                if (id === myId) continue;
+                n++;
+                const row = document.createElement('label');
+                row.className = 'dev-row';
+
+                const r = document.createElement('input');
+                r.type = 'radio';
+                r.name = 'dev-target';
+                r.value = id;
+                if (n === 1) r.checked = true;
+
+                const nm = document.createElement('span');
+                nm.className = 'dn';
+                nm.textContent = locIcon(m.location) + ' ' + m.name;
+
+                row.appendChild(r);
+                row.appendChild(nm);
+                wrap.appendChild(row);
+            }
+
+            if (n === 0) {
+                const p = document.createElement('div');
+                p.className = 'log-empty';
+                p.textContent = '対象者がいません';
+                wrap.appendChild(p);
+            }
+        }
+
+        function devKick() {
+            const id = devSelected();
+            if (!id) { alert('対象者を選択してください。'); return; }
+            const m = members.get(id);
+            if (!confirm((m ? m.name : 'このメンバー') + ' を退場させますか？')) return;
+            sendRaw({
+                id: uid(), kind: 'kick', sender: myName, senderId: myId,
+                location: userLoc, time: nowTime(), targetId: id
+            });
+        }
+
+        function devMute() {
+            const id = devSelected();
+            if (!id) { alert('対象者を選択してください。'); return; }
+            const min = parseInt(document.getElementById('dev-mute-min').value, 10) || 5;
+            sendRaw({
+                id: uid(), kind: 'mute', sender: myName, senderId: myId,
+                location: userLoc, time: nowTime(), targetId: id,
+                until: Date.now() + min * 60000, minutes: min
+            });
+            const m = members.get(id);
+            addSystemLog((m ? m.name : 'メンバー') + ' を ' + min + ' 分間の発言禁止にしました');
+        }
+
+        function devUnmute() {
+            const id = devSelected();
+            if (!id) { alert('対象者を選択してください。'); return; }
+            sendRaw({
+                id: uid(), kind: 'unmute', sender: myName, senderId: myId,
+                location: userLoc, time: nowTime(), targetId: id
+            });
+            const m = members.get(id);
+            addSystemLog((m ? m.name : 'メンバー') + ' の発言禁止を解除しました');
         }
 
         /* =========================================================
@@ -1150,14 +1752,21 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         function leaveRoom() {
             if (!confirm('スライドを退出しますか？')) return;
             sendRaw({ id: uid(), kind: 'bye', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+            setTimeout(cleanupAndReload, 200);
+        }
 
-            setTimeout(() => {
-                try { if (mqttClient) mqttClient.end(true); } catch (e) { }
-                try { if (ws) ws.close(); } catch (e) { }
-                try { if (bc) bc.close(); } catch (e) { }
-                clearInterval(pingTimer);
-                location.reload();
-            }, 200);
+        // 追い出されたとき用（確認なし）
+        function forceLeave() {
+            cleanupAndReload();
+        }
+
+        function cleanupAndReload() {
+            try { if (mqttClient) mqttClient.end(true); } catch (e) { }
+            try { if (ws) ws.close(); } catch (e) { }
+            try { if (bc) bc.close(); } catch (e) { }
+            clearInterval(pingTimer);
+            clearInterval(muteTimer);
+            location.reload();
         }
 
         // タブを閉じる・リロードするときも退出を通知
@@ -1170,6 +1779,18 @@ server.listen(process.env.PORT || 8080, () =&gt; {
            ========================================================= */
         (function init() {
             updateTransportUI();
+
+            // 隠し認証入口（UI上は何の変哲もないアイコン）
+            document.getElementById('secret-trigger').addEventListener('click', openPassModal);
+
+            const passInput = document.getElementById('pass-input');
+            passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPassword(); });
+            document.getElementById('pass-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'pass-modal') closePassModal();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePassModal();
+            });
 
             // URLに ?room=xxxx があれば自動入力
             const params = new URLSearchParams(location.search);
@@ -1190,5 +1811,5 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         })();
     </script>
 
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4739e427a50b740',t:'MTc5MTQ0NjQ5Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
