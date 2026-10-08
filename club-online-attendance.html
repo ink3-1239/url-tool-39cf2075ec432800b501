@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <!-- Standalone GitHub Pages build converted from the Arena app. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>部活オンライン出席スライド</title>
@@ -27,28 +28,36 @@
             font-family: sans-serif;
             background-color: #f1f3f4;
             margin: 0;
-            padding: 0;
+            padding: 16px 0;
+            box-sizing: border-box;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
+            overflow-y: auto;
         }
         #home-screen {
             background: white;
-            padding: 30px;
+            padding: 24px 26px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             width: 350px;
             max-width: calc(100vw - 32px);
             text-align: center;
+            margin: auto;             /* 縦中央寄せ・はみ出しても上から読める */
+            box-sizing: border-box;
         }
         #home-screen h1 {
             color: #3c4043;
-            font-size: 22px;
-            margin-bottom: 20px;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        .home-block {
+            border-top: 1px solid #f1f3f4;
+            padding-top: 12px;
         }
         .input-group {
-            margin-bottom: 15px;
+            margin-bottom: 13px;
             text-align: left;
         }
         .input-group label {
@@ -90,8 +99,9 @@
         .btn-row {
             display: flex;
             gap: 10px;
-            margin-top: 15px;
+            margin-top: 12px;
         }
+        #transport-label { font-weight: normal; }
         button {
             background-color: var(--primary-color);
             color: #fff;
@@ -506,8 +516,16 @@
         }
         #dev-panel {
             display: none;
+            position: fixed;
+            left: 16px;
+            bottom: 16px;
+            width: 252px;
+            max-height: 72vh;
+            overflow-y: auto;
+            z-index: 50;
             border-color: #202124 !important;
-            background: #f1f3f4 !important;
+            background: #fff !important;
+            box-shadow: 0 6px 26px rgba(0,0,0,.3);
         }
         #dev-panel h4 { border-bottom-color: #202124 !important; }
         .dev-row {
@@ -605,6 +623,191 @@
             -webkit-user-select: none;
         }
 
+        /* =========================================
+           入室禁止（BAN）画面
+           ========================================= */
+        #ban-screen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #202124;
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        #ban-screen.show { display: flex; }
+        #ban-screen .inner { max-width: 420px; }
+        #ban-screen .big { font-size: 48px; margin-bottom: 14px; }
+        #ban-screen h2 { color: #fff; font-size: 20px; margin: 0 0 12px; }
+        #ban-screen p { color: #9aa0a6; font-size: 13px; line-height: 1.8; margin: 0; }
+        #ban-timer {
+            font-size: 34px;
+            font-weight: bold;
+            color: #ea4335;
+            margin: 18px 0 24px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 2px;
+        }
+        #ban-screen button { width: auto; padding: 11px 26px; }
+
+        /* =========================================
+           音声通話モード
+           ========================================= */
+        .voice-workspace {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+            background: #202124;
+        }
+        .voice-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .voice-stage {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+            gap: 14px;
+            padding: 20px;
+            overflow-y: auto;
+            align-content: start;
+            box-sizing: border-box;
+        }
+        .voice-card {
+            background: #292a2d;
+            border: 2px solid #3c4043;
+            border-radius: 12px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            transition: border-color .12s, box-shadow .12s;
+            min-width: 0;
+        }
+        .voice-card.speaking {
+            border-color: #34a853;
+            box-shadow: 0 0 0 3px rgba(52, 168, 83, .35);
+        }
+        .voice-card.me { background: #2f2b1c; }
+        .voice-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #3c4043;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 25px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .voice-card.speaking .voice-avatar { background: #34a853; }
+        .voice-card-name {
+            color: #e8eaed;
+            font-size: 13px;
+            font-weight: bold;
+            max-width: 92%;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .voice-icons { display: flex; gap: 7px; font-size: 14px; min-height: 18px; }
+        .voice-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: #5f6368;
+            font-size: 14px;
+            padding: 50px 0;
+        }
+        .voice-bar {
+            background: #292a2d;
+            border-top: 1px solid #3c4043;
+            padding: 12px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        .voice-bar button {
+            width: auto;
+            min-width: 132px;
+            padding: 11px 16px;
+            font-size: 13px;
+            border-radius: 22px;
+            background: #3c4043;
+            color: #e8eaed;
+        }
+        .voice-bar button:hover { background: #4a4d51; }
+        .voice-bar button.off { background: #ea4335; color: #fff; }
+        .voice-bar button.off:hover { background: #d33426; }
+        .voice-side {
+            width: 232px;
+            background: #292a2d;
+            border-left: 1px solid #3c4043;
+            padding: 14px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .voice-side h4 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            color: #e8eaed;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 5px;
+        }
+        .voice-member {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #e8eaed;
+        }
+        .voice-member.speaking { background: rgba(52, 168, 83, .16); }
+        .voice-member .vd {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #5f6368;
+            flex-shrink: 0;
+        }
+        .voice-member.speaking .vd { background: #34a853; }
+        .voice-member .vn {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .voice-member .vi { font-size: 12px; }
+        @media (max-width: 880px) {
+            .voice-workspace { flex-direction: column; }
+            .voice-side {
+                width: 100%;
+                max-height: 30vh;
+                border-left: none;
+                border-top: 1px solid #3c4043;
+            }
+            .voice-stage {
+                grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+                padding: 12px;
+                gap: 10px;
+            }
+            .voice-avatar { width: 44px; height: 44px; font-size: 19px; }
+            .voice-card-name { font-size: 11px; }
+        }
+
         /* --- レスポンシブ（スマホ対応） --- */
         @media (max-width: 880px) {
             .workspace { flex-direction: column-reverse; }
@@ -631,7 +834,7 @@
             .slot-name { font-size: 10px; }
             .slot-body { font-size: 11px; }
             .slot-body img { max-height: 40px; }
-            #dev-panel { flex: 1 1 100%; }
+            #dev-panel { flex: 1 1 100%; width: calc(100vw - 32px); }
         }
     </style>
 </head>
@@ -660,8 +863,8 @@
             <div class="conn-note">※同じIDのメンバーと同じスライドを共有します</div>
         </div>
 
-        <div class="input-group">
-            <label for="transport-select">接続方法</label>
+        <div class="input-group home-block">
+            <label for="transport-select">🌐 インターネット接続（どれを使うか）</label>
             <select id="transport-select" onchange="updateTransportUI()">
                 <option value="mqtt" selected>🌐 かんたんオンライン（サーバー不要・推奨）</option>
                 <option value="ws">🖥️ 自分のWebSocketサーバー</option>
@@ -675,18 +878,27 @@
             </div>
         </div>
 
-        <div class="input-group">
-            <label>スライドの表示モード</label>
+        <div class="input-group home-block">
+            <label>📦 部屋のモード</label>
+            <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="room-mode" value="slide" checked onchange="updateHomeModeUI()"> 📊 リアルタイムスライド</label>
+                <label class="radio-label"><input type="radio" name="room-mode" value="voice" onchange="updateHomeModeUI()"> 🎧 音声通話</label>
+            </div>
+            <div class="conn-note">ルームIDとモードの両方が一致するメンバーと同じ部屋に入ります。</div>
+        </div>
+
+        <div class="input-group home-block" id="display-mode-group">
+            <label>🖼 スライドの表示モード</label>
             <div class="radio-group">
                 <label class="radio-label"><input type="radio" name="display-mode" value="latest" checked> 🖼 最新のみ表示</label>
                 <label class="radio-label"><input type="radio" name="display-mode" value="slot"> 👥 1人1枠</label>
             </div>
-            <div class="conn-note">「1人1枠」にすると、メンバー全員ぶんの枠が並び、各自の最新投稿が枠ごとに表示されます（切り替えは全員に反映されます）。</div>
+            <div class="conn-note">「1人1枠」にすると、メンバー全員ぶんの枠が並び、各自の最新投稿が枠ごとに表示されます（この切替はあなたの画面だけに適用されます）。</div>
         </div>
 
         <div class="btn-row">
             <button type="button" class="btn-secondary" onclick="generateRoomID()">IDを自動生成</button>
-            <button type="button" onclick="joinRoom()">スライドに入る</button>
+            <button type="button" id="join-btn" onclick="joinRoom()">スライドに入る</button>
         </div>
         <div class="btn-row">
             <button type="button" class="btn-link btn-mini" onclick="copyInviteLink()">🔗 招待URLをコピー</button>
@@ -755,6 +967,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 <span class="status-dot" id="status-dot"></span>
                 <span id="display-room-id">--</span>
                 <span class="conn-text" id="conn-text">接続中...</span>
+                <span class="conn-text" id="transport-label"></span>
                 <span>｜</span>
                 <span id="display-user-name">--</span>
                 <button type="button" id="mode-btn" class="btn-link btn-mini" onclick="toggleDisplayMode()">👥 1人1枠に切替</button>
@@ -762,7 +975,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             </div>
         </div>
 
-        <div class="workspace">
+        <div class="workspace" id="slide-workspace">
             <div class="controls-panel">
 
                 <div class="control-section">
@@ -789,26 +1002,6 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 <div class="control-section">
                     <h4>🎤 ボイスメッセージ</h4>
                     <button id="record-btn" class="ctrl-btn" style="background:#ea4335;" onclick="toggleRecording()">録音スタート</button>
-                </div>
-
-                <div class="control-section" id="dev-panel">
-                    <h4>🛠 管理者ツール</h4>
-                    <div id="dev-member-list"></div>
-                    <select id="dev-mute-min">
-                        <option value="1">1分</option>
-                        <option value="5" selected>5分</option>
-                        <option value="10">10分</option>
-                        <option value="30">30分</option>
-                        <option value="60">60分</option>
-                    </select>
-                    <div class="dev-actions">
-                        <button type="button" class="dev-kick" onclick="devKick()">追い出す</button>
-                        <button type="button" class="dev-mute" onclick="devMute()">発言禁止</button>
-                    </div>
-                    <div class="dev-actions">
-                        <button type="button" class="dev-mute" onclick="devUnmute()">禁止を解除</button>
-                        <button type="button" class="dev-off" onclick="disableDevMode()">OFF</button>
-                    </div>
                 </div>
 
                 <div class="control-section">
@@ -841,6 +1034,66 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- 音声通話モード -->
+        <div class="voice-workspace" id="voice-workspace">
+            <div class="voice-main">
+                <div class="voice-stage" id="voice-stage"></div>
+                <div class="voice-bar">
+                    <button type="button" id="mic-btn" onclick="toggleMic()">🎙 マイク ON</button>
+                    <button type="button" id="deafen-btn" onclick="toggleDeafen()">🎧 スピーカー ON</button>
+                    <button type="button" class="leave" onclick="leaveRoom()">🚪 切断</button>
+                </div>
+            </div>
+            <div class="voice-side">
+                <h4>参加者（<span id="voice-count">0</span>）</h4>
+                <div id="voice-members"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理者ツール（どのモードでも使える浮動パネル） -->
+    <div class="control-section" id="dev-panel">
+        <h4>🛠 管理者ツール</h4>
+        <div id="dev-member-list"></div>
+        <div class="dev-actions">
+            <button type="button" class="dev-kick" onclick="devKick()">入室禁止</button>
+            <button type="button" class="dev-mute" onclick="devMute()">発言禁止</button>
+        </div>
+        <select id="dev-ban-min">
+            <option value="1">禁止 1分</option>
+            <option value="5" selected>禁止 5分</option>
+            <option value="10">禁止 10分</option>
+            <option value="30">禁止 30分</option>
+            <option value="60">禁止 60分</option>
+            <option value="0">無期限</option>
+        </select>
+        <select id="dev-mute-min">
+            <option value="1">ミュート 1分</option>
+            <option value="5" selected>ミュート 5分</option>
+            <option value="10">ミュート 10分</option>
+            <option value="30">ミュート 30分</option>
+            <option value="60">ミュート 60分</option>
+        </select>
+        <div class="dev-actions">
+            <button type="button" class="dev-mute" onclick="devUnmute()">ミュート解除</button>
+            <button type="button" class="dev-mute" onclick="devUnbanSelected()">BAN解除</button>
+        </div>
+        <div class="dev-actions">
+            <button type="button" class="dev-off" onclick="disableDevMode()">OFF</button>
+        </div>
+        <div class="conn-note" id="dev-ban-list">BAN中のユーザー: なし</div>
+    </div>
+
+    <!-- 入室禁止画面 -->
+    <div id="ban-screen">
+        <div class="inner">
+            <div class="big">⛔</div>
+            <h2>この部屋への入室が禁止されています</h2>
+            <p>管理者によってブロックされました。<br>時間が経つまで再度入室することはできません。</p>
+            <div id="ban-timer">0:00</div>
+            <button type="button" class="btn-secondary" onclick="backFromBan()">ホームに戻る</button>
         </div>
     </div>
 
@@ -881,6 +1134,34 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         let mutedUntil = 0;
         let muteTimer = null;
 
+        // 部屋のモード（'slide' / 'voice'）
+        let roomMode = 'slide';
+
+        // ブラウザ単位で永続なID（BAN判定用・リロードしても変わらない）
+        const myDevId = (function () {
+            try {
+                let v = localStorage.getItem('bukatsu-devid');
+                if (!v) {
+                    v = 'd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+                    localStorage.setItem('bukatsu-devid', v);
+                }
+                return v;
+            } catch (e) {
+                return 'd-' + Math.random().toString(36).slice(2, 12);
+            }
+        })();
+
+        let bans = new Map();             // devId -> {name, until}（開発者側のBANリスト）
+        let bannedUntil = 0;              // 自分がBANされている時刻
+        let banTimer = null;
+
+        // 音声通話
+        let localStream = null, audioCtx = null, localAnalyser = null;
+        let micOn = true, deafOn = false;
+        let peers = new Map();            // senderId -> {pc, name, devId, audioEl, offered}
+        let speakingStates = new Map();   // senderId -> bool
+        let speakingLoop = null;
+
         /* =========================================================
            ユーティリティ
            ========================================================= */
@@ -888,7 +1169,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         function nowTime() { return new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }); }
         function locLabel(l) { return l === 'home' ? '自宅' : '部室'; }
         function locIcon(l) { return l === 'home' ? '🏠' : '🏫'; }
-        function topicName() { return 'bukatsu-slide/' + roomID; }
+        function topicName() { return 'bukatsu-' + roomMode + '/' + roomID; }
 
         function setStatus(state, text) {
             const dot = document.getElementById('status-dot');
@@ -921,6 +1202,13 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             }
         }
 
+        function updateHomeModeUI() {
+            const isVoice = document.querySelector('input[name="room-mode"]:checked').value === 'voice';
+            // 音声通話モードではスライド関連の設定欄を出さない
+            document.getElementById('display-mode-group').style.display = isVoice ? 'none' : 'block';
+            document.getElementById('join-btn').textContent = isVoice ? '🎧 音声通話に入る' : 'スライドに入る';
+        }
+
         function copyInviteLink() {
             // 空なら先にIDを発行してから読み直す
             if (!document.getElementById('room-id').value.trim()) generateRoomID();
@@ -939,10 +1227,15 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             roomID = document.getElementById('room-id').value.trim();
             userLoc = document.querySelector('input[name="user-location"]:checked').value;
             transport = document.getElementById('transport-select').value;
+            roomMode = document.querySelector('input[name="room-mode"]:checked').value;
             wsUrl = document.getElementById('ws-url').value.trim();
 
             if (!myName) { alert('あなたの名前を入力してください。'); return; }
             if (!roomID) { alert('ルームIDを入力してください（自動生成もできます）。'); return; }
+
+            // BAN判定（ローカル保存・リロードしても回避不可）
+            loadBan();
+            if (bannedUntil > Date.now()) { showBanScreen(); return; }
             if (transport === 'ws' && !/^wss?:\/\//.test(wsUrl)) {
                 alert('WebSocketサーバーのURLを wss:// または ws:// から入力してください。');
                 return;
@@ -959,13 +1252,20 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             } catch (e) { /* 無視 */ }
 
             document.getElementById('home-screen').style.display = 'none';
+            document.getElementById('ban-screen').classList.remove('show');
             document.getElementById('app-screen').style.display = 'flex';
             document.getElementById('display-room-id').textContent = 'ルーム: ' + roomID;
             document.getElementById('display-user-name').textContent = myName + ' (' + locLabel(userLoc) + ')';
 
+            // モードに応じて表示を切り替え
+            const isVoice = (roomMode === 'voice');
+            document.getElementById('slide-workspace').style.display = isVoice ? 'none' : 'flex';
+            document.getElementById('voice-workspace').style.display = isVoice ? 'flex' : 'none';
+            document.getElementById('mode-btn').style.display = isVoice ? 'none' : 'inline-block';
+
             seenIds = new Set();
             members = new Map();
-            members.set(myId, { name: myName, location: userLoc, lastSeen: Date.now(), me: true });
+            members.set(myId, { name: myName, location: userLoc, lastSeen: Date.now(), me: true, devId: myDevId });
             oneSlotMode = document.querySelector('input[name="display-mode"]:checked').value === 'slot';
             userContent = new Map();
             mutedUntil = 0;
@@ -974,8 +1274,12 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             updateModeButton();
 
             setStatus('connecting', '接続中...');
+            const tLabel = { mqtt: '🌐 かんたんオンライン', ws: '🖥️ 自前サーバー', local: '💻 タブ間同期' };
+            document.getElementById('transport-label').textContent = '［' + (tLabel[transport] || transport) + '］';
+
             initCanvas();
             connectTransport();
+            if (isVoice) startVoice();
 
             // 定型文入力はEnterで送信
             document.getElementById('text-input').onkeydown = (e) => {
@@ -994,7 +1298,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             // 生存確認（離席メンバーの整理＋接続維持）
             clearInterval(pingTimer);
             pingTimer = setInterval(() => {
-                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, devId: myDevId, location: userLoc, time: nowTime() });
                 pruneMembers();
             }, 20000);
         }
@@ -1056,7 +1360,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 bc = new BroadcastChannel('bukatsu-slide-' + roomID);
                 bc.onmessage = (e) => onIncoming(e.data);
                 setStatus('online', 'タブ間同期中');
-                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, devId: myDevId, location: userLoc, time: nowTime() });
             } catch (e) {
                 setStatus('offline', 'このブラウザは非対応です');
             }
@@ -1100,35 +1404,28 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 if (members.has(msg.senderId)) {
                     members.delete(msg.senderId);
                     userContent.delete(msg.senderId);
+                    speakingStates.delete(msg.senderId);
                     renderMembers();
-                    addSystemLog(msg.sender + ' が退出しました');
+                    if (roomMode === 'voice') { removePeer(msg.senderId); renderVoiceUI(); }
+                    if (roomMode === 'slide') addSystemLog(msg.sender + ' が退出しました');
                 }
                 return;
             }
 
-            // 表示モードの切替（全員に反映）
-            if (msg.kind === 'mode') {
-                if (msg.senderId !== myId && typeof msg.slot === 'boolean') {
-                    oneSlotMode = msg.slot;
-                    syncModeRadios();
-                    updateModeButton();
-                    if (oneSlotMode) rerenderAllAreas(); else renderLatestFallback();
-                    addSystemLog('表示モードが「' + (oneSlotMode ? '1人1枠' : '最新のみ') + '」に切り替わりました');
-                }
-                return;
-            }
-
-            // 追い出す
-            if (msg.kind === 'kick') {
-                if (members.has(msg.targetId)) {
-                    members.delete(msg.targetId);
-                    userContent.delete(msg.targetId);
-                    renderMembers();
-                }
-                if (msg.targetId === myId) {
-                    alert('管理者により退出させられました。');
+            // 入室禁止（BAN）
+            if (msg.kind === 'ban') {
+                if (msg.targetDevId === myDevId || msg.targetId === myId) {
+                    bannedUntil = msg.until || (Date.now() + 5 * 60000);
+                    saveBan();
+                    showBanScreen();
                     forceLeave();
                 }
+                return;
+            }
+
+            // 音声通話のシグナリング
+            if (msg.kind === 'signal') {
+                handleSignal(msg);
                 return;
             }
 
@@ -1137,7 +1434,6 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 if (msg.targetId === myId) {
                     mutedUntil = msg.until || (Date.now() + 5 * 60000);
                     startMuteTimer();
-                    alert((msg.minutes || '') + '分間、発言が禁止されました。');
                 }
                 return;
             }
@@ -1149,18 +1445,45 @@ server.listen(process.env.PORT || 8080, () =&gt; {
                 return;
             }
 
+            // 発話状態（音声通話）
+            if (msg.kind === 'speaking') {
+                speakingStates.set(msg.senderId, !!msg.on);
+                if (roomMode === 'voice') renderVoiceUI();
+                return;
+            }
+
             // 在席管理
             const isNew = !members.has(msg.senderId);
             members.set(msg.senderId, {
                 name: msg.sender,
                 location: msg.location,
-                lastSeen: Date.now()
+                lastSeen: Date.now(),
+                devId: msg.devId
             });
+
+            // BANリストに居たら即ブロック（入り直し対策）
+            if (bans.has(msg.devId)) {
+                const b = bans.get(msg.devId);
+                if (b.until > Date.now()) {
+                    sendRaw({
+                        id: uid(), kind: 'ban', sender: myName, senderId: myId, devId: myDevId,
+                        location: userLoc, time: nowTime(),
+                        targetId: msg.senderId, targetDevId: msg.devId,
+                        until: b.until, minutes: Math.max(1, Math.round((b.until - Date.now()) / 60000))
+                    });
+                } else {
+                    bans.delete(msg.devId);
+                    saveBans();
+                }
+            }
+
             if (isNew && msg.senderId !== myId) {
                 renderMembers();
-                addSystemLog(msg.sender + ' が参加しました');
+                if (roomMode === 'slide') addSystemLog(msg.sender + ' が参加しました');
+                // 音声通話：接続を張る
+                if (roomMode === 'voice' && localStream) ensurePeer(msg.senderId, msg.sender, msg.devId);
                 // 自分を知らせ返す（初回だけ）
-                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+                sendRaw({ id: uid(), kind: 'hello', sender: myName, senderId: myId, devId: myDevId, location: userLoc, time: nowTime() });
             }
 
             if (msg.kind === 'content') {
@@ -1174,7 +1497,12 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             let changed = false;
             for (const [id, m] of members) {
                 if (id === myId) continue;
-                if (now - m.lastSeen > 60000) { members.delete(id); userContent.delete(id); changed = true; }
+                if (now - m.lastSeen > 60000) {
+                    members.delete(id);
+                    userContent.delete(id);
+                    speakingStates.delete(id);
+                    changed = true;
+                }
             }
             if (changed) renderMembers();
         }
@@ -1183,11 +1511,21 @@ server.listen(process.env.PORT || 8080, () =&gt; {
            各コンテンツの送信
            ========================================================= */
         function dispatchPayload(type, payload) {
+            // 発言禁止チェック（全送信経路の共通ポイント）
+            if (Date.now() < mutedUntil) {
+                const left = mutedUntil - Date.now();
+                const m = Math.floor(left / 60000);
+                const s = Math.floor((left % 60000) / 1000);
+                alert('🔇 発言が禁止されています。（残り ' + m + ':' + String(s).padStart(2, '0') + '）');
+                return;
+            }
+
             const msg = {
                 id: uid(),
                 kind: 'content',
                 sender: myName,
                 senderId: myId,
+                devId: myDevId,
                 location: userLoc,
                 time: nowTime(),
                 t: Date.now(),
@@ -1202,15 +1540,6 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         }
 
         function sendSlideData(type) {
-            // 発言禁止チェック
-            if (Date.now() < mutedUntil) {
-                const left = mutedUntil - Date.now();
-                const m = Math.floor(left / 60000);
-                const s = Math.floor((left % 60000) / 1000);
-                alert('🔇 発言が禁止されています。（残り ' + m + ':' + String(s).padStart(2, '0') + '）');
-                return;
-            }
-
             let payload = "";
 
             if (type === 'text') {
@@ -1507,7 +1836,8 @@ server.listen(process.env.PORT || 8080, () =&gt; {
            表示モード切替
            ========================================================= */
         function toggleDisplayMode() {
-            setDisplayMode(!oneSlotMode, true);
+            // 表示モードは個人設定（他の人には影響しない）
+            setDisplayMode(!oneSlotMode, false);
         }
 
         function setDisplayMode(slot, broadcast) {
@@ -1536,6 +1866,281 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             const b = document.getElementById('mode-btn');
             if (!b) return;
             b.textContent = oneSlotMode ? '🖼 最新のみに切替' : '👥 1人1枠に切替';
+        }
+
+        /* =========================================================
+           音声通話モード（WebRTC メッシュ + MQTT/WS シグナリング）
+           ========================================================= */
+        const RTC_CONFIG = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        async function startVoice() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+            } catch (e) {
+                alert('マイクを取得できませんでした。\nHTTPSで開いているか、マイクの許可を確認してください。');
+                setStatus('offline', 'マイク不可');
+                return;
+            }
+
+            // 自分の声の大きさを測る（発話検知）
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
+                const src = audioCtx.createMediaStreamSource(localStream);
+                localAnalyser = audioCtx.createAnalyser();
+                localAnalyser.fftSize = 512;
+                src.connect(localAnalyser);
+            } catch (e) { audioCtx = null; }
+
+            micOn = true;
+            deafOn = false;
+            updateVoiceButtons();
+            renderVoiceUI();
+            startSpeakingLoop();
+        }
+
+        function stopVoice() {
+            clearInterval(speakingLoop);
+            speakingLoop = null;
+            for (const id of [...peers.keys()]) removePeer(id);
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            localAnalyser = null;
+            if (audioCtx) { try { audioCtx.close(); } catch (e) { } audioCtx = null; }
+        }
+
+        //  Offer を出す側をIDで決めて打ち合いを防ぐ
+        function shouldInitiate(otherId) { return myId < otherId; }
+
+        function ensurePeer(id, name, devId) {
+            let p = peers.get(id);
+
+            if (!p) {
+                const pc = new RTCPeerConnection(RTC_CONFIG);
+                p = { pc: pc, name: name, devId: devId, audioEl: null, offered: false };
+
+                if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+                pc.ontrack = (e) => {
+                    if (!p.audioEl) {
+                        p.audioEl = new Audio();
+                        p.audioEl.autoplay = true;
+                    }
+                    p.audioEl.srcObject = e.streams[0];
+                    p.audioEl.muted = deafOn;
+                    p.audioEl.play().catch(() => { });
+                };
+
+                pc.onicecandidate = (e) => {
+                    if (!e.candidate) return;
+                    sendRaw({
+                        id: uid(), kind: 'signal', sub: 'ice', from: myId, to: id, devId: myDevId,
+                        sender: myName, location: userLoc, time: nowTime(),
+                        candidate: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate
+                    });
+                };
+
+                pc.onconnectionstatechange = () => {
+                    if (pc.connectionState === 'failed' || pc.connectionState === 'closed') removePeer(id);
+                };
+
+                peers.set(id, p);
+                renderVoiceUI();
+            } else {
+                if (name) p.name = name;
+                if (devId) p.devId = devId;
+            }
+
+            if (!p.offered && shouldInitiate(id)) {
+                p.offered = true;
+                p.pc.createOffer()
+                    .then(o => p.pc.setLocalDescription(o))
+                    .then(() => {
+                        sendRaw({
+                            id: uid(), kind: 'signal', sub: 'offer', from: myId, to: id, devId: myDevId,
+                            sender: myName, location: userLoc, time: nowTime(), sdp: p.pc.localDescription
+                        });
+                    })
+                    .catch(err => console.warn('offer error', err));
+            }
+            return p;
+        }
+
+        function removePeer(id) {
+            const p = peers.get(id);
+            if (!p) return;
+            try { p.pc.close(); } catch (e) { }
+            if (p.audioEl) { try { p.audioEl.srcObject = null; } catch (e) { } }
+            peers.delete(id);
+            renderVoiceUI();
+        }
+
+        function handleSignal(msg) {
+            if (!msg.to || msg.to !== myId) return;   // 自分宛だけ処理
+            if (!localStream) return;
+
+            if (msg.sub === 'offer') {
+                const p = ensurePeer(msg.from, msg.sender, msg.devId);
+                p.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
+                    .then(() => p.pc.createAnswer())
+                    .then(a => p.pc.setLocalDescription(a))
+                    .then(() => {
+                        sendRaw({
+                            id: uid(), kind: 'signal', sub: 'answer', from: myId, to: msg.from, devId: myDevId,
+                            sender: myName, location: userLoc, time: nowTime(), sdp: p.pc.localDescription
+                        });
+                    })
+                    .catch(err => console.warn('answer error', err));
+            } else if (msg.sub === 'answer') {
+                const p = peers.get(msg.from);
+                if (p && p.pc.signalingState === 'have-local-offer') {
+                    p.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(err => console.warn(err));
+                }
+            } else if (msg.sub === 'ice') {
+                const p = peers.get(msg.from);
+                if (p && msg.candidate) {
+                    p.pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(err => console.warn(err));
+                }
+            }
+        }
+
+        /* --- マイク・スピーカー --- */
+        function toggleMic() {
+            if (Date.now() < mutedUntil) {
+                alert('発言が禁止されているためマイクをONにできません。');
+                updateVoiceButtons();
+                return;
+            }
+            micOn = !micOn;
+            if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+            updateVoiceButtons();
+        }
+
+        function toggleDeafen() {
+            deafOn = !deafOn;
+            for (const p of peers.values()) {
+                if (p.audioEl) p.audioEl.muted = deafOn;
+            }
+            updateVoiceButtons();
+        }
+
+        function updateVoiceButtons() {
+            const mb = document.getElementById('mic-btn');
+            const db = document.getElementById('deafen-btn');
+            if (mb) {
+                mb.textContent = micOn ? '🎙 マイク ON' : '🔇 マイク OFF';
+                mb.classList.toggle('off', !micOn);
+            }
+            if (db) {
+                db.textContent = deafOn ? '🔈 スピーカー OFF' : '🎧 スピーカー ON';
+                db.classList.toggle('off', deafOn);
+            }
+        }
+
+        /* --- 発話検知 --- */
+        function getVolume(an) {
+            const buf = new Uint8Array(an.fftSize);
+            an.getByteTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) {
+                const v = (buf[i] - 128) / 128;
+                sum += v * v;
+            }
+            return Math.sqrt(sum / buf.length);
+        }
+
+        function startSpeakingLoop() {
+            clearInterval(speakingLoop);
+            speakingLoop = setInterval(() => {
+                if (!localAnalyser || !micOn) { setSpeaking(myId, false); return; }
+                setSpeaking(myId, getVolume(localAnalyser) > 0.055);
+            }, 160);
+        }
+
+        function setSpeaking(id, on) {
+            if (speakingStates.get(id) === on) return;
+            speakingStates.set(id, on);
+            if (id === myId) {
+                sendRaw({
+                    id: uid(), kind: 'speaking', sender: myName, senderId: myId, devId: myDevId,
+                    location: userLoc, time: nowTime(), on: on
+                });
+            }
+            renderVoiceUI();
+        }
+
+        /* --- 描画 --- */
+        function renderVoiceUI() {
+            if (roomMode !== 'voice') return;
+            const stage = document.getElementById('voice-stage');
+            const list = document.getElementById('voice-members');
+            if (!stage || !list) return;
+
+            stage.textContent = '';
+            list.textContent = '';
+
+            const ids = [myId];
+            for (const id of members.keys()) if (id !== myId) ids.push(id);
+            document.getElementById('voice-count').textContent = ids.length;
+
+            ids.forEach((id) => {
+                const m = members.get(id) || { name: myName, location: userLoc };
+                const isMe = (id === myId);
+                const sp = !!speakingStates.get(id);
+
+                // カード
+                const card = document.createElement('div');
+                card.className = 'voice-card' + (isMe ? ' me' : '') + (sp ? ' speaking' : '');
+
+                const av = document.createElement('div');
+                av.className = 'voice-avatar';
+                av.textContent = (m.name || '?').slice(0, 1);
+                card.appendChild(av);
+
+                const nm = document.createElement('div');
+                nm.className = 'voice-card-name';
+                nm.textContent = (isMe ? '★ ' : '') + m.name + (isMe ? '（あなた）' : '');
+                card.appendChild(nm);
+
+                const ic = document.createElement('div');
+                ic.className = 'voice-icons';
+                let icons = locIcon(m.location);
+                if (isMe && !micOn) icons += ' 🔇';
+                if (deafOn) icons += ' 🔈';
+                ic.textContent = icons;
+                card.appendChild(ic);
+
+                stage.appendChild(card);
+
+                // サイドの参加者リスト
+                const row = document.createElement('div');
+                row.className = 'voice-member' + (sp ? ' speaking' : '');
+
+                const d = document.createElement('span');
+                d.className = 'vd';
+                row.appendChild(d);
+
+                const vn = document.createElement('span');
+                vn.className = 'vn';
+                vn.textContent = (isMe ? '★ ' : '') + m.name;
+                row.appendChild(vn);
+
+                const vi = document.createElement('span');
+                vi.className = 'vi';
+                vi.textContent = locIcon(m.location) + (isMe && !micOn ? ' 🔇' : '');
+                row.appendChild(vi);
+
+                list.appendChild(row);
+            });
         }
 
         /* =========================================================
@@ -1598,6 +2203,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             document.getElementById('member-count').textContent = '(' + n + '人)';
             if (oneSlotMode) rerenderAllAreas();
             if (devMode) renderDevMembers();
+            if (roomMode === 'voice') renderVoiceUI();
         }
 
         /* =========================================================
@@ -1622,6 +2228,13 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             const s = Math.floor((left % 60000) / 1000);
             b.textContent = '🔇 発言が禁止されています（残り ' + m + ':' + String(s).padStart(2, '0') + '）';
             b.style.display = 'block';
+
+            // 音声通話中はマイクも連動して切る
+            if (roomMode === 'voice' && localStream) {
+                micOn = false;
+                localStream.getAudioTracks().forEach(t => t.enabled = false);
+                updateVoiceButtons();
+            }
         }
 
         /* =========================================================
@@ -1662,7 +2275,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             document.getElementById('dev-panel').style.display = 'block';
             document.getElementById('dev-badge').style.display = 'inline-block';
             renderMembers();
-            addSystemLog('管理者ツールが有効になりました');
+            renderBanList();
         }
 
         function disableDevMode() {
@@ -1715,11 +2328,29 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             const id = devSelected();
             if (!id) { alert('対象者を選択してください。'); return; }
             const m = members.get(id);
-            if (!confirm((m ? m.name : 'このメンバー') + ' を退場させますか？')) return;
+            if (!m) return;
+            const min = parseInt(document.getElementById('dev-ban-min').value, 10) || 0;
+            const until = min > 0 ? Date.now() + min * 60000 : Date.now() + 3650 * 24 * 3600000;
+            const label = min > 0 ? (min + '分間') : '無期限';
+
+            if (!confirm(m.name + ' を退場させ、' + label + '入室禁止にしますか？')) return;
+
+            // 開発者側にも記録（入り直しても即ブロック）
+            bans.set(m.devId, { name: m.name, until: until });
+            saveBans();
+            renderBanList();
+
             sendRaw({
-                id: uid(), kind: 'kick', sender: myName, senderId: myId,
-                location: userLoc, time: nowTime(), targetId: id
+                id: uid(), kind: 'ban', sender: myName, senderId: myId, devId: myDevId,
+                location: userLoc, time: nowTime(),
+                targetId: id, targetDevId: m.devId, until: until, minutes: min
             });
+
+            members.delete(id);
+            userContent.delete(id);
+            speakingStates.delete(id);
+            renderMembers();
+            if (roomMode === 'voice') { removePeer(id); renderVoiceUI(); }
         }
 
         function devMute() {
@@ -1727,7 +2358,7 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             if (!id) { alert('対象者を選択してください。'); return; }
             const min = parseInt(document.getElementById('dev-mute-min').value, 10) || 5;
             sendRaw({
-                id: uid(), kind: 'mute', sender: myName, senderId: myId,
+                id: uid(), kind: 'mute', sender: myName, senderId: myId, devId: myDevId,
                 location: userLoc, time: nowTime(), targetId: id,
                 until: Date.now() + min * 60000, minutes: min
             });
@@ -1739,19 +2370,108 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             const id = devSelected();
             if (!id) { alert('対象者を選択してください。'); return; }
             sendRaw({
-                id: uid(), kind: 'unmute', sender: myName, senderId: myId,
+                id: uid(), kind: 'unmute', sender: myName, senderId: myId, devId: myDevId,
                 location: userLoc, time: nowTime(), targetId: id
             });
+        }
+
+        function devUnbanSelected() {
+            const id = devSelected();
+            if (!id) { alert('対象者を選択してください。'); return; }
             const m = members.get(id);
-            addSystemLog((m ? m.name : 'メンバー') + ' の発言禁止を解除しました');
+            if (m && bans.has(m.devId)) {
+                bans.delete(m.devId);
+                saveBans();
+                renderBanList();
+                alert(m.name + ' の入室禁止を解除しました。');
+            } else {
+                alert('このユーザーはBANされていません。');
+            }
+        }
+
+        function renderBanList() {
+            const el = document.getElementById('dev-ban-list');
+            if (!el) return;
+            const now = Date.now();
+            const alive = [...bans.values()].filter(b => b.until > now);
+            bans = new Map(alive.map(b => [b.devId, b]));
+            saveBans();
+            if (alive.length === 0) {
+                el.textContent = 'BAN中のユーザー: なし';
+                return;
+            }
+            el.textContent = 'BAN中のユーザー: ' + alive.map(b => {
+                const left = b.until - now;
+                return b.name + '（残り ' + Math.ceil(left / 60000) + '分）';
+            }).join(' / ');
+        }
+
+        /* =========================================================
+           BANデータの保存・復元
+           ========================================================= */
+        function loadBans() {
+            try {
+                const arr = JSON.parse(localStorage.getItem('bukatsu-bans') || '[]');
+                bans = new Map();
+                arr.forEach(b => { if (b && b.devId && b.until > Date.now()) bans.set(b.devId, b); });
+            } catch (e) { bans = new Map(); }
+        }
+
+        function saveBans() {
+            try { localStorage.setItem('bukatsu-bans', JSON.stringify([...bans.values()])); } catch (e) { }
+        }
+
+        function loadBan() {
+            try { bannedUntil = parseInt(localStorage.getItem('bukatsu-ban-until') || '0', 10) || 0; } catch (e) { bannedUntil = 0; }
+        }
+
+        function saveBan() {
+            try { localStorage.setItem('bukatsu-ban-until', String(bannedUntil)); } catch (e) { }
+        }
+
+        function showBanScreen() {
+            document.getElementById('home-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('ban-screen').classList.add('show');
+            updateBanScreen();
+            clearInterval(banTimer);
+            banTimer = setInterval(updateBanScreen, 1000);
+        }
+
+        function updateBanScreen() {
+            const left = bannedUntil - Date.now();
+            const el = document.getElementById('ban-timer');
+            if (left <= 0) {
+                bannedUntil = 0;
+                saveBan();
+                clearInterval(banTimer);
+                document.getElementById('ban-screen').classList.remove('show');
+                document.getElementById('home-screen').style.display = 'block';
+                return;
+            }
+            const h = Math.floor(left / 3600000);
+            const m = Math.floor((left % 3600000) / 60000);
+            const s = Math.floor((left % 60000) / 1000);
+            el.textContent = (h > 0 ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(s).padStart(2, '0');
+        }
+
+        function backFromBan() {
+            loadBan();
+            if (bannedUntil > Date.now()) {
+                alert('まだ入室が禁止されています。');
+                return;
+            }
+            clearInterval(banTimer);
+            document.getElementById('ban-screen').classList.remove('show');
+            document.getElementById('home-screen').style.display = 'block';
         }
 
         /* =========================================================
            退出処理
            ========================================================= */
         function leaveRoom() {
-            if (!confirm('スライドを退出しますか？')) return;
-            sendRaw({ id: uid(), kind: 'bye', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+            if (!confirm('退出しますか？')) return;
+            sendRaw({ id: uid(), kind: 'bye', sender: myName, senderId: myId, devId: myDevId, location: userLoc, time: nowTime() });
             setTimeout(cleanupAndReload, 200);
         }
 
@@ -1761,17 +2481,26 @@ server.listen(process.env.PORT || 8080, () =&gt; {
         }
 
         function cleanupAndReload() {
+            // 音声通話を終了
+            stopVoice();
             try { if (mqttClient) mqttClient.end(true); } catch (e) { }
             try { if (ws) ws.close(); } catch (e) { }
             try { if (bc) bc.close(); } catch (e) { }
             clearInterval(pingTimer);
             clearInterval(muteTimer);
+            clearInterval(banTimer);
+            clearInterval(speakingLoop);
+
+            if (bannedUntil > Date.now()) {
+                showBanScreen();
+                return;
+            }
             location.reload();
         }
 
         // タブを閉じる・リロードするときも退出を通知
         window.addEventListener('pagehide', () => {
-            sendRaw({ id: uid(), kind: 'bye', sender: myName, senderId: myId, location: userLoc, time: nowTime() });
+            sendRaw({ id: uid(), kind: 'bye', sender: myName, senderId: myId, devId: myDevId, location: userLoc, time: nowTime() });
         });
 
         /* =========================================================
@@ -1779,6 +2508,9 @@ server.listen(process.env.PORT || 8080, () =&gt; {
            ========================================================= */
         (function init() {
             updateTransportUI();
+            updateHomeModeUI();
+            loadBans();
+            loadBan();
 
             // 隠し認証入口（UI上は何の変哲もないアイコン）
             document.getElementById('secret-trigger').addEventListener('click', openPassModal);
@@ -1810,6 +2542,5 @@ server.listen(process.env.PORT || 8080, () =&gt; {
             }
         })();
     </script>
-
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4739e427a50b740',t:'MTc5MTQ0NjQ5Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a473f5b0ab727e4d',t:'MTc5MTQ1MDA3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
