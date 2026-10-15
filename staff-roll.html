@@ -130,7 +130,7 @@
   var fxc = fx.getContext("2d");
   var wrap = document.getElementById("stations");
   var flowing = false, ended = false, failed = false, focused = 0, allclear = false;
-  var plain = true, gateClosed = false, seqIdx = 0;
+  var plain = true, seqIdx = 0;
   var KEYSEQ = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
   var prepEnd = 0, flowStart = 0, lastSec = -1;
   var games = [], stations = [];
@@ -958,17 +958,27 @@
   }
 
   function startGameMode() {
+    ended = false;
     plain = false;
     document.body.classList.remove("plain");
     games.forEach(function (g, n) { stat(n, g.cleared ? "CLEAR ✓" : g.label()); drawFramed(n); });
     focus(focused);
     chalUpdate();
   }
+  function restartFlow() {
+    games.forEach(function (g) { if (!g.cleared) g.reset(); });
+    flowStart = performance.now();
+    roll.classList.remove("flowing");
+    void roll.offsetWidth;
+    roll.style.animationDuration = FLOW_SEC + "s";
+    roll.classList.add("flowing");
+    focus(0);
+    chalUpdate();
+  }
   document.addEventListener("keydown", function (e) {
     if (plain) {
-      if (ended || gateClosed) return;
       var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      if (k === KEYSEQ[seqIdx]) { seqIdx++; if (seqIdx >= KEYSEQ.length) { seqIdx = 0; startGameMode(); } }
+      if (k === KEYSEQ[seqIdx]) { seqIdx++; if (seqIdx >= KEYSEQ.length) { seqIdx = 0; startGameMode(); restartFlow(); } }
       else seqIdx = (k === KEYSEQ[0]) ? 1 : 0;
       return;
     }
@@ -1015,10 +1025,6 @@
     var dt = Math.min(.05, (now - last) / 1000);
     last = now;
     if (!flowing && !ended && now >= prepEnd) startFlow();
-    if (plain && !gateClosed && flowing) {
-      var r0 = stations[0].getBoundingClientRect();
-      if (r0.top < innerHeight && r0.bottom > 0) gateClosed = true;
-    }
     if (!ended && !plain) {
       var g = games[focused];
       if (!g.cleared) {
@@ -1052,5 +1058,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ad7644ffec3b99',t:'MTc5MjA1MzAyOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
