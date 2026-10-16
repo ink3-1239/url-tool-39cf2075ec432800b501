@@ -170,6 +170,7 @@
     else autoNext(i);
   }
   function autoNext(i) {
+    if (DEMO) return;
     for (var k = 1; k <= games.length; k++) {
       var j = (i + k) % games.length;
       if (!games[j].cleared) { focus(j); return; }
@@ -281,10 +282,11 @@
       g.aiT = (g.aiT || 0) + dt;
       if (g.aiT < .3) return;
       g.aiT = 0;
-      if (ammo <= 2 && ore) { g.down(ore.x, ore.y); return; }
+      if (ammo <= 2 && ore) { demoClick(i, ore.x, ore.y); g.down(ore.x, ore.y); return; }
       if (foes.length) {
         var best = foes[0], bd2 = 1e9;
         foes.forEach(function (f) { var d = Math.hypot(f.x - 75, f.y - 75); if (d < bd2) { bd2 = d; best = f; } });
+        demoClick(i, best.x, best.y);
         g.down(best.x, best.y);
       }
     };
@@ -326,8 +328,10 @@
     };
     g.ai = function (dt) {
       var mid = .55 + Math.sin(g.t * 1.3) * .08;
+      var ph = g.keyHold;
       if (v < mid - .04) g.keyHold = true;
       else if (v > mid + .04) g.keyHold = false;
+      if (ph !== g.keyHold) demoHold(i, 30, 100, g.keyHold);
     };
     return g;
   }
@@ -361,7 +365,7 @@
         c.fillStyle = "#ff7a45"; c.fillRect(x - 26, y + 8, 52, 3);
       }
     };
-    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 2) g.down(); };
+    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 2) { demoClick(i, g.cur(), 20); g.down(); } };
     return g;
   }
 
@@ -505,7 +509,7 @@
       g.aiT = (g.aiT || 0) + dt;
       if (g.aiT < .5) return;
       g.aiT = 0;
-      if (total(P) < 17) g.down(30, 130); else g.down(110, 130);
+      if (total(P) < 17) { demoClick(i, 30, 130); g.down(30, 130); } else { demoClick(i, 110, 130); g.down(110, 130); }
     };
     return g;
   }
@@ -544,8 +548,8 @@
       c.fillStyle = ten > .8 ? "#ff5566" : "#7fd8c8"; c.fillRect(14, 22 + (1 - Math.min(1, ten)) * 106, 8, Math.min(1, ten) * 106);
     };
     g.ai = function (dt) {
-      if (ten > .82) g.up();
-      else if (ten < .55) g.down();
+      if (ten > .82) { demoHold(i, 75, 75, false); g.up(); }
+      else if (ten < .55) { demoHold(i, 75, 75, true); g.down(); }
     };
     return g;
   }
@@ -836,16 +840,31 @@
       }
     };
     g.ai = function (dt) {
-      if (turn !== 1) return;
+      if (g.demoDone || turn !== 1) return;
       g.aiT = (g.aiT || 0) + dt;
-      if (g.aiT < .4) return;
+      if (g.aiT < .5) return;
       g.aiT = 0;
-      var c2 = 7;
-      for (c2 = 0; c2 < 7; c2++) if (col(c2) >= 0 && tryWin(c2, 1)) break;
-      if (c2 >= 7) { for (c2 = 0; c2 < 7; c2++) if (col(c2) >= 0 && tryWin(c2, 2)) break; }
-      if (c2 >= 7) c2 = 3;
-      if (col(c2) < 0) c2 = 0;
-      g.down(c2 * 150 / 7 + 75 / 7, 10);
+      function heur(p) {
+        var c;
+        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, p)) return c;
+        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, 3 - p)) return c;
+        if (col(3) >= 0) return 3;
+        var n2 = 0;
+        do { c = Math.floor(Math.random() * W); } while (col(c) < 0 && ++n2 < 50);
+        return c;
+      }
+      function endSample() { g.demoDone = true; stat(i, "SAMPLE END"); drawFramed(i); }
+      var c1 = heur(1);
+      demoClick(i, c1 * 150 / 7 + 75 / 7, 12);
+      if (put(c1, 1)) { endSample(); return; }
+      turn = 2; stat(i, "AI..."); drawFramed(i);
+      setTimeout(function () {
+        if (g.cleared || ended || g.demoDone) return;
+        var c2b = heur(2);
+        if (put(c2b, 2)) { endSample(); return; }
+        if (bd.every(function (v) { return v; })) { endSample(); return; }
+        turn = 1; stat(i, g.label()); drawFramed(i);
+      }, 260);
     };
     return g;
   }
@@ -1149,6 +1168,55 @@
   demoBtn.addEventListener("click", function (e) { e.stopPropagation(); openDemo(); });
   document.body.appendChild(demoBtn);
   }
+  var demoPlaying = false, curEl = null, curT = 0, curHold = false;
+  function cursorTo(ix, x, y, click) {
+    if (!DEMO) return;
+    if (!curEl) {
+      curEl = document.createElement("div");
+      curEl.style.cssText = "position:fixed;left:0;top:0;z-index:9999;pointer-events:none;";
+      curEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 1 L16 7 L9 9 L7 16 Z" fill="#ffffff" stroke="#000" stroke-width="1.2"></path></svg>';
+      document.body.appendChild(curEl);
+    }
+    var r = stations[ix].querySelector("canvas").getBoundingClientRect();
+    curEl.style.left = (r.left + x * r.width / 150) + "px";
+    curEl.style.top = (r.top + y * r.height / 150) + "px";
+    if (click) { curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); curT = performance.now(); }
+    else if (!curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff");
+  }
+  function cursorTick() {
+    if (curEl && curT && performance.now() - curT > 160) { curT = 0; if (!curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); }
+  }
+  function demoClick(ix, x, y) { curHold = false; cursorTo(ix, x, y, true); }
+  function demoHold(ix, x, y, on) {
+    curHold = !!on;
+    cursorTo(ix, x, y, false);
+    if (curEl) curEl.firstChild.firstChild.setAttribute("fill", on ? "#ff3347" : "#ffffff");
+  }
+  function startSegment() {
+    var g = games[focused];
+    g.cleared = false; g.demoDone = false;
+    stations[focused].classList.remove("cleared");
+    g.reset(); g.flash = 0;
+    stat(focused, g.label()); drawFramed(focused);
+    chalUpdate();
+    demoPlaying = true;
+  }
+  if (DEMO) {
+    games.forEach(function (g) {
+      var d0 = g.down, m0 = g.move, u0 = g.up;
+      g.down = function (x, y) { if (x !== undefined) cursorTo(g.i, x, y, true); return d0.apply(g, arguments); };
+      g.move = function (x, y) { if (x !== undefined) cursorTo(g.i, x, y, false); return m0.apply(g, arguments); };
+      g.up = function () { if (curEl && !curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); return u0.apply(g, arguments); };
+    });
+    document.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!demoPlaying) startSegment();
+    }, true);
+    var hb2 = document.createElement("div");
+    hb2.textContent = "↑↓ 切替 / クリック 再生 / SPACE 次へ";
+    hb2.style.cssText = "position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:97;color:#8fd8c0;font:700 11px/1.4 monospace;letter-spacing:.08em;pointer-events:none;";
+    document.body.appendChild(hb2);
+  }
   var framed = (window.self !== window.top);
   var waitTap = !DEMO;
   var loadT = performance.now();
@@ -1191,7 +1259,11 @@
       return;
     }
     if (demoOpen) return;
-    if (DEMO && e.code === "Space") { e.preventDefault(); if (!ended) focus(focused + 1); return; }
+    if (DEMO) {
+      if (e.code === "Space" || e.key === "ArrowDown") { e.preventDefault(); demoPlaying = false; focus(focused + 1); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); demoPlaying = false; focus(focused - 1); return; }
+      return;
+    }
     if (e.key === "Enter" && !ended) { e.preventDefault(); focus(focused + 1); }
   });
   (function () {
@@ -1238,13 +1310,14 @@
   function loop(now) {
     var dt = Math.min(.05, (now - last) / 1000);
     last = now;
+    cursorTick();
     if (!flowing && !ended && !waitTap && now >= prepEnd) startFlow();
     if (!ended && !plain) {
       var g = games[focused];
       if (!g.cleared) {
         g.update(dt);
-        if (DEMO && g.ai) g.ai(dt);
-        if (DEMO && stations[focused].getBoundingClientRect().bottom < 0) autoNext(focused);
+        if (DEMO && demoPlaying && g.ai) g.ai(dt);
+        if (DEMO && demoPlaying && (g.cleared || g.demoDone)) demoPlaying = false;
         if (g.flash > 0) g.flash -= dt * 2.2;
         drawFramed(focused);
       }
@@ -1271,9 +1344,9 @@
   chalUpdate();
   if (DEMO) { plain = false; document.body.classList.remove("plain"); }
   focus(0);
-  if (!waitTap) startFlow();
+  if (!waitTap && !DEMO) startFlow();
   requestAnimationFrame(loop);
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b6d5fa9c81d844',t:'MTc5MjE1MTMyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
