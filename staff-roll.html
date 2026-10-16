@@ -1171,7 +1171,7 @@
   demoBtn.addEventListener("click", function (e) { e.stopPropagation(); openDemo(); });
   document.body.appendChild(demoBtn);
   }
-  var demoPlaying = false, curEl = null, curT = 0, curHold = false, demoTries = [];
+  var demoPlaying = false, curEl = null, curT = 0, curHold = false, holdTok = 0, demoTries = [];
   var curPos = { x: -40, y: -40 }, curTgt = null, curFn = null, curDrag = null, curHas = false, viewY = 0;
   function cursorEnsure() {
     if (curEl) return;
@@ -1187,27 +1187,25 @@
   function setTarget(ix, x, y, fn, dragFn) {
     if (!DEMO) { if (fn) fn(); return; }
     cursorEnsure();
-    var sc = screenOf(ix, x, y);
-    curTgt = { sx: sc.sx, sy: sc.sy, i: ix };
+    curTgt = { gx: x, gy: y, i: ix };
     curFn = fn || null;
     curDrag = dragFn || null;
     if (!curHas) {
       curHas = true;
-      curPos.x = sc.sx; curPos.y = sc.sy;
+      curPos.x = innerWidth / 2; curPos.y = innerHeight * .82;
       curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
-      var f0 = curFn; curFn = null; curTgt = null;
-      if (f0) { curT = performance.now(); curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); f0(); }
     }
   }
   function cursorStep(dt) {
     if (!curEl) return;
     if (curT && performance.now() - curT > 160 && !curHold) { curT = 0; curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); }
     if (!curTgt) return;
-    var dx = curTgt.sx - curPos.x, dy = curTgt.sy - curPos.y, d = Math.hypot(dx, dy);
+    var sc = screenOf(curTgt.i, curTgt.gx, curTgt.gy);
+    var dx = sc.sx - curPos.x, dy = sc.sy - curPos.y, d = Math.hypot(dx, dy);
     if (d < 2) {
-      curPos.x = curTgt.sx; curPos.y = curTgt.sy;
+      curPos.x = sc.sx; curPos.y = sc.sy;
       curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
-      if (curDrag) { var r2 = stations[curTgt.i].querySelector("canvas").getBoundingClientRect(); curDrag((curPos.x - r2.left) * 150 / r2.width, (curPos.y - r2.top) * 150 / r2.height); }
+      if (curDrag) curDrag(curTgt.gx, curTgt.gy);
       var f = curFn; curFn = null; curTgt = null; curDrag = null;
       if (f) { curT = performance.now(); curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); f(); }
       return;
@@ -1215,7 +1213,7 @@
     var mv = Math.min(Math.max(120, d * 5) * dt, d);
     curPos.x += dx / d * mv; curPos.y += dy / d * mv;
     curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
-    if (curDrag) { var r3 = stations[curTgt.i].querySelector("canvas").getBoundingClientRect(); curDrag((curPos.x - r3.left) * 150 / r3.width, (curPos.y - r3.top) * 150 / r3.height); }
+    if (curDrag) { var r3 = sc.r; curDrag((curPos.x - r3.left) * 150 / r3.width, (curPos.y - r3.top) * 150 / r3.height); }
   }
   function demoAct(ix, x, y, fn) { setTarget(ix, x, y, fn, null); }
   function demoHoldOn(ix, x, y, fn) {
@@ -1233,7 +1231,7 @@
   }
   function startSegment(n) {
     var g = games[n];
-    g.cleared = false; g.demoDone = false;
+    g.cleared = false; g.demoDone = false; demoTries[n] = 0;
     stations[n].classList.remove("cleared");
     g.reset(); g.flash = 0;
     focused = n;
@@ -1246,31 +1244,48 @@
     games.forEach(function (g) {
       var d0 = g.down, m0 = g.move, u0 = g.up;
       g.down = function (x, y) {
-        if (x === undefined) { setTarget(g.i, 75, 75, function () { curHold = true; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); d0.apply(g, []); }, null); return; }
-        setTarget(g.i, x, y, function () { d0.apply(g, [x, y]); }, null);
+        if (x === undefined) {
+          setTarget(g.i, 75, 75, function () {
+            curHold = true; holdTok++;
+            if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ff3347");
+            d0.apply(g, []);
+            var tk = holdTok;
+            setTimeout(function () { if (tk === holdTok && curHold) { curHold = false; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); } }, 600);
+          }, null);
+          return;
+        }
+        setTarget(g.i, x, y, function () { curHold = false; d0.apply(g, [x, y]); }, null);
       };
       g.move = function (x, y) {
         if (x === undefined) return;
-        setTarget(g.i, x, y, null, function (gx, gy) { m0.apply(g, [gx, gy]); });
+        var keep = (curTgt && curTgt.i === g.i) ? curFn : null;
+        setTarget(g.i, x, y, keep, function (gx, gy) { m0.apply(g, [gx, gy]); });
       };
       g.up = function () {
-        var f = function () { curHold = false; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); u0.apply(g, []); };
+        var prev = (curTgt && curTgt.i === g.i) ? curFn : null;
+        var f = function () { if (prev) prev(); curHold = false; holdTok++; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); u0.apply(g, []); };
         if (curTgt) curFn = f; else f();
       };
     });
     document.addEventListener("pointerdown", function (e) {
+      if (!e.isTrusted) return;
       e.preventDefault(); e.stopPropagation();
+      if (demoPlaying) return;
       var st = e.target && e.target.closest ? e.target.closest(".station") : null;
-      if (st && !demoPlaying) {
+      if (st) {
         var idx = Array.prototype.indexOf.call(stations, st);
         if (idx >= 0) startSegment(idx);
       }
     }, true);
+    ["pointermove", "pointerup", "pointercancel", "pointerleave", "pointerenter", "pointerover", "pointerout", "mousedown", "mousemove", "mouseup", "mouseover", "mouseout", "click", "dblclick", "contextmenu", "touchstart", "touchmove", "touchend"].forEach(function (t) {
+      document.addEventListener(t, function (e) { if (e.isTrusted) { e.preventDefault(); e.stopPropagation(); } }, true);
+    });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowDown") { e.preventDefault(); setView(viewY - 90); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setView(viewY + 90); }
-      else if (e.code === "Space") {
-        e.preventDefault();
+      if (!e.isTrusted) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.key === "ArrowDown") setView(viewY - 90);
+      else if (e.key === "ArrowUp") setView(viewY + 90);
+      else if (e.code === "Space" && !demoPlaying) {
         var jj = (focused + 1) % games.length;
         focused = jj;
         stations.forEach(function (s4, n4) { s4.classList.toggle("focused", n4 === focused); });
@@ -1279,8 +1294,11 @@
       }
     }, true);
     document.addEventListener("wheel", function (e) { e.preventDefault(); setView(viewY - e.deltaY); }, { passive: false });
+    var cst = document.createElement("style");
+    cst.textContent = "*{cursor:none !important;}";
+    document.head.appendChild(cst);
     var hb2 = document.createElement("div");
-    hb2.textContent = "↑↓ スクロール / ゲームクリック 再生 / SPACE 次へ";
+    hb2.textContent = "↑↓/ホイール スクロール / ゲームクリック 再生 / SPACE 次へ";
     hb2.style.cssText = "position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:97;color:#8fd8c0;font:700 11px/1.4 monospace;letter-spacing:.08em;pointer-events:none;";
     document.body.appendChild(hb2);
   }
