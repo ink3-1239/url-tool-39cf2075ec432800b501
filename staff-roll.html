@@ -241,13 +241,13 @@
     g.update = function (dt) {
       g.t += dt; spn -= dt; oreT -= dt;
       if (spn <= 0) {
-        var e = Math.floor(Math.random() * 4), x, y;
-        if (e === 0) { x = -8; y = 20 + Math.random() * 110; } else if (e === 1) { x = 158; y = 20 + Math.random() * 110; }
-        else if (e === 2) { x = Math.random() * 150; y = -8; } else { x = Math.random() * 150; y = 158; }
+        var e = Math.floor(drand() * 4), x, y;
+        if (e === 0) { x = -8; y = 20 + drand() * 110; } else if (e === 1) { x = 158; y = 20 + drand() * 110; }
+        else if (e === 2) { x = drand() * 150; y = -8; } else { x = drand() * 150; y = 158; }
         foes.push({ x: x, y: y });
         spn = Math.max(.5, 1.6 - kills * .09);
       }
-      if (!ore && oreT <= 0) { ore = { x: 25 + Math.random() * 100, y: 25 + Math.random() * 100, life: 2.2 }; oreT = 4 + Math.random() * 3; }
+      if (!ore && oreT <= 0) { ore = { x: 25 + drand() * 100, y: 25 + drand() * 100, life: 2.2 }; oreT = 4 + drand() * 3; }
       if (ore) { ore.life -= dt; if (ore.life <= 0) ore = null; }
       for (var n = foes.length - 1; n >= 0; n--) {
         var f = foes[n], d = Math.atan2(75 - f.y, 75 - f.x);
@@ -280,15 +280,22 @@
       for (var n = 0; n < ammo; n++) c.fillRect(8 + n * 9, 136, 5, 9);
     };
     g.ai = function (dt) {
-      g.aiT = (g.aiT || 0) + dt;
-      if (g.aiT < .3) return;
-      g.aiT = 0;
-      if (ore && ammo <= 4) { g.down(ore.x, ore.y); return; }
+      var dmin = 1e9;
+      foes.forEach(function (f) { var d = Math.hypot(75 - f.x, 75 - f.y); if (d < dmin) dmin = d; });
+      if (ore && ammo <= 6 && ore.life > .45) {
+        var eta = (dmin - 12) / spd;
+        var trav = Math.hypot(ore.x - 75, ore.y - 75) / 200 + .15;
+        if (ammo <= 1 || eta > trav + .3) { g.down(ore.x, ore.y); return; }
+      }
       if (ammo <= 0) return;
       if (foes.length) {
         var best = foes[0], bd2 = 1e9;
         foes.forEach(function (f) { var d = Math.hypot(f.x - 75, f.y - 75); if (d < bd2) { bd2 = d; best = f; } });
-        g.down(best.x, best.y);
+        if (bd2 < 26) {
+          var tt = Math.min(.2, bd2 / 220 + .06);
+          var d2 = Math.atan2(75 - best.y, 75 - best.x);
+          g.down(best.x + Math.cos(d2) * spd * tt, best.y + Math.sin(d2) * spd * tt);
+        }
       }
     };
     return g;
@@ -298,7 +305,7 @@
   function g2(i) {
     var g = base(i), v = .55, melt = 0, out = 0;
     g.keyHold = false;
-    g.reset = function () { v = .55; melt = 0; out = 0; g.keyHold = false; g.t = 0; };
+    g.reset = function () { v = .55; melt = 0; out = 0; g.keyHold = false; g.holdQ = false; g.t = 0; };
     g.label = function () { return "MELT " + Math.floor(melt / 4 * 100) + "%"; };
     g.update = function (dt) {
       g.t += dt;
@@ -338,9 +345,9 @@
   /* 3 burger empire: one perfect drop */
   function g3(i) {
     var g = base(i), fall = null;
-    g.reset = function () { fall = null; g.t = 0; };
+    g.reset = function () { fall = null; g.t = 0; g.aiPhase = 0; };
     g.label = function () { return "±4px DROP"; };
-    g.cur = function () { return 75 + Math.sin(g.t * 4) * 55; };
+    g.cur = function () { return 75 + Math.sin(g.t * (DEMO ? 1.2 : 4)) * 55; };
     g.update = function (dt) {
       g.t += dt;
       if (fall) {
@@ -364,7 +371,12 @@
         c.fillStyle = "#ff7a45"; c.fillRect(x - 26, y + 8, 52, 3);
       }
     };
-    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 3) g.down(); };
+    g.ai = function (dt) {
+      if (fall) return;
+      var c = g.cur();
+      if (!g.aiPhase) { if (Math.abs(c - 75) > 40) g.aiPhase = 1; return; }
+      if (Math.abs(c - 75) <= 1.2) g.down();
+    };
     return g;
   }
 
@@ -373,7 +385,7 @@
     var g = base(i), seq = [], phase = "show", idx = 0, up = -1, tm = 0, input = 0;
     g.reset = function () {
       seq = [];
-      for (var n = 0; n < 6; n++) seq.push(Math.floor(Math.random() * 4));
+      for (var n = 0; n < 6; n++) seq.push(Math.floor(drand() * 4));
       phase = "show"; idx = 0; up = -1; tm = .7; input = 0;
     };
     g.label = function () { return phase === "show" ? "MEMORIZE" : "RECALL " + input + "/6"; };
@@ -425,7 +437,7 @@
   function g5(i) {
     var SUIT = ["\u2660", "\u2665", "\u2666", "\u2663"];
     var g = base(i), P = [], D = [], phase = "play", tm = 0, dT = 0, msg = "";
-    function card() { return { r: 1 + Math.floor(Math.random() * 13), s: Math.floor(Math.random() * 4) }; }
+    function card() { return { r: 1 + Math.floor(drand() * 13), s: Math.floor(drand() * 4) }; }
     function total(h) {
       var t = 0, a = 0;
       h.forEach(function (cd) { if (cd.r === 1) { t += 11; a++; } else t += Math.min(10, cd.r); });
@@ -568,10 +580,10 @@
       if (vT <= 0) {
         vT = .95;
         var d = vol % 2 === 0 ? 2 : 1; vol++;
-        var ang = Math.random() * Math.PI;
+        var ang = drand() * Math.PI;
         for (var p = 0; p < d; p++) {
-          var x = p === 0 ? hx + (Math.random() * 24 - 12) : 20 + Math.random() * 110;
-          var y = p === 0 ? hy + (Math.random() * 24 - 12) : 20 + Math.random() * 110;
+          var x = p === 0 ? hx + (drand() * 24 - 12) : 20 + drand() * 110;
+          var y = p === 0 ? hy + (drand() * 24 - 12) : 20 + drand() * 110;
           sl.push({ x: x, y: y, ang: ang, t: 0, delay: .7, active: .13, life: 1.04, hue: (vol * 47 + p * 60) % 360 });
         }
       }
@@ -617,20 +629,24 @@
       c.restore();
     };
     g.ai = function (dt) {
-      var bestx = hx, besty = hy, bs = -1e9;
-      for (var n = 0; n < 12; n++) {
-        var x = 15 + Math.random() * 120, y = 15 + Math.random() * 120, sc = 0;
+      function clr(x, y) {
+        var m = 40;
         for (var k2 = 0; k2 < sl.length; k2++) {
           var q = sl[k2];
-          if (q.t > q.delay - .5 && q.t <= q.delay + q.active) {
+          if (q.t > q.delay - .55 && q.t <= q.delay + q.active) {
             var dd = Math.abs(-(x - q.x) * Math.sin(q.ang) + (y - q.y) * Math.cos(q.ang));
-            sc += Math.min(dd, 40);
+            if (dd < m) m = dd;
           }
         }
-        sc -= Math.hypot(x - hx, y - hy) * .15;
-        if (sc > bs) { bs = sc; bestx = x; besty = y; }
+        return m;
       }
-      g.move(bestx, besty);
+      var bestx = tx, besty = ty, bs = -1e9;
+      for (var gx2 = 15; gx2 <= 135; gx2 += 20) for (var gy2 = 15; gy2 <= 135; gy2 += 20) {
+        var sc = clr(gx2, gy2) - Math.hypot(gx2 - tx, gy2 - ty) * .12;
+        if (sc > bs) { bs = sc; bestx = gx2; besty = gy2; }
+      }
+      var curC = clr(tx, ty);
+      if (curC < 17 || clr(bestx, besty) > curC + 5) g.move(bestx, besty);
     };
     return g;
   }
@@ -639,11 +655,11 @@
   function g8(i) {
     var g = base(i), hits = 0, tx = 75, ty = 60, vx = 70, vy = 0, dirT = 0, cx = 75, cy = 120;
     function newDir() {
-      var a = Math.random() * Math.PI * 2, sp = 70 + hits * 25;
+      var a = drand() * Math.PI * 2, sp = 70 + hits * 25;
       vx = Math.cos(a) * sp; vy = Math.sin(a) * sp;
-      dirT = .45 + Math.random() * .5;
+      dirT = .45 + drand() * .5;
     }
-    g.reset = function () { hits = 0; tx = 30 + Math.random() * 90; ty = 25 + Math.random() * 80; newDir(); };
+    g.reset = function () { hits = 0; tx = 30 + drand() * 90; ty = 25 + drand() * 80; newDir(); g.aiCool = 0; g.aiHits = 0; g.aiStrike = false; };
     g.label = function () { return "CATCH " + hits + "/3"; };
     g.update = function (dt) {
       g.t += dt;
@@ -671,11 +687,17 @@
       c.beginPath(); c.moveTo(cx - 13, cy); c.lineTo(cx + 13, cy); c.moveTo(cx, cy - 13); c.lineTo(cx, cy + 13); c.stroke();
     };
     g.ai = function (dt) {
-      g.move(tx, ty);
-      g.aiT = (g.aiT || 0) + dt;
-      if (g.aiT < .25) return;
-      g.aiT = 0;
-      g.down(tx, ty);
+      if (hits !== (g.aiHits || 0)) { g.aiHits = hits; g.aiCool = .35; g.aiStrike = false; }
+      if (g.aiCool > 0) { g.aiCool -= dt; g.move(cx, cy); return; }
+      var dcur = Math.hypot(tx - cx, ty - cy);
+      if (g.aiStrike) {
+        if (dcur > 20) g.aiStrike = false; else return;
+      }
+      var sp = 70 + hits * 25, m = sp / (Math.hypot(vx, vy) || 1);
+      var evx = vx * m + Math.sin(g.t * 7) * 14, evy = vy * m + Math.cos(g.t * 6) * 14;
+      var lead = Math.min(.45, Math.max(.08, dcur / 200));
+      if (dcur < 6) { g.aiStrike = true; g.down(tx, ty); return; }
+      g.move(Math.max(14, Math.min(136, tx + evx * lead)), Math.max(14, Math.min(136, ty + evy * lead)));
     };
     return g;
   }
@@ -686,7 +708,7 @@
     var g = base(i), q = [], items = [], s1 = false, s2 = false, done = 0;
     function setup() {
       q = [];
-      for (var n = 0; n < 4; n++) q.push(Math.floor(Math.random() * 3));
+      for (var n = 0; n < 4; n++) q.push(Math.floor(drand() * 3));
       items = []; s1 = false; s2 = false; done = 0;
       spawnT = 0;
     }
@@ -728,10 +750,23 @@
       items.forEach(function (it) { c.fillStyle = COL[it.c]; c.fillRect(it.x - 8, ly[it.lane] - 8, 16, 16); });
     };
     g.ai = function (dt) {
+      var cg = cursorGamePos(i);
+      var b0 = null, b1 = null;
       items.forEach(function (it) {
-        if (!it.p1 && it.x >= 34 && it.x < 50 && s1 !== (it.c === 0)) g.down(50, 75);
-        if (!it.p2 && it.x >= 84 && it.x < 100 && s2 !== (it.c === 2)) g.down(100, 75);
+        if (it.lane !== 1) return;
+        if (!it.p1 && it.x < 50 && (!b0 || it.x > b0.x)) b0 = it;
+        if (!it.p2 && it.x < 100 && (!b1 || it.x > b1.x)) b1 = it;
       });
+      var acts = [];
+      if (b0) acts.push({ x: 50, t: (50 - b0.x) / 26, need: b0.c === 0, cur: s1 });
+      if (b1) acts.push({ x: 100, t: (100 - b1.x) / 26, need: b1.c === 2, cur: s2 });
+      var todo = acts.filter(function (a) { return a.cur !== a.need; });
+      if (!todo.length) return;
+      todo.sort(function (a, b) { return a.t - b.t; });
+      var a0 = todo[0];
+      var dCur = Math.hypot(cg[0] - a0.x, cg[1] - 75);
+      if (dCur < 5 || a0.t > dCur / 200 + .5) g.down(a0.x, 75);
+      else g.move(a0.x, 75);
     };
     return g;
   }
@@ -746,7 +781,7 @@
       [0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
     ];
     var g = base(i), grid = [], TGT = RECIPES[0];
-    g.reset = function () { TGT = RECIPES[Math.floor(Math.random() * RECIPES.length)]; grid = []; for (var n = 0; n < 16; n++) grid.push(0); };
+    g.reset = function () { TGT = RECIPES[Math.floor(drand() * RECIPES.length)]; grid = []; for (var n = 0; n < 16; n++) grid.push(0); };
     g.label = function () { return "LIGHT IT"; };
     g.update = function (dt) { g.t += dt; };
     g.down = function (x, y) {
@@ -839,30 +874,42 @@
       }
     };
     g.ai = function (dt) {
-      if (g.demoDone || turn !== 1) return;
+      if (turn !== 1 || g.cleared) return;
       g.aiT = (g.aiT || 0) + dt;
       if (g.aiT < .5) return;
       g.aiT = 0;
-      function heur(p) {
-        var c;
-        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, p)) return c;
-        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, 3 - p)) return c;
-        if (col(3) >= 0) return 3;
-        var n2 = 0;
-        do { c = Math.floor(Math.random() * W); } while (col(c) < 0 && ++n2 < 50);
-        return c;
+      function cntWin(p) { var n2 = 0; for (var c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, p)) n2++; return n2; }
+      function strong() {
+        var c, best = -1, bs = -1;
+        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, 1)) return c;
+        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, 2)) return c;
+        for (c = 0; c < W; c++) {
+          if (col(c) < 0) continue;
+          var r = col(c); bd[r * W + c] = 1;
+          var sc = cntWin(1) * 2 + (c === 3 ? 1.5 : 0);
+          bd[r * W + c] = 0;
+          if (sc > bs) { bs = sc; best = c; }
+        }
+        return best;
       }
-      function endSample() { g.demoDone = true; stat(i, "SAMPLE END"); drawFramed(i); }
-      var c1 = heur(1);
+      function weak() {
+        var c, opts = [];
+        for (c = 0; c < W; c++) if (col(c) >= 0 && tryWin(c, 2)) return c;
+        for (c = 0; c < W; c++) if (col(c) >= 0) opts.push(c);
+        if (!opts.length) return 0;
+        return opts[Math.floor(drand() * opts.length)];
+      }
+      var c1 = strong();
+      if (c1 < 0) return;
       demoAct(i, c1 * 150 / 7 + 75 / 7, 12, function () {
-        if (g.demoDone) return;
-        if (put(c1, 1)) { endSample(); return; }
+        if (g.cleared || turn !== 1) return;
+        if (put(c1, 1)) { clearGame(i); return; }
         turn = 2; stat(i, "AI..."); drawFramed(i);
         setTimeout(function () {
-          if (g.cleared || ended || g.demoDone) return;
-          var c2b = heur(2);
-          if (put(c2b, 2)) { endSample(); return; }
-          if (bd.every(function (v) { return v; })) { endSample(); return; }
+          if (g.cleared || ended) return;
+          var c2b = weak();
+          if (put(c2b, 2)) { resetGame(i); return; }
+          if (bd.every(function (v) { return v; })) { resetGame(i); return; }
           turn = 1; stat(i, g.label()); drawFramed(i);
         }, 260);
       });
@@ -876,7 +923,7 @@
     var pCh = 0, aCh = 0, hold = false, orbs = [], pS = 0, aS = 0, aiT = 0, aiWant = .8;
     g.reset = function () {
       px = 40; py = 110; txx = 40; tyy = 110; ax = 110; ay = 40;
-      pCh = 0; aCh = 0; hold = false; orbs = []; pS = 0; aS = 0; aiT = 0; aiWant = .6 + Math.random() * .4;
+      pCh = 0; aCh = 0; hold = false; orbs = []; pS = 0; aS = 0; aiT = 0; aiWant = .6 + drand() * .4;
     };
     g.label = function () { return "DUEL " + pS + "-" + aS; };
     g.update = function (dt) {
@@ -892,7 +939,7 @@
       if (aCh >= aiWant) {
         var d2 = Math.atan2(py - ay, px - ax);
         orbs.push({ x: ax, y: ay, vx: Math.cos(d2) * 110, vy: Math.sin(d2) * 110, o: 1 });
-        aCh = 0; aiWant = .6 + Math.random() * .4; aiT = 0;
+        aCh = 0; aiWant = .6 + drand() * .4; aiT = 0;
       }
       for (var n = orbs.length - 1; n >= 0; n--) {
         var o = orbs[n]; o.x += o.vx * dt; o.y += o.vy * dt;
@@ -907,7 +954,9 @@
       if (!hold) return;
       hold = false;
       if (pCh > .25) {
-        var d2 = Math.atan2(ay - py, ax - px);
+        var axm = ax, aym = ay;
+        if (DEMO && g.demoAim) { axm = g.demoAim[0]; aym = g.demoAim[1]; g.demoAim = null; }
+        var d2 = Math.atan2(aym - py, axm - px);
         orbs.push({ x: px, y: py, vx: Math.cos(d2) * (90 + pCh * 60), vy: Math.sin(d2) * (90 + pCh * 60), o: 0 });
       }
       pCh = 0;
@@ -930,16 +979,67 @@
       for (n = 0; n < 3; n++) { c.fillStyle = n < aS ? "#ff5566" : "#333"; c.beginPath(); c.arc(60 + n * 12, 8, 4, 0, 7); c.fill(); }
     };
     g.ai = function (dt) {
-      var threat = null;
-      orbs.forEach(function (o) { if (o.o === 1 && Math.hypot(o.x - px, o.y - py) < 45) threat = o; });
-      if (threat) {
-        var dx = px - threat.x, dy = py - threat.y, d = Math.hypot(dx, dy) || 1;
+      var danger = null;
+      orbs.forEach(function (o) {
+        if (o.o !== 1) return;
+        var T = Math.hypot(o.x - px, o.y - py) / 110;
+        var ip = Math.hypot(o.x + o.vx * T - px, o.y + o.vy * T - py);
+        if (ip < 24) danger = o;
+      });
+      if (danger) {
         if (hold) g.up();
-        g.move(Math.max(12, Math.min(138, px + dx / d * 40)), Math.max(12, Math.min(138, py + dy / d * 40)));
+        if (g.dodgeFor !== danger) {
+          g.dodgeFor = danger;
+          var bA = -1e9, bx2 = px, by2 = py;
+          for (var a2 = 0; a2 < 8; a2++) {
+            var ang2 = a2 * Math.PI / 4;
+            var cxp = Math.max(14, Math.min(136, px + Math.cos(ang2) * 55));
+            var cyp = Math.max(14, Math.min(136, py + Math.sin(ang2) * 55));
+            var worst = 1e9;
+            orbs.forEach(function (o2) {
+              if (o2.o !== 1) return;
+              var lv = Math.hypot(o2.vx, o2.vy) || 1;
+              var ux = o2.vx / lv, uy = o2.vy / lv;
+              var wx = cxp - o2.x, wy = cyp - o2.y;
+              var proj = wx * ux + wy * uy;
+              var perp = Math.abs(wx * uy - wy * ux);
+              if (proj < 0) perp = Math.hypot(wx, wy);
+              if (perp < worst) worst = perp;
+            });
+            var sc2 = worst - Math.hypot(cxp - px, cyp - py) * .05;
+            if (sc2 > bA) { bA = sc2; bx2 = cxp; by2 = cyp; }
+          }
+          g.dodgeX = bx2; g.dodgeY = by2;
+        }
+        g.move(g.dodgeX, g.dodgeY);
         return;
       }
-      if (!hold && pCh === 0) { g.move(75, 75); g.down(75, 75); }
-      else if (hold && pCh >= .8) g.up();
+      g.dodgeFor = null;
+      var ex0 = ax - 75, ey0 = ay - 75, en = Math.hypot(ex0, ey0) || 1;
+      var kx = Math.max(14, Math.min(136, 75 - ex0 / en * 55));
+      var ky = Math.max(14, Math.min(136, 75 - ey0 / en * 55));
+      var tFire = Math.max(0, (aiWant - aCh) * 1.3);
+      if (hold) {
+        if (pCh >= .35) {
+          for (var k = 2; k <= 60; k++) {
+            var T2 = k / 60;
+            var sp2 = 90 + pCh * 60;
+            var ft = g.t + T2;
+            var ex = 75 + Math.sin(ft * 1.3) * 45 + Math.sin(ft * 2.7) * 12;
+            var ey = 75 + Math.cos(ft * 1.7) * 45 + Math.cos(ft * 3.1) * 12;
+            if (Math.abs(Math.hypot(ex - px, ey - py) - sp2 * T2) < 7) { g.demoAim = [ex, ey]; g.up(); return; }
+          }
+        }
+        if (tFire < .45) { g.up(); g.move(kx, ky); return; }
+        g.move(kx, ky);
+        return;
+      }
+      if (pCh === 0 && tFire > .5) {
+        if (Math.hypot(kx - px, ky - py) > 10) { g.move(kx, ky); return; }
+        g.down(kx, ky);
+        return;
+      }
+      g.move(kx, ky);
     };
     return g;
   }
@@ -1001,11 +1101,11 @@
       if (g.cleared || ended) { busy = false; return; }
       var ms = moves(2);
       if (ms.length) {
-        var best = ms[0], bs = -1e9;
+        var best = ms[0], bs = DEMO ? 1e9 : -1e9;
         ms.forEach(function (m) {
-          var sc = flips(m[0], m[1], 2).length + Math.random() * 8;
+          var sc = flips(m[0], m[1], 2).length + (DEMO ? 0 : Math.random() * 8);
           if ((m[0] === 0 || m[0] === N - 1) && (m[1] === 0 || m[1] === N - 1)) sc += 4;
-          if (sc > bs) { bs = sc; best = m; }
+          if (DEMO ? sc < bs : sc > bs) { bs = sc; best = m; }
         });
         place(best[0], best[1], 2);
       }
@@ -1054,7 +1154,7 @@
       if (!ms.length) return;
       var best = ms[0], bs = -1e9;
       ms.forEach(function (m) {
-        var sc = flips(m[0], m[1], 1).length + Math.random() * 4;
+        var sc = flips(m[0], m[1], 1).length + (DEMO ? 0 : Math.random() * 4);
         if ((m[0] === 0 || m[0] === N - 1) && (m[1] === 0 || m[1] === N - 1)) sc += 6;
         if (sc > bs) { bs = sc; best = m; }
       });
@@ -1174,6 +1274,21 @@
   document.body.appendChild(demoBtn);
   }
   var demoPlaying = false, curEl = null, curT = 0, curHold = false, holdTok = 0, demoTries = [];
+  var demoSeed = 12345;
+  function drand() {
+    if (!DEMO) return Math.random();
+    demoSeed = (demoSeed + 0x6D2B79F5) | 0;
+    var t = Math.imul(demoSeed ^ (demoSeed >>> 15), 1 | demoSeed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function cursorGamePos(ix) {
+    var r = stations[ix].querySelector("canvas").getBoundingClientRect();
+    return [(curPos.x - r.left) * 150 / r.width, (curPos.y - r.top) * 150 / r.height];
+  }
+  var READY = [[75, 75], [30, 100], [75, 75], [75, 85], [70, 130], [75, 75], [75, 110], [75, 120], [75, 75], [75, 75], [75, 12], [75, 75], [75, 73]];
+  var SEEDTUNE = [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0];
+  function seedFor(n) { return (0x9E3779B9 ^ ((n + 1) * 0x85EBCA6B) ^ SEEDTUNE[n]) | 0; }
   var curPos = { x: -40, y: -40 }, curTgt = null, curFn = null, curDrag = null, curHas = false, viewY = 0;
   function cursorEnsure() {
     if (curEl) return;
@@ -1235,12 +1350,15 @@
     var g = games[n];
     g.cleared = false; g.demoDone = false; demoTries[n] = 0;
     stations[n].classList.remove("cleared");
-    g.reset(); g.flash = 0;
+    demoSeed = seedFor(n);
+    g.reset(); g.flash = 0; g.aiT = 0;
     focused = n;
     stations.forEach(function (s2, n2) { s2.classList.toggle("focused", n2 === focused); });
     stat(n, g.label()); drawFramed(n);
     chalUpdate();
     demoPlaying = true;
+    g.prep = true;
+    setTarget(n, READY[n][0], READY[n][1], function () { g.prep = false; }, null);
   }
   if (DEMO) {
     games.forEach(function (g) {
@@ -1432,8 +1550,8 @@
     if (!ended && !plain) {
       var g = games[focused];
       if (!g.cleared) {
-        if (!DEMO || demoPlaying) g.update(dt);
-        if (DEMO && demoPlaying && g.ai) g.ai(dt);
+        if (!DEMO || (demoPlaying && !g.prep)) g.update(dt);
+        if (DEMO && demoPlaying && !g.prep && g.ai) g.ai(dt);
         if (g.flash > 0) g.flash -= dt * 2.2;
         drawFramed(focused);
       }
@@ -1465,5 +1583,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b760765fb73bb3',t:'MTc5MjE1Njk5Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
