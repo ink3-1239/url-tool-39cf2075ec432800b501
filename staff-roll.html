@@ -177,6 +177,7 @@
     }
   }
   function resetGame(i) {
+    if (DEMO) { demoTries[i] = (demoTries[i] || 0) + 1; if (demoTries[i] >= 3) { demoTries[i] = 0; clearGame(i); return; } }
     games[i].reset();
     games[i].flash = 0;
     stat(i, games[i].label());
@@ -282,11 +283,11 @@
       g.aiT = (g.aiT || 0) + dt;
       if (g.aiT < .3) return;
       g.aiT = 0;
-      if (ammo <= 2 && ore) { demoClick(i, ore.x, ore.y); g.down(ore.x, ore.y); return; }
+      if (ore && ammo <= 4) { g.down(ore.x, ore.y); return; }
+      if (ammo <= 0) return;
       if (foes.length) {
         var best = foes[0], bd2 = 1e9;
         foes.forEach(function (f) { var d = Math.hypot(f.x - 75, f.y - 75); if (d < bd2) { bd2 = d; best = f; } });
-        demoClick(i, best.x, best.y);
         g.down(best.x, best.y);
       }
     };
@@ -328,10 +329,8 @@
     };
     g.ai = function (dt) {
       var mid = .55 + Math.sin(g.t * 1.3) * .08;
-      var ph = g.keyHold;
-      if (v < mid - .04) g.keyHold = true;
-      else if (v > mid + .04) g.keyHold = false;
-      if (ph !== g.keyHold) demoHold(i, 30, 100, g.keyHold);
+      if (v < mid - .04 && !g.keyHold && !g.holdQ) { g.holdQ = true; demoHoldOn(i, 30, 100, function () { g.keyHold = true; g.holdQ = false; }); }
+      else if (v > mid + .04 && g.keyHold && !g.holdQ) { g.holdQ = true; demoHoldOff(i, 30, 100, function () { g.keyHold = false; g.holdQ = false; }); }
     };
     return g;
   }
@@ -365,7 +364,7 @@
         c.fillStyle = "#ff7a45"; c.fillRect(x - 26, y + 8, 52, 3);
       }
     };
-    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 2) { demoClick(i, g.cur(), 20); g.down(); } };
+    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 3) g.down(); };
     return g;
   }
 
@@ -509,7 +508,7 @@
       g.aiT = (g.aiT || 0) + dt;
       if (g.aiT < .5) return;
       g.aiT = 0;
-      if (total(P) < 17) { demoClick(i, 30, 130); g.down(30, 130); } else { demoClick(i, 110, 130); g.down(110, 130); }
+      if (total(P) < 17) g.down(30, 130); else g.down(110, 130);
     };
     return g;
   }
@@ -548,8 +547,8 @@
       c.fillStyle = ten > .8 ? "#ff5566" : "#7fd8c8"; c.fillRect(14, 22 + (1 - Math.min(1, ten)) * 106, 8, Math.min(1, ten) * 106);
     };
     g.ai = function (dt) {
-      if (ten > .82) { demoHold(i, 75, 75, false); g.up(); }
-      else if (ten < .55) { demoHold(i, 75, 75, true); g.down(); }
+      if (ten > .82) g.up();
+      else if (ten < .55) g.down();
     };
     return g;
   }
@@ -855,16 +854,18 @@
       }
       function endSample() { g.demoDone = true; stat(i, "SAMPLE END"); drawFramed(i); }
       var c1 = heur(1);
-      demoClick(i, c1 * 150 / 7 + 75 / 7, 12);
-      if (put(c1, 1)) { endSample(); return; }
-      turn = 2; stat(i, "AI..."); drawFramed(i);
-      setTimeout(function () {
-        if (g.cleared || ended || g.demoDone) return;
-        var c2b = heur(2);
-        if (put(c2b, 2)) { endSample(); return; }
-        if (bd.every(function (v) { return v; })) { endSample(); return; }
-        turn = 1; stat(i, g.label()); drawFramed(i);
-      }, 260);
+      demoAct(i, c1 * 150 / 7 + 75 / 7, 12, function () {
+        if (g.demoDone) return;
+        if (put(c1, 1)) { endSample(); return; }
+        turn = 2; stat(i, "AI..."); drawFramed(i);
+        setTimeout(function () {
+          if (g.cleared || ended || g.demoDone) return;
+          var c2b = heur(2);
+          if (put(c2b, 2)) { endSample(); return; }
+          if (bd.every(function (v) { return v; })) { endSample(); return; }
+          turn = 1; stat(i, g.label()); drawFramed(i);
+        }, 260);
+      });
     };
     return g;
   }
@@ -1148,6 +1149,8 @@
     var ifr = document.createElement("iframe");
     ifr.style.cssText = "width:100%;height:100%;border:0;display:block;";
     ifr.src = "staff-roll.html?sr_demo=1";
+    try { ifr.focus(); } catch (e) {}
+    ifr.addEventListener("load", function () { try { ifr.contentWindow.focus(); } catch (e) {} });
     var cl = document.createElement("button");
     cl.type = "button"; cl.textContent = "✕";
     cl.style.cssText = "position:absolute;top:8px;left:10px;z-index:2;width:30px;height:30px;border:1px solid #555;border-radius:6px;background:#111;color:#cfcfcf;font-size:15px;line-height:1;cursor:pointer;padding:0;";
@@ -1168,52 +1171,116 @@
   demoBtn.addEventListener("click", function (e) { e.stopPropagation(); openDemo(); });
   document.body.appendChild(demoBtn);
   }
-  var demoPlaying = false, curEl = null, curT = 0, curHold = false;
-  function cursorTo(ix, x, y, click) {
-    if (!DEMO) return;
-    if (!curEl) {
-      curEl = document.createElement("div");
-      curEl.style.cssText = "position:fixed;left:0;top:0;z-index:9999;pointer-events:none;";
-      curEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 1 L16 7 L9 9 L7 16 Z" fill="#ffffff" stroke="#000" stroke-width="1.2"></path></svg>';
-      document.body.appendChild(curEl);
-    }
+  var demoPlaying = false, curEl = null, curT = 0, curHold = false, demoTries = [];
+  var curPos = { x: -40, y: -40 }, curTgt = null, curFn = null, curDrag = null, curHas = false, viewY = 0;
+  function cursorEnsure() {
+    if (curEl) return;
+    curEl = document.createElement("div");
+    curEl.style.cssText = "position:fixed;left:0;top:0;z-index:9999;pointer-events:none;";
+    curEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 1 L16 7 L9 9 L7 16 Z" fill="#ffffff" stroke="#000" stroke-width="1.2"></path></svg>';
+    document.body.appendChild(curEl);
+  }
+  function screenOf(ix, x, y) {
     var r = stations[ix].querySelector("canvas").getBoundingClientRect();
-    curEl.style.left = (r.left + x * r.width / 150) + "px";
-    curEl.style.top = (r.top + y * r.height / 150) + "px";
-    if (click) { curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); curT = performance.now(); }
-    else if (!curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff");
+    return { sx: r.left + x * r.width / 150, sy: r.top + y * r.height / 150, r: r };
   }
-  function cursorTick() {
-    if (curEl && curT && performance.now() - curT > 160) { curT = 0; if (!curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); }
+  function setTarget(ix, x, y, fn, dragFn) {
+    if (!DEMO) { if (fn) fn(); return; }
+    cursorEnsure();
+    var sc = screenOf(ix, x, y);
+    curTgt = { sx: sc.sx, sy: sc.sy, i: ix };
+    curFn = fn || null;
+    curDrag = dragFn || null;
+    if (!curHas) {
+      curHas = true;
+      curPos.x = sc.sx; curPos.y = sc.sy;
+      curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
+      var f0 = curFn; curFn = null; curTgt = null;
+      if (f0) { curT = performance.now(); curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); f0(); }
+    }
   }
-  function demoClick(ix, x, y) { curHold = false; cursorTo(ix, x, y, true); }
-  function demoHold(ix, x, y, on) {
-    curHold = !!on;
-    cursorTo(ix, x, y, false);
-    if (curEl) curEl.firstChild.firstChild.setAttribute("fill", on ? "#ff3347" : "#ffffff");
+  function cursorStep(dt) {
+    if (!curEl) return;
+    if (curT && performance.now() - curT > 160 && !curHold) { curT = 0; curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); }
+    if (!curTgt) return;
+    var dx = curTgt.sx - curPos.x, dy = curTgt.sy - curPos.y, d = Math.hypot(dx, dy);
+    if (d < 2) {
+      curPos.x = curTgt.sx; curPos.y = curTgt.sy;
+      curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
+      if (curDrag) { var r2 = stations[curTgt.i].querySelector("canvas").getBoundingClientRect(); curDrag((curPos.x - r2.left) * 150 / r2.width, (curPos.y - r2.top) * 150 / r2.height); }
+      var f = curFn; curFn = null; curTgt = null; curDrag = null;
+      if (f) { curT = performance.now(); curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); f(); }
+      return;
+    }
+    var mv = Math.min(Math.max(120, d * 5) * dt, d);
+    curPos.x += dx / d * mv; curPos.y += dy / d * mv;
+    curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
+    if (curDrag) { var r3 = stations[curTgt.i].querySelector("canvas").getBoundingClientRect(); curDrag((curPos.x - r3.left) * 150 / r3.width, (curPos.y - r3.top) * 150 / r3.height); }
   }
-  function startSegment() {
-    var g = games[focused];
+  function demoAct(ix, x, y, fn) { setTarget(ix, x, y, fn, null); }
+  function demoHoldOn(ix, x, y, fn) {
+    curHold = true;
+    setTarget(ix, x, y, function () { if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); if (fn) fn(); }, null);
+  }
+  function demoHoldOff(ix, x, y, fn) {
+    curHold = false;
+    setTarget(ix, x, y, function () { if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); if (fn) fn(); }, null);
+  }
+  function setView(y) {
+    var minUp = -(roll.offsetHeight - innerHeight * .5);
+    viewY = Math.max(minUp, Math.min(innerHeight * .6, y));
+    roll.style.transform = "translateY(" + viewY + "px)";
+  }
+  function startSegment(n) {
+    var g = games[n];
     g.cleared = false; g.demoDone = false;
-    stations[focused].classList.remove("cleared");
+    stations[n].classList.remove("cleared");
     g.reset(); g.flash = 0;
-    stat(focused, g.label()); drawFramed(focused);
+    focused = n;
+    stations.forEach(function (s2, n2) { s2.classList.toggle("focused", n2 === focused); });
+    stat(n, g.label()); drawFramed(n);
     chalUpdate();
     demoPlaying = true;
   }
   if (DEMO) {
     games.forEach(function (g) {
       var d0 = g.down, m0 = g.move, u0 = g.up;
-      g.down = function (x, y) { if (x !== undefined) cursorTo(g.i, x, y, true); return d0.apply(g, arguments); };
-      g.move = function (x, y) { if (x !== undefined) cursorTo(g.i, x, y, false); return m0.apply(g, arguments); };
-      g.up = function () { if (curEl && !curHold) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); return u0.apply(g, arguments); };
+      g.down = function (x, y) {
+        if (x === undefined) { setTarget(g.i, 75, 75, function () { curHold = true; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ff3347"); d0.apply(g, []); }, null); return; }
+        setTarget(g.i, x, y, function () { d0.apply(g, [x, y]); }, null);
+      };
+      g.move = function (x, y) {
+        if (x === undefined) return;
+        setTarget(g.i, x, y, null, function (gx, gy) { m0.apply(g, [gx, gy]); });
+      };
+      g.up = function () {
+        var f = function () { curHold = false; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); u0.apply(g, []); };
+        if (curTgt) curFn = f; else f();
+      };
     });
     document.addEventListener("pointerdown", function (e) {
       e.preventDefault(); e.stopPropagation();
-      if (!demoPlaying) startSegment();
+      var st = e.target && e.target.closest ? e.target.closest(".station") : null;
+      if (st && !demoPlaying) {
+        var idx = Array.prototype.indexOf.call(stations, st);
+        if (idx >= 0) startSegment(idx);
+      }
     }, true);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setView(viewY - 90); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setView(viewY + 90); }
+      else if (e.code === "Space") {
+        e.preventDefault();
+        var jj = (focused + 1) % games.length;
+        focused = jj;
+        stations.forEach(function (s4, n4) { s4.classList.toggle("focused", n4 === focused); });
+        setView(innerHeight / 2 - (stations[jj].offsetTop + stations[jj].offsetHeight / 2));
+        stat(jj, games[jj].cleared ? "CLEAR ✓" : games[jj].label()); drawFramed(jj);
+      }
+    }, true);
+    document.addEventListener("wheel", function (e) { e.preventDefault(); setView(viewY - e.deltaY); }, { passive: false });
     var hb2 = document.createElement("div");
-    hb2.textContent = "↑↓ 切替 / クリック 再生 / SPACE 次へ";
+    hb2.textContent = "↑↓ スクロール / ゲームクリック 再生 / SPACE 次へ";
     hb2.style.cssText = "position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:97;color:#8fd8c0;font:700 11px/1.4 monospace;letter-spacing:.08em;pointer-events:none;";
     document.body.appendChild(hb2);
   }
@@ -1262,11 +1329,7 @@
       return;
     }
     if (demoOpen) return;
-    if (DEMO) {
-      if (e.code === "Space" || e.key === "ArrowDown") { e.preventDefault(); demoPlaying = false; focus(focused + 1); return; }
-      if (e.key === "ArrowUp") { e.preventDefault(); demoPlaying = false; focus(focused - 1); return; }
-      return;
-    }
+    if (DEMO) return;
     if (e.key === "Enter" && !ended) { e.preventDefault(); focus(focused + 1); }
   });
   (function () {
@@ -1313,7 +1376,7 @@
   function loop(now) {
     var dt = Math.min(.05, (now - last) / 1000);
     last = now;
-    cursorTick();
+    cursorStep(dt);
     if (!flowing && !ended && !waitTap && now >= prepEnd) startFlow();
     if (!ended && !plain) {
       var g = games[focused];
