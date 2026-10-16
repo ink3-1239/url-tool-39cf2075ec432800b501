@@ -16,6 +16,7 @@
     padding:0 20px; text-align:center; letter-spacing:.06em; line-height:1.65;
     transition:transform .35s ease;
   }
+  body.waiting #roll, body.waiting #chal, body.waiting #allclear { visibility:hidden; }
   #roll.flowing {
     transition:none;
     animation-name:rollUp; animation-timing-function:linear;
@@ -186,6 +187,21 @@
     banner.className = "";
     banner.innerHTML = "★ ALL CLEAR ★<small>何かは案内所とくっつけた時に解禁…!</small>";
     banner.style.display = "block";
+    try {
+      var cu = (localStorage.getItem("gesen_sr_clear_url") || "").trim();
+      if (cu && !document.getElementById("sr-perk")) {
+        var pk = document.createElement("div");
+        pk.id = "sr-perk";
+        pk.textContent = "☆クリア特典☆ここをタップ";
+        pk.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:95;background:#ffd400;color:#14120e;border:2px solid #14120e;border-radius:8px;padding:8px 16px;font:900 14px/1.4 sans-serif;letter-spacing:.08em;cursor:pointer;box-shadow:3px 3px 0 rgba(255,255,255,.85);";
+        pk.addEventListener("click", function () {
+          var u = "";
+          try { u = (localStorage.getItem("gesen_sr_clear_url") || "").trim(); } catch (e2) {}
+          if (u) window.open(u, "_blank", "noopener");
+        });
+        document.body.appendChild(pk);
+      }
+    } catch (e) {}
     fx.width = innerWidth; fx.height = innerHeight;
     parts = [];
     for (var i = 0; i < 140; i++) parts.push({
@@ -975,6 +991,39 @@
     focus(0);
     chalUpdate();
   }
+  var framed = (window.self !== window.top);
+  var waitTap = true;
+  var loadT = performance.now();
+  document.body.classList.add("waiting");
+  var focusChip = document.createElement("div");
+  focusChip.textContent = "TAP TO START";
+  focusChip.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;background:none;border:none;color:#d8d8d8;font:700 18px/1 monospace;letter-spacing:.35em;text-indent:.35em;display:none;pointer-events:none;white-space:nowrap;";
+  document.body.appendChild(focusChip);
+  function beginFlow() {
+    if (!waitTap) return;
+    waitTap = false;
+    document.body.classList.remove("waiting");
+    focusChip.style.cssText = "position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:80;background:#111;color:#cfcfcf;border:1px solid #555;border-radius:6px;padding:4px 10px;font:11px/1.4 monospace;opacity:.92;display:none;pointer-events:none;white-space:nowrap;";
+    prepEnd = performance.now() + PREP_SEC * 1000;
+    chipSync();
+    startFlow();
+  }
+  function chipSync() {
+    if (!framed) { focusChip.style.display = "none"; return; }
+    if (waitTap) {
+      focusChip.textContent = "TAP TO START";
+      focusChip.style.display = "block";
+      return;
+    }
+    focusChip.textContent = "画面内をタップ";
+    focusChip.style.display = document.hasFocus() ? "none" : "block";
+  }
+  document.addEventListener("pointerdown", beginFlow, true);
+  document.addEventListener("keydown", beginFlow, true);
+  window.addEventListener("focus", chipSync);
+  window.addEventListener("blur", chipSync);
+  setInterval(chipSync, 700);
+  chipSync();
   document.addEventListener("keydown", function (e) {
     if (plain) {
       var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -1024,7 +1073,7 @@
   function loop(now) {
     var dt = Math.min(.05, (now - last) / 1000);
     last = now;
-    if (!flowing && !ended && now >= prepEnd) startFlow();
+    if (!flowing && !ended && !waitTap && now >= prepEnd) startFlow();
     if (!ended && !plain) {
       var g = games[focused];
       if (!g.cleared) {
@@ -1054,9 +1103,9 @@
   prepEnd = performance.now() + PREP_SEC * 1000;
   chalUpdate();
   focus(0);
-  startFlow();
+  if (!waitTap) startFlow();
   requestAnimationFrame(loop);
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b600a4eb472038',t:'MTc5MjE0MjU4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
