@@ -1128,10 +1128,11 @@
     focus(0);
     chalUpdate();
   }
-  var demoOpen = false, demoTimers = [], pauseAt = 0, demoBtn = null;
+  var demoOpen = false, demoTimers = [], pauseAt = 0, demoBtn = null, demoFrame = null;
   function closeDemo() {
     if (!demoOpen) return;
     demoOpen = false;
+    demoFrame = null;
     demoTimers.forEach(clearTimeout); demoTimers = [];
     var ov = document.getElementById("sr-demo-ov");
     if (ov) { if (ov._removeEsc) ov._removeEsc(); ov.remove(); }
@@ -1149,6 +1150,7 @@
     var ifr = document.createElement("iframe");
     ifr.style.cssText = "width:100%;height:100%;border:0;display:block;";
     ifr.src = "staff-roll.html?sr_demo=1";
+    demoFrame = ifr;
     try { ifr.focus(); } catch (e) {}
     ifr.addEventListener("load", function () { try { ifr.contentWindow.focus(); } catch (e) {} });
     var cl = document.createElement("button");
@@ -1269,7 +1271,7 @@
     });
     document.addEventListener("pointerdown", function (e) {
       if (!e.isTrusted) return;
-      e.preventDefault(); e.stopPropagation();
+      e.stopPropagation();
       if (demoPlaying) return;
       var st = e.target && e.target.closest ? e.target.closest(".station") : null;
       if (st) {
@@ -1277,26 +1279,47 @@
         if (idx >= 0) startSegment(idx);
       }
     }, true);
-    ["pointermove", "pointerup", "pointercancel", "pointerleave", "pointerenter", "pointerover", "pointerout", "mousedown", "mousemove", "mouseup", "mouseover", "mouseout", "click", "dblclick", "contextmenu", "touchstart", "touchmove", "touchend"].forEach(function (t) {
+    ["pointerup", "pointercancel", "pointerleave", "pointerenter", "pointerover", "pointerout", "mousedown", "mousemove", "mouseup", "mouseover", "mouseout", "click", "dblclick", "contextmenu", "touchstart", "touchmove", "touchend"].forEach(function (t) {
       document.addEventListener(t, function (e) { if (e.isTrusted) { e.preventDefault(); e.stopPropagation(); } }, true);
     });
+    document.addEventListener("pointermove", function (e) {
+      if (!e.isTrusted) return;
+      e.preventDefault(); e.stopPropagation();
+      if (demoPlaying) return;
+      cursorEnsure();
+      curTgt = null; curFn = null; curDrag = null; curHold = false;
+      curPos.x = e.clientX; curPos.y = e.clientY;
+      curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
+      curEl.firstChild.firstChild.setAttribute("fill", "#ffffff");
+    }, true);
+    function demoJump() {
+      if (demoPlaying) return;
+      var jj = (focused + 1) % games.length;
+      focused = jj;
+      stations.forEach(function (s4, n4) { s4.classList.toggle("focused", n4 === focused); });
+      setView(innerHeight / 2 - (stations[jj].offsetTop + stations[jj].offsetHeight / 2));
+      stat(jj, games[jj].cleared ? "CLEAR ✓" : games[jj].label()); drawFramed(jj);
+    }
+    window.__srNav = function (k) {
+      if (k === "down") setView(viewY - 90);
+      else if (k === "up") setView(viewY + 90);
+      else if (k === "space") demoJump();
+    };
     document.addEventListener("keydown", function (e) {
       if (!e.isTrusted) return;
       e.preventDefault(); e.stopPropagation();
       if (e.key === "ArrowDown") setView(viewY - 90);
       else if (e.key === "ArrowUp") setView(viewY + 90);
-      else if (e.code === "Space" && !demoPlaying) {
-        var jj = (focused + 1) % games.length;
-        focused = jj;
-        stations.forEach(function (s4, n4) { s4.classList.toggle("focused", n4 === focused); });
-        setView(innerHeight / 2 - (stations[jj].offsetTop + stations[jj].offsetHeight / 2));
-        stat(jj, games[jj].cleared ? "CLEAR ✓" : games[jj].label()); drawFramed(jj);
-      }
+      else if (e.code === "Space") demoJump();
     }, true);
     document.addEventListener("wheel", function (e) { e.preventDefault(); setView(viewY - e.deltaY); }, { passive: false });
     var cst = document.createElement("style");
-    cst.textContent = "*{cursor:none !important;}";
+    cst.textContent = "*{cursor:none !important;-webkit-user-select:none;user-select:none;}";
     document.head.appendChild(cst);
+    roll.style.animation = "none";
+    cursorEnsure();
+    curPos.x = innerWidth / 2; curPos.y = innerHeight / 2;
+    curEl.style.left = curPos.x + "px"; curEl.style.top = curPos.y + "px";
     var hb2 = document.createElement("div");
     hb2.textContent = "↑↓/ホイール スクロール / ゲームクリック 再生 / SPACE 次へ";
     hb2.style.cssText = "position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:97;color:#8fd8c0;font:700 11px/1.4 monospace;letter-spacing:.08em;pointer-events:none;";
@@ -1346,7 +1369,17 @@
       else seqIdx = (k === KEYSEQ[0]) ? 1 : 0;
       return;
     }
-    if (demoOpen) return;
+    if (demoOpen) {
+      try {
+        var dw = demoFrame && demoFrame.contentWindow;
+        if (dw && dw.__srNav) {
+          if (e.key === "ArrowDown") { e.preventDefault(); dw.__srNav("down"); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); dw.__srNav("up"); }
+          else if (e.code === "Space") { e.preventDefault(); dw.__srNav("space"); }
+        }
+      } catch (e9) {}
+      return;
+    }
     if (DEMO) return;
     if (e.key === "Enter" && !ended) { e.preventDefault(); focus(focused + 1); }
   });
@@ -1395,13 +1428,13 @@
     var dt = Math.min(.05, (now - last) / 1000);
     last = now;
     cursorStep(dt);
-    if (!flowing && !ended && !waitTap && now >= prepEnd) startFlow();
+    if (!flowing && !ended && !waitTap && !DEMO && now >= prepEnd) startFlow();
     if (!ended && !plain) {
       var g = games[focused];
       if (!g.cleared) {
-        g.update(dt);
+        if (!DEMO || demoPlaying) g.update(dt);
         if (DEMO && demoPlaying && g.ai) g.ai(dt);
-        if (DEMO && demoPlaying && (g.cleared || g.demoDone)) demoPlaying = false;
+        if (DEMO && demoPlaying && (g.cleared || g.demoDone)) { demoPlaying = false; curTgt = null; curFn = null; curDrag = null; curHold = false; holdTok++; if (curEl) curEl.firstChild.firstChild.setAttribute("fill", "#ffffff"); }
         if (g.flash > 0) g.flash -= dt * 2.2;
         drawFramed(focused);
       }
