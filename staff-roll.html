@@ -94,6 +94,7 @@
 (function () {
   "use strict";
   var FLOW_SEC = 200, PREP_SEC = 0;
+  var DEMO = /[?&]sr_demo=1/.test(location.search);
   var META = [
     ["1", "クラフト＆バスターズ", "ink3"],
     ["2", "フローズン・ダジャレ", "ink3"],
@@ -185,6 +186,7 @@
   function payoff() {
     allclear = true;
     window.STAFF_ROLL_ALLCLEAR = true;
+    if (DEMO) return;
     roll.classList.add("gold");
     banner.className = "";
     banner.innerHTML = "★ ALL CLEAR ★<small>何かは案内所とくっつけた時に解禁…!</small>";
@@ -275,6 +277,17 @@
       c.fillStyle = "#ffd76a";
       for (var n = 0; n < ammo; n++) c.fillRect(8 + n * 9, 136, 5, 9);
     };
+    g.ai = function (dt) {
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .3) return;
+      g.aiT = 0;
+      if (ammo <= 2 && ore) { g.down(ore.x, ore.y); return; }
+      if (foes.length) {
+        var best = foes[0], bd2 = 1e9;
+        foes.forEach(function (f) { var d = Math.hypot(f.x - 75, f.y - 75); if (d < bd2) { bd2 = d; best = f; } });
+        g.down(best.x, best.y);
+      }
+    };
     return g;
   }
 
@@ -309,7 +322,12 @@
       var mid = .55 + Math.sin(g.t * 1.3) * .08;
       c.fillStyle = "#1d5a43"; c.fillRect(12, 10 + (1 - (mid + .1)) * 130, 10, .2 * 130);
       c.fillStyle = "#fff"; c.fillRect(10, 10 + (1 - v) * 130 - 2, 14, 3);
-      c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif"; c.fillText("SPACE", 96, 16);
+      c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif"; c.fillText("HOLD", 96, 16);
+    };
+    g.ai = function (dt) {
+      var mid = .55 + Math.sin(g.t * 1.3) * .08;
+      if (v < mid - .04) g.keyHold = true;
+      else if (v > mid + .04) g.keyHold = false;
     };
     return g;
   }
@@ -343,6 +361,7 @@
         c.fillStyle = "#ff7a45"; c.fillRect(x - 26, y + 8, 52, 3);
       }
     };
+    g.ai = function (dt) { if (!fall && Math.abs(g.cur() - 75) <= 2) g.down(); };
     return g;
   }
 
@@ -387,6 +406,14 @@
       }
       c.fillStyle = "#8f9a9a";
       for (n = 0; n < 6; n++) { c.beginPath(); c.arc(45 + n * 12, 140, 3, 0, 7); c.fill(); }
+    };
+    g.ai = function (dt) {
+      if (phase !== "input") return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .4) return;
+      g.aiT = 0;
+      var p = g.pos(seq[input]);
+      g.down(p.x, p.y);
     };
     return g;
   }
@@ -473,6 +500,13 @@
         c.font = "bold 15px sans-serif"; c.fillText(msg, 52, 61);
       }
     };
+    g.ai = function (dt) {
+      if (phase !== "play") return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .5) return;
+      g.aiT = 0;
+      if (total(P) < 17) g.down(30, 130); else g.down(110, 130);
+    };
     return g;
   }
 
@@ -508,6 +542,10 @@
       c.fillStyle = "#222"; c.fillRect(12, 20, 12, 110);
       c.fillStyle = "#7a1f1f"; c.fillRect(14, 22, 8, 20);
       c.fillStyle = ten > .8 ? "#ff5566" : "#7fd8c8"; c.fillRect(14, 22 + (1 - Math.min(1, ten)) * 106, 8, Math.min(1, ten) * 106);
+    };
+    g.ai = function (dt) {
+      if (ten > .82) g.up();
+      else if (ten < .55) g.down();
     };
     return g;
   }
@@ -575,6 +613,22 @@
       c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-6, -5, 2, 2);
       c.restore();
     };
+    g.ai = function (dt) {
+      var bestx = hx, besty = hy, bs = -1e9;
+      for (var n = 0; n < 12; n++) {
+        var x = 15 + Math.random() * 120, y = 15 + Math.random() * 120, sc = 0;
+        for (var k2 = 0; k2 < sl.length; k2++) {
+          var q = sl[k2];
+          if (q.t > q.delay - .5 && q.t <= q.delay + q.active) {
+            var dd = Math.abs(-(x - q.x) * Math.sin(q.ang) + (y - q.y) * Math.cos(q.ang));
+            sc += Math.min(dd, 40);
+          }
+        }
+        sc -= Math.hypot(x - hx, y - hy) * .15;
+        if (sc > bs) { bs = sc; bestx = x; besty = y; }
+      }
+      g.move(bestx, besty);
+    };
     return g;
   }
 
@@ -612,6 +666,13 @@
       c.strokeStyle = "#fff"; c.lineWidth = 1.5;
       c.beginPath(); c.arc(cx, cy, 9, 0, 7); c.stroke();
       c.beginPath(); c.moveTo(cx - 13, cy); c.lineTo(cx + 13, cy); c.moveTo(cx, cy - 13); c.lineTo(cx, cy + 13); c.stroke();
+    };
+    g.ai = function (dt) {
+      g.move(tx, ty);
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .25) return;
+      g.aiT = 0;
+      g.down(tx, ty);
     };
     return g;
   }
@@ -663,6 +724,12 @@
       q.forEach(function (qc, n) { c.fillStyle = COL[qc]; c.fillRect(2 + n * 10, 6, 8, 8); });
       items.forEach(function (it) { c.fillStyle = COL[it.c]; c.fillRect(it.x - 8, ly[it.lane] - 8, 16, 16); });
     };
+    g.ai = function (dt) {
+      items.forEach(function (it) {
+        if (!it.p1 && it.x >= 34 && it.x < 50 && s1 !== (it.c === 0)) g.down(50, 75);
+        if (!it.p2 && it.x >= 84 && it.x < 100 && s2 !== (it.c === 2)) g.down(100, 75);
+      });
+    };
     return g;
   }
 
@@ -701,6 +768,15 @@
         c.fillRect(tx2, ty2, 8, 8);
       }
       c.strokeStyle = "#ffd76a"; c.strokeRect(55, 4, 40, 40);
+    };
+    g.ai = function (dt) {
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .2) return;
+      g.aiT = 0;
+      for (var n = 0; n < 16; n++) if (grid[n] !== TGT[n]) {
+        g.down(39 + (n % 4) * 19 + 8, 39 + Math.floor(n / 4) * 19 + 8);
+        return;
+      }
     };
     return g;
   }
@@ -758,6 +834,18 @@
         var v = bd[r * W + q];
         if (v) { c.fillStyle = v === 1 ? "#ffd76a" : "#ff7a45"; c.beginPath(); c.arc(q * 21 + 12, r * 24 + 15, 8, 0, 7); c.fill(); }
       }
+    };
+    g.ai = function (dt) {
+      if (turn !== 1) return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .4) return;
+      g.aiT = 0;
+      var c2 = 7;
+      for (c2 = 0; c2 < 7; c2++) if (col(c2) >= 0 && tryWin(c2, 1)) break;
+      if (c2 >= 7) { for (c2 = 0; c2 < 7; c2++) if (col(c2) >= 0 && tryWin(c2, 2)) break; }
+      if (c2 >= 7) c2 = 3;
+      if (col(c2) < 0) c2 = 0;
+      g.down(c2 * 150 / 7 + 75 / 7, 10);
     };
     return g;
   }
@@ -820,6 +908,18 @@
       });
       for (var n = 0; n < 3; n++) { c.fillStyle = n < pS ? "#3fe081" : "#333"; c.beginPath(); c.arc(60 + n * 12, 142, 4, 0, 7); c.fill(); }
       for (n = 0; n < 3; n++) { c.fillStyle = n < aS ? "#ff5566" : "#333"; c.beginPath(); c.arc(60 + n * 12, 8, 4, 0, 7); c.fill(); }
+    };
+    g.ai = function (dt) {
+      var threat = null;
+      orbs.forEach(function (o) { if (o.o === 1 && Math.hypot(o.x - px, o.y - py) < 45) threat = o; });
+      if (threat) {
+        var dx = px - threat.x, dy = py - threat.y, d = Math.hypot(dx, dy) || 1;
+        if (hold) g.up();
+        g.move(Math.max(12, Math.min(138, px + dx / d * 40)), Math.max(12, Math.min(138, py + dy / d * 40)));
+        return;
+      }
+      if (!hold && pCh === 0) { g.move(75, 75); g.down(75, 75); }
+      else if (hold && pCh >= .8) g.up();
     };
     return g;
   }
@@ -925,6 +1025,21 @@
       c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif";
       c.fillText("\u25cf " + cc[0] + " - " + cc[1] + " \u25cb", X0, Y0 + CS * N + 11);
     };
+    g.ai = function (dt) {
+      if (busy || turn !== 1) return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .5) return;
+      g.aiT = 0;
+      var ms = moves(1);
+      if (!ms.length) return;
+      var best = ms[0], bs = -1e9;
+      ms.forEach(function (m) {
+        var sc = flips(m[0], m[1], 1).length + Math.random() * 4;
+        if ((m[0] === 0 || m[0] === N - 1) && (m[1] === 0 || m[1] === N - 1)) sc += 6;
+        if (sc > bs) { bs = sc; best = m; }
+      });
+      g.down(X0 + best[1] * CS + CS / 2, Y0 + best[0] * CS + CS / 2);
+    };
     return g;
   }
 
@@ -1011,56 +1126,21 @@
     var ov = document.createElement("div");
     ov.id = "sr-demo-ov";
     ov.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#000;";
-    var box = document.createElement("div");
-    box.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#efe8da;font-family:sans-serif;width:86%;";
-    var no = document.createElement("div");
-    no.style.cssText = "font:700 12px/1 monospace;letter-spacing:.3em;color:#8fd8c0;";
-    var ti = document.createElement("div");
-    ti.style.cssText = "font:800 26px/1.4 sans-serif;letter-spacing:.12em;margin-top:12px;";
-    var st = document.createElement("div");
-    st.style.cssText = "font:700 15px/1.6 monospace;margin-top:14px;color:#ffd76a;min-height:24px;";
-    var pg = document.createElement("div");
-    pg.style.cssText = "font:400 11px/1 monospace;color:#888;margin-top:18px;letter-spacing:.2em;";
+    var ifr = document.createElement("iframe");
+    ifr.style.cssText = "width:100%;height:100%;border:0;display:block;";
+    ifr.src = "staff-roll.html?sr_demo=1";
     var cl = document.createElement("button");
     cl.type = "button"; cl.textContent = "✕";
-    cl.style.cssText = "position:absolute;top:8px;left:10px;width:30px;height:30px;border:1px solid #555;border-radius:6px;background:#111;color:#cfcfcf;font-size:15px;line-height:1;cursor:pointer;padding:0;";
+    cl.style.cssText = "position:absolute;top:8px;left:10px;z-index:2;width:30px;height:30px;border:1px solid #555;border-radius:6px;background:#111;color:#cfcfcf;font-size:15px;line-height:1;cursor:pointer;padding:0;";
     cl.addEventListener("click", closeDemo);
     function onEsc(e) { if (e.key === "Escape") closeDemo(); }
     ov._removeEsc = function () { document.removeEventListener("keydown", onEsc, true); };
     document.addEventListener("keydown", onEsc, true);
-    ov.appendChild(box); box.appendChild(no); box.appendChild(ti); box.appendChild(st); box.appendChild(pg); ov.appendChild(cl);
+    ov.appendChild(ifr);
+    ov.appendChild(cl);
     document.body.appendChild(ov);
-    var n = 0;
-    function step() {
-      if (!demoOpen) return;
-      if (n >= META.length) {
-        no.textContent = "SAMPLE";
-        ti.textContent = "★ ALL CLEAR ★";
-        ti.style.color = "#3fe081";
-        st.textContent = "13/13 すべて一発クリアのお手本でした";
-        pg.textContent = "✕ で終了";
-        demoTimers.push(setTimeout(closeDemo, 4200));
-        return;
-      }
-      var m = META[n];
-      no.textContent = "SAMPLE " + String(n + 1).padStart(2, "0") + " / " + META.length;
-      ti.textContent = m[1];
-      ti.style.color = "#efe8da";
-      st.textContent = "プレイ中…";
-      pg.textContent = "作者 " + m[2];
-      demoTimers.push(setTimeout(function () {
-        if (!demoOpen) return;
-        st.textContent = "CLEAR ✓ 一発成功";
-        st.style.color = "#3fe081";
-        demoTimers.push(setTimeout(function () {
-          if (!demoOpen) return;
-          st.style.color = "#ffd76a";
-          n++; step();
-        }, 850));
-      }, 1500));
-    }
-    step();
   }
+  if (!DEMO) {
   demoBtn = document.createElement("button");
   demoBtn.type = "button";
   demoBtn.id = "sr-demo";
@@ -1068,8 +1148,9 @@
   demoBtn.style.cssText = "position:fixed;top:6px;right:100px;z-index:96;background:#14120e;color:#ffd76a;border:1px solid #ffd76a;border-radius:6px;padding:3px 8px;font:700 10.5px/1.4 sans-serif;letter-spacing:.05em;cursor:pointer;";
   demoBtn.addEventListener("click", function (e) { e.stopPropagation(); openDemo(); });
   document.body.appendChild(demoBtn);
+  }
   var framed = (window.self !== window.top);
-  var waitTap = true;
+  var waitTap = !DEMO;
   var loadT = performance.now();
   document.body.classList.add("waiting");
   var focusChip = document.createElement("div");
@@ -1086,6 +1167,7 @@
     startFlow();
   }
   function chipSync() {
+    if (DEMO) { focusChip.style.display = "none"; return; }
     if (!framed) { focusChip.style.display = "none"; return; }
     if (waitTap) {
       focusChip.textContent = "TAP TO START";
@@ -1109,6 +1191,7 @@
       return;
     }
     if (demoOpen) return;
+    if (DEMO && e.code === "Space") { e.preventDefault(); if (!ended) focus(focused + 1); return; }
     if (e.key === "Enter" && !ended) { e.preventDefault(); focus(focused + 1); }
   });
   (function () {
@@ -1146,6 +1229,7 @@
   });
   roll.addEventListener("animationend", function () {
     if (plain) { ended = true; return; }
+    if (DEMO) { ended = true; return; }
     if (!allclear) failOut();
     else ended = true;
   });
@@ -1159,6 +1243,7 @@
       var g = games[focused];
       if (!g.cleared) {
         g.update(dt);
+        if (DEMO && g.ai) g.ai(dt);
         if (g.flash > 0) g.flash -= dt * 2.2;
         drawFramed(focused);
       }
@@ -1183,6 +1268,7 @@
   games.forEach(function (g, i) { drawFramed(i); });
   prepEnd = performance.now() + PREP_SEC * 1000;
   chalUpdate();
+  if (DEMO) { plain = false; document.body.classList.remove("plain"); }
   focus(0);
   if (!waitTap) startFlow();
   requestAnimationFrame(loop);
