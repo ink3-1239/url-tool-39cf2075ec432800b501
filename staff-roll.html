@@ -1236,14 +1236,17 @@
   }
   function chipSync() {
     if (DEMO) { focusChip.style.display = "none"; return; }
-    if (!framed) { focusChip.style.display = "none"; return; }
     if (waitTap) {
       focusChip.textContent = "TAP TO START";
       focusChip.style.display = "block";
       return;
     }
-    focusChip.textContent = "画面内をタップ";
-    focusChip.style.display = document.hasFocus() ? "none" : "block";
+    if (framed && !document.hasFocus()) {
+      focusChip.textContent = "画面内をタップ";
+      focusChip.style.display = "block";
+      return;
+    }
+    focusChip.style.display = "none";
   }
   document.addEventListener("pointerdown", beginFlow, true);
   document.addEventListener("keydown", beginFlow, true);
@@ -1348,5 +1351,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b6d5fa9c81d844',t:'MTc5MjE1MTMyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
