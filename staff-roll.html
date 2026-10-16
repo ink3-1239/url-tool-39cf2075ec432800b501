@@ -1152,7 +1152,7 @@
   var framed = (window.self !== window.top);
   var waitTap = !DEMO;
   var loadT = performance.now();
-  document.body.classList.add("waiting");
+  if (waitTap) document.body.classList.add("waiting");
   var focusChip = document.createElement("div");
   focusChip.textContent = "TAP TO START";
   focusChip.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;background:none;border:none;color:#d8d8d8;font:700 18px/1 monospace;letter-spacing:.35em;text-indent:.35em;display:none;pointer-events:none;white-space:nowrap;";
@@ -1244,6 +1244,7 @@
       if (!g.cleared) {
         g.update(dt);
         if (DEMO && g.ai) g.ai(dt);
+        if (DEMO && stations[focused].getBoundingClientRect().bottom < 0) autoNext(focused);
         if (g.flash > 0) g.flash -= dt * 2.2;
         drawFramed(focused);
       }
