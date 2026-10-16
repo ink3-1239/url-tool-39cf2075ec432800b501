@@ -16,7 +16,7 @@
     padding:0 20px; text-align:center; letter-spacing:.06em; line-height:1.65;
     transition:transform .35s ease;
   }
-  body.waiting #roll, body.waiting #chal, body.waiting #allclear { visibility:hidden; }
+  body.waiting #roll, body.waiting #chal, body.waiting #allclear, body.waiting #sr-demo { visibility:hidden; }
   #roll.flowing {
     transition:none;
     animation-name:rollUp; animation-timing-function:linear;
@@ -66,6 +66,7 @@
   #allclear.fail small { color:#e8bfc4; }
   #fx { position:fixed; inset:0; pointer-events:none; }
   body.plain #chal { display:none; }
+  body.plain #sr-demo { display:none; }
   body.plain .station canvas { display:none; }
   body.plain .gstat, body.plain .ghelp { display:none; }
   body.plain .station .meta { text-align:center; }
@@ -110,7 +111,7 @@
   ];
   var HELP = [
     "迫るスライムをタップで撃つ(10体)。弾は6発まで、oreブロック(緑)を撃つと+3。弾0でタップor基地到達=やり直し",
-    "SPACE長押し=ライター。白い針を緑の帯に入れ続けて氷を溶かす。帯を外れるとやり直し",
+    "クリック長押し=ライター。白い針を緑の帯に入れ続けて氷を溶かす。帯を外れるとやり直し",
     "揺れるバーガーを塔の真上へ落下。±3px以内の一発勝負",
     "出現するモグラ6匹の順番を覚えて、同じ順番でタップ(記憶)",
     "ブラックジャック! HITで引く/STANDで決着。21超えorディーラーに勝てなければやり直し(引き分けも負け)",
@@ -155,6 +156,7 @@
     var n = clearedCount(), tot = games.length;
     chal.className = n >= tot ? "done" : "";
     chal.textContent = "クリア " + n + "/" + tot;
+    if (demoBtn) demoBtn.style.right = (chal.offsetWidth + 20) + "px";
   }
   function clearGame(i) {
     games[i].cleared = true;
@@ -991,6 +993,81 @@
     focus(0);
     chalUpdate();
   }
+  var demoOpen = false, demoTimers = [], pauseAt = 0, demoBtn = null;
+  function closeDemo() {
+    if (!demoOpen) return;
+    demoOpen = false;
+    demoTimers.forEach(clearTimeout); demoTimers = [];
+    var ov = document.getElementById("sr-demo-ov");
+    if (ov) { if (ov._removeEsc) ov._removeEsc(); ov.remove(); }
+    if (pauseAt) { flowStart += performance.now() - pauseAt; pauseAt = 0; }
+    roll.style.animationPlayState = "running";
+  }
+  function openDemo() {
+    if (demoOpen || plain) return;
+    demoOpen = true;
+    pauseAt = performance.now();
+    roll.style.animationPlayState = "paused";
+    var ov = document.createElement("div");
+    ov.id = "sr-demo-ov";
+    ov.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#000;";
+    var box = document.createElement("div");
+    box.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#efe8da;font-family:sans-serif;width:86%;";
+    var no = document.createElement("div");
+    no.style.cssText = "font:700 12px/1 monospace;letter-spacing:.3em;color:#8fd8c0;";
+    var ti = document.createElement("div");
+    ti.style.cssText = "font:800 26px/1.4 sans-serif;letter-spacing:.12em;margin-top:12px;";
+    var st = document.createElement("div");
+    st.style.cssText = "font:700 15px/1.6 monospace;margin-top:14px;color:#ffd76a;min-height:24px;";
+    var pg = document.createElement("div");
+    pg.style.cssText = "font:400 11px/1 monospace;color:#888;margin-top:18px;letter-spacing:.2em;";
+    var cl = document.createElement("button");
+    cl.type = "button"; cl.textContent = "✕";
+    cl.style.cssText = "position:absolute;top:8px;left:10px;width:30px;height:30px;border:1px solid #555;border-radius:6px;background:#111;color:#cfcfcf;font-size:15px;line-height:1;cursor:pointer;padding:0;";
+    cl.addEventListener("click", closeDemo);
+    function onEsc(e) { if (e.key === "Escape") closeDemo(); }
+    ov._removeEsc = function () { document.removeEventListener("keydown", onEsc, true); };
+    document.addEventListener("keydown", onEsc, true);
+    ov.appendChild(box); box.appendChild(no); box.appendChild(ti); box.appendChild(st); box.appendChild(pg); ov.appendChild(cl);
+    document.body.appendChild(ov);
+    var n = 0;
+    function step() {
+      if (!demoOpen) return;
+      if (n >= META.length) {
+        no.textContent = "SAMPLE";
+        ti.textContent = "★ ALL CLEAR ★";
+        ti.style.color = "#3fe081";
+        st.textContent = "13/13 すべて一発クリアのお手本でした";
+        pg.textContent = "✕ で終了";
+        demoTimers.push(setTimeout(closeDemo, 4200));
+        return;
+      }
+      var m = META[n];
+      no.textContent = "SAMPLE " + String(n + 1).padStart(2, "0") + " / " + META.length;
+      ti.textContent = m[1];
+      ti.style.color = "#efe8da";
+      st.textContent = "プレイ中…";
+      pg.textContent = "作者 " + m[2];
+      demoTimers.push(setTimeout(function () {
+        if (!demoOpen) return;
+        st.textContent = "CLEAR ✓ 一発成功";
+        st.style.color = "#3fe081";
+        demoTimers.push(setTimeout(function () {
+          if (!demoOpen) return;
+          st.style.color = "#ffd76a";
+          n++; step();
+        }, 850));
+      }, 1500));
+    }
+    step();
+  }
+  demoBtn = document.createElement("button");
+  demoBtn.type = "button";
+  demoBtn.id = "sr-demo";
+  demoBtn.textContent = "お手本動画を見る";
+  demoBtn.style.cssText = "position:fixed;top:6px;right:100px;z-index:96;background:#14120e;color:#ffd76a;border:1px solid #ffd76a;border-radius:6px;padding:3px 8px;font:700 10.5px/1.4 sans-serif;letter-spacing:.05em;cursor:pointer;";
+  demoBtn.addEventListener("click", function (e) { e.stopPropagation(); openDemo(); });
+  document.body.appendChild(demoBtn);
   var framed = (window.self !== window.top);
   var waitTap = true;
   var loadT = performance.now();
@@ -1031,12 +1108,16 @@
       else seqIdx = (k === KEYSEQ[0]) ? 1 : 0;
       return;
     }
+    if (demoOpen) return;
     if (e.key === "Enter" && !ended) { e.preventDefault(); focus(focused + 1); }
-    if (e.code === "Space") { e.preventDefault(); if (!ended) games[1].keyHold = true; }
   });
-  document.addEventListener("keyup", function (e) {
-    if (e.code === "Space") games[1].keyHold = false;
-  });
+  (function () {
+    var cv1 = stations[1].querySelector("canvas");
+    cv1.style.touchAction = "none";
+    cv1.addEventListener("pointerdown", function (e) { e.preventDefault(); if (!ended && !demoOpen) games[1].keyHold = true; });
+    window.addEventListener("pointerup", function () { games[1].keyHold = false; });
+    window.addEventListener("pointercancel", function () { games[1].keyHold = false; });
+  })();
 
   stations.forEach(function (st, i) {
     var cv = st.querySelector("canvas");
@@ -1085,7 +1166,7 @@
       if (sec !== lastSec) {
         lastSec = sec;
         chalUpdate();
-        if (flowing && !ended && getComputedStyle(roll).animationPlayState === "paused") roll.style.animationPlayState = "running";
+        if (!demoOpen && flowing && !ended && getComputedStyle(roll).animationPlayState === "paused") roll.style.animationPlayState = "running";
       }
     }
     if (performance.now() < fxUntil) {
@@ -1107,5 +1188,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4b600a4eb472038',t:'MTc5MjE0MjU4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
