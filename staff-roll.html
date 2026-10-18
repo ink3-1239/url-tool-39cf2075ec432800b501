@@ -110,7 +110,8 @@
     ["12", "ドールビーム", "MO"],
     ["13", "オセロ・アリーナ", "MO"],
     ["14", "Dilemma", "ink3"],
-    ["15", "ｍaru-pla", "まるくん"]
+    ["15", "ｍaru-pla", "まるくん"],
+    ["16", "ノック＆ピンポン", "ink3"]
   ];
   var HELP = [
     "迫るスライムをタップで撃つ(10体)。弾は6発まで、oreブロック(緑)を撃つと+3。弾0でタップor基地到達=やり直し",
@@ -127,8 +128,9 @@
     "ドラッグ移動+長押しチャージ、離すとビーム弾発射! 先に3回当てて(相手の弾は回避)。本家の2D版",
     "6×6オセロでAIと一戦。AIより多く石を取ればクリア(引き分けもやり直し)。光る点=置ける場所"
   ,
-    "攻撃/チャージ/ガードの三すくみ心理戦! 攻撃はチャージを妨げ、チャージはガードを崩し、ガードは攻撃を防ぐ。3本先取でクリア",
-    "インク決闘! ドラッグ移動+長押しチャージ→離すとインク弾(当たれば大きく塗れる)。障害物がインクを遮る。15秒ラウンド、青より多く塗れば勝ち"];
+    "チャージ1つを消費して1回攻撃。ガードは攻撃を完全防御。相手のチャージ中に3回当てればクリア",
+    "インク決闘! ドラッグ移動+長押しチャージ→離すとインク弾(当たれば大きく塗れる)。障害物がインクを遮る。15秒ラウンド、青より多く塗れば勝ち",
+    "流れてくる音符をレーンに合わせてタップ。12音中8回以上ヒットでクリア"];
   var roll = document.getElementById("roll");
   var stage = document.getElementById("stage");
   var banner = document.getElementById("allclear");
@@ -1169,61 +1171,87 @@
   }
 
     function g14(i) {
-    var g = { i: i, t: 0, cleared: false, flash: 0 };
-    var NAME = ["攻撃", "チャージ", "ガード"];
-    function beats(a, b) { return (a === 0 && b === 1) || (a === 1 && b === 2) || (a === 2 && b === 0); }
-    function beat(m) { for (var k = 0; k < 3; k++) if (beats(k, m)) return k; return 0; }
-    var ps, os, round, lastP, phase, phaseT, showP, showO;
-    function setup() { ps = 0; os = 0; round = 1; lastP = -1; phase = "pick"; phaseT = 0; showP = -1; showO = -1; }
-    function cpuPick() { return lastP < 0 ? Math.floor(drand() * 3) % 3 : beat(lastP); }
-    g.choose = function (p) {
+    var g = base(i), ACTIONS = ["攻撃", "チャージ", "ガード"];
+    var pattern = [1, 2, 1, 0, 1, 2, 1, 1, 0, 1];
+    var pEN, eEN, hp, hits, round, phase, phaseT, showP, showE, showPower, showMsg, aiWait, aiReady, aiWaitT, aiPick;
+    function setup() {
+      g.t = 0; pEN = 2; eEN = 0; hp = 3; hits = 0; round = 1;
+      phase = "pick"; phaseT = 0; showP = -1; showE = -1; showPower = 0; showMsg = ""; aiWait = false; aiReady = false; aiWaitT = 0; aiPick = 0; g.aiT = 0;
+    }
+    function enemyPick() { return pattern[(round - 1) % pattern.length]; }
+    function resolve(p) {
       if (phase !== "pick" || g.cleared) return;
-      var o = cpuPick();
-      showP = p; showO = o; lastP = p; phase = "show"; phaseT = 0;
-      if (beats(p, o)) { ps++; g.flash = .6; } else if (beats(o, p)) os++;
-      if (ps >= 3) { g.cleared = true; g.flash = 1; }
-      else if (os >= 3) setup();
-      else round++;
-    };
+      if (p === 0 && pEN <= 0) return;
+      var e = enemyPick(), power = p === 0 ? 1 : 0;
+      if (p === 1) pEN++;
+      else if (p === 0) pEN = Math.max(0, pEN - 1);
+      if (e === 1) {
+        eEN++;
+        if (p === 0 && power > 0) hits++;
+      } else if (e === 0) {
+        if (p === 2) showMsg = "完全ガード！";
+        else { hp--; showMsg = "攻撃を受けた"; }
+        eEN = 0;
+      } else if (p === 0) showMsg = "相手のガードで防がれた";
+      else showMsg = "相手はガード";
+      showP = p; showE = e; showPower = power; phase = "show"; phaseT = 0;
+      round++; stat(i, g.label());
+      if (hp <= 0) { resetGame(i); return; }
+      if (hits >= 3) { clearGame(i); return; }
+    }
     g.reset = function () { setup(); };
-    g.label = function () { return ps + "-" + os + " R" + round; };
+    g.label = function () { return "HIT " + hits + "/3  EN " + pEN; };
     g.update = function (dt) {
+      if (g.cleared) return;
       g.t += dt;
-      if (phase === "show") { phaseT += dt; if (phaseT > 1.25) { phase = "pick"; showP = -1; showO = -1; } }
+      if (phase === "show") { phaseT += dt; if (phaseT > .72) { phase = "pick"; showP = -1; showE = -1; showMsg = ""; } }
     };
     g.down = function (x, y) {
       if (phase !== "pick" || g.cleared || y < 108) return;
-      g.choose(x < 50 ? 0 : x < 100 ? 1 : 2);
+      resolve(x < 50 ? 0 : x < 100 ? 1 : 2);
     };
     g.draw = function (c) {
-      cls(c);
-      c.fillStyle = "#20263a"; c.fillRect(0, 0, 150, 150);
-      c.fillStyle = "#ffd76a"; c.beginPath(); c.arc(45, 42, 14, 0, 7); c.fill();
-      c.fillStyle = "#7fd4c1"; c.beginPath(); c.arc(105, 42, 14, 0, 7); c.fill();
-      c.fillStyle = "#fff"; c.font = "bold 12px sans-serif"; c.textAlign = "center";
-      c.fillText(ps + "", 45, 66); c.fillText(os + "", 105, 66);
-      c.fillText("R" + round, 75, 20);
-      if (showP >= 0) { c.fillStyle = "#ffe9a8"; c.fillText(NAME[showP] + " vs " + NAME[showO], 75, 92); }
-      else { c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif"; c.fillText("手を選んでね!", 75, 92); }
+      cls(c); c.fillStyle = "#20263a"; c.fillRect(0, 0, 150, 150);
+      c.fillStyle = "#ffd76a"; c.font = "bold 10px sans-serif"; c.textAlign = "center";
+      c.fillText("DILEMMA", 75, 13);
+      c.fillStyle = "#fff"; c.font = "bold 12px sans-serif"; c.fillText("CHARGE BREAK " + hits + "/3", 75, 30);
+      c.fillStyle = "#ffd76a"; c.font = "bold 10px sans-serif"; c.fillText("YOU " + pEN + " EN", 36, 49);
+      c.fillStyle = "#7fd4c1"; c.fillText("CPU " + eEN + " EN", 114, 49);
+      c.fillStyle = "#ff9eaa"; c.fillText("♥ ".repeat(hp).trim(), 75, 64);
+      if (showP >= 0) {
+        c.fillStyle = "#ffe9a8"; c.font = "bold 10px sans-serif";
+        c.fillText(ACTIONS[showP] + " vs " + ACTIONS[showE], 75, 82);
+        c.fillStyle = showMsg === "完全ガード！" ? "#7fd4c1" : "#fff"; c.font = "9px sans-serif";
+        c.fillText(showMsg || (showP === 0 ? "消費チャージ " + showPower : ""), 75, 96);
+      } else {
+        c.fillStyle = "#8f9a9a"; c.font = "9px sans-serif"; c.fillText("相手の一手を読む", 75, 88);
+      }
       var bx = [25, 75, 125];
       for (var k = 0; k < 3; k++) {
-        c.fillStyle = k === 0 ? "#e2606a" : k === 1 ? "#e8b13f" : "#5f8fd0";
-        c.fillRect(bx[k] - 22, 112, 44, 26);
-        c.fillStyle = "#fff"; c.font = "bold 11px sans-serif"; c.fillText(NAME[k], bx[k], 129);
+        c.fillStyle = k === 0 && pEN <= 0 ? "#666b78" : k === 0 ? "#e2606a" : k === 1 ? "#e8b13f" : "#5f8fd0";
+        c.fillRect(bx[k] - 23, 111, 46, 29);
+        c.fillStyle = "#fff"; c.font = "bold 9px sans-serif"; c.fillText(ACTIONS[k], bx[k], 129);
       }
       c.textAlign = "left";
     };
     g.ai = function (dt) {
       if (g.cleared || phase !== "pick") return;
-      g.aiT = (g.aiT || 0) + dt;
-      if (g.aiT < .85) return;
-      g.aiT = 0;
-      var pick = lastP < 0 ? 2 : beat(beat(lastP));
-      var bx = [25, 75, 125][pick];
-      setTarget(g.i, bx, 125, function (pp) { return function () { g.choose(pp); }; }(pick));
+      if (!aiWait) {
+        g.aiT = (g.aiT || 0) + dt; if (g.aiT < .65) return; g.aiT = 0;
+        var e = enemyPick(), pick;
+        if (e === 1 && pEN > 0) pick = 0;
+        else if (e === 0) pick = 2;
+        else if (pEN < 2) pick = 1;
+        else pick = 2;
+        aiPick = pick; aiWait = true; aiReady = false; aiWaitT = 0;
+        setTarget(g.i, [25, 75, 125][pick], 125, function () { aiReady = true; }, null);
+      }
+      aiWaitT += dt;
+      if (aiReady || aiWaitT >= 1.25) { var action = aiPick; aiWait = false; resolve(action); }
     };
     return g;
   }
+
 
   function g15(i) {
     var g = base(i), T = 15;
@@ -1329,7 +1357,76 @@
     return g;
   }
 
-  var MAKERS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15];
+  /* 16 knock & pinpon: tap falling notes on the beat */
+  function g16(i) {
+    var g = base(i), HIT_Y = 119, LANEX = [34, 75, 116], TOL = .34;
+    var at = [1.05, 1.60, 2.15, 2.70, 3.25, 3.80, 4.35, 4.90, 5.45, 6.00, 6.55, 7.10];
+    var lane = [1, 0, 2, 1, 2, 0, 1, 2, 0, 1, 0, 2];
+    var notes = [], hits = 0, misses = 0, aiNote = null;
+    function setup() {
+      g.t = 0; hits = 0; misses = 0; aiNote = null; g.aiT = 0;
+      notes = at.map(function (t, n) { return { at: t, lane: lane[n], judged: false, hit: false }; });
+    }
+    function noteY(n) { return HIT_Y + (g.t - n.at) * 105; }
+    function allDone() { return notes.every(function (n) { return n.judged; }); }
+    function finish() {
+      if (!allDone() || g.cleared) return;
+      if (hits >= 8) clearGame(i); else resetGame(i);
+    }
+    function markHit(n) {
+      if (!n || n.judged || Math.abs(g.t - n.at) > TOL) return false;
+      n.judged = true; n.hit = true; hits++; g.flash = .45; stat(i, g.label()); finish(); return true;
+    }
+    g.reset = function () { setup(); };
+    g.label = function () { return "HIT " + hits + "/12  GOAL 8  " + Math.max(0, 12 - hits - misses) + " LEFT"; };
+    g.update = function (dt) {
+      if (g.cleared) return;
+      g.t += dt;
+      notes.forEach(function (n) { if (!n.judged && g.t > n.at + TOL) { n.judged = true; misses++; } });
+      stat(i, g.label()); finish();
+    };
+    g.down = function (x, y) {
+      if (g.cleared || y < 78) return;
+      var best = null, bestD = 1e9;
+      notes.forEach(function (n) {
+        if (n.judged) return;
+        var d = Math.abs(g.t - n.at), dx = Math.abs(x - LANEX[n.lane]), dy = Math.abs(y - noteY(n));
+        if (d <= TOL && dx <= 21 && dy <= 30 && d < bestD) { best = n; bestD = d; }
+      });
+      if (best) markHit(best);
+    };
+    g.draw = function (c) {
+      cls(c); c.fillStyle = "#111a24"; c.fillRect(0, 0, 150, 150);
+      var colors = ["#f2789f", "#ffd76a", "#4fc3e8"];
+      for (var k = 0; k < 3; k++) {
+        c.fillStyle = k % 2 ? "#1b2634" : "#182331"; c.fillRect(k * 50, 0, 50, 150);
+        c.strokeStyle = "#344251"; c.beginPath(); c.moveTo(k * 50, 0); c.lineTo(k * 50, 150); c.stroke();
+        c.fillStyle = colors[k]; c.globalAlpha = .22; c.fillRect(k * 50 + 3, 107, 44, 25); c.globalAlpha = 1;
+      }
+      c.fillStyle = "#fff"; c.font = "bold 9px sans-serif"; c.textAlign = "center";
+      c.fillText("HIT " + hits + "/12  8+ CLEAR", 75, 13);
+      c.strokeStyle = "#ffd76a"; c.lineWidth = 2; c.beginPath(); c.moveTo(4, HIT_Y); c.lineTo(146, HIT_Y); c.stroke(); c.lineWidth = 1;
+      notes.forEach(function (n) {
+        if (n.judged && !n.hit) return;
+        var y = noteY(n); if (y < -15 || y > 164) return;
+        var col = colors[n.lane];
+        c.fillStyle = n.hit ? "#fff" : col; c.beginPath(); c.arc(LANEX[n.lane], y, 10, 0, 7); c.fill();
+        c.strokeStyle = "#fff"; c.stroke();
+        c.fillStyle = "#111a24"; c.font = "bold 13px sans-serif"; c.fillText("♪", LANEX[n.lane], y + 4);
+      });
+      c.fillStyle = "#aab8c7"; c.font = "8px sans-serif"; c.fillText("TAP THE NOTES", 75, 145);
+      c.textAlign = "left";
+    };
+    g.ai = function (dt) {
+      if (g.cleared) return;
+      var n = notes.find(function (v) { return !v.judged; }); if (!n) return;
+      if (aiNote !== n) { aiNote = n; setTarget(g.i, LANEX[n.lane], HIT_Y, null, null); }
+      if (g.t >= n.at) markHit(n);
+    };
+    return g;
+  }
+
+  var MAKERS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16];
   MAKERS.forEach(function (f, i) {
     var g = f(i);
     g.ctx = ctxOf(i);
@@ -1452,8 +1549,8 @@
     var r = stations[ix].querySelector("canvas").getBoundingClientRect();
     return [(curPos.x - r.left) * 150 / r.width, (curPos.y - r.top) * 150 / r.height];
   }
-  var READY = [[75, 75], [30, 100], [75, 75], [75, 85], [70, 130], [75, 75], [75, 110], [75, 120], [75, 75], [75, 75], [75, 12], [75, 75], [75, 73], [75, 125], [75, 75]];
-  var SEEDTUNE = [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0];
+  var READY = [[75, 75], [30, 100], [75, 75], [75, 85], [70, 130], [75, 75], [75, 110], [75, 120], [75, 75], [75, 75], [75, 12], [75, 75], [75, 73], [75, 125], [75, 75], [75, 75]];
+  var SEEDTUNE = [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0];
   function seedFor(n) { return (0x9E3779B9 ^ ((n + 1) * 0x85EBCA6B) ^ SEEDTUNE[n]) | 0; }
   var curPos = { x: -40, y: -40 }, curTgt = null, curFn = null, curDrag = null, curHas = false, viewY = 0;
   function cursorEnsure() {
@@ -1749,5 +1846,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4c3764f7f50d779',t:'MTc5MjI4MzcxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cb290aead4e398',t:'MTc5MjM2NDQzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
