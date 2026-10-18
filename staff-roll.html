@@ -127,8 +127,8 @@
     "ドラッグ移動+長押しチャージ、離すとビーム弾発射! 先に3回当てて(相手の弾は回避)。本家の2D版",
     "6×6オセロでAIと一戦。AIより多く石を取ればクリア(引き分けもやり直し)。光る点=置ける場所"
   ,
-    "チキンレース×三すくみ! 接近する相手の手(チャージ/ガード/攻撃備え)に克つ手で反撃(攻撃>チャージ>ガード>攻撃)。3回当てれば好機=攻撃で締める! ミス2回・攻撃被弾・衝突=やり直し",
-    "インクランナー×ナワバリ! 自動走行+ジャンプでボムを避けつつコースをピンクに塗る。ライバルは青で並走=300mゴール時の塗り勝ちで勝利。ボム=やり直し(ライバルは止まらない!)"];
+    "攻撃/チャージ/ガードの三すくみ心理戦! 攻撃はチャージを妨げ、チャージはガードを崩し、ガードは攻撃を防ぐ。3本先取でクリア",
+    "インク決闘! ドラッグ移動+長押しチャージ→離すとインク弾(当たれば大きく塗れる)。障害物がインクを遮る。15秒ラウンド、青より多く塗れば勝ち"];
   var roll = document.getElementById("roll");
   var stage = document.getElementById("stage");
   var banner = document.getElementById("allclear");
@@ -1169,152 +1169,161 @@
   }
 
     function g14(i) {
-    var g = base(i), d = 110, miss = 0, wins = 0, phase = "run", opp = "walk", oppT = 0, nextWin = 0, runId = 0, aiWait = false, SEQ = [];
-    function setup() {
-      runId++; d = 110; miss = 0; wins = 0; phase = "run"; opp = "walk"; oppT = 0; aiWait = false;
-      SEQ = [];
-      for (var k = 0; k < 5; k++) SEQ.push(Math.floor(drand() * 3) % 3);
-      nextWin = 2.0 + drand() * 1.2;
-    }
-    g.reset = function () { g.t = 0; setup(); };
-    g.label = function () { return phase === "run" ? "katu" + wins + "/3 misu" + miss + "/2" : "WIN!"; };
+    var g = { i: i, t: 0, cleared: false, flash: 0 };
+    var NAME = ["攻撃", "チャージ", "ガード"];
+    function beats(a, b) { return (a === 0 && b === 1) || (a === 1 && b === 2) || (a === 2 && b === 0); }
+    function beat(m) { for (var k = 0; k < 3; k++) if (beats(k, m)) return k; return 0; }
+    var ps, os, round, lastP, phase, phaseT, showP, showO;
+    function setup() { ps = 0; os = 0; round = 1; lastP = -1; phase = "pick"; phaseT = 0; showP = -1; showO = -1; }
+    function cpuPick() { return lastP < 0 ? Math.floor(drand() * 3) % 3 : beat(lastP); }
+    g.choose = function (p) {
+      if (phase !== "pick" || g.cleared) return;
+      var o = cpuPick();
+      showP = p; showO = o; lastP = p; phase = "show"; phaseT = 0;
+      if (beats(p, o)) { ps++; g.flash = .6; } else if (beats(o, p)) os++;
+      if (ps >= 3) { g.cleared = true; g.flash = 1; }
+      else if (os >= 3) setup();
+      else round++;
+    };
+    g.reset = function () { setup(); };
+    g.label = function () { return ps + "-" + os + " R" + round; };
     g.update = function (dt) {
       g.t += dt;
-      if (phase !== "run") return;
-      d -= (12 + g.t * 1.8) * dt;
-      oppT += dt;
-      if (opp === "walk" && g.t >= nextWin) { opp = SEQ[Math.min(wins, 4)]; oppT = 0; }
-      else if (opp === 0 || opp === 1) {
-        if (oppT >= .75) { opp = "walk"; nextWin = g.t + 1.1 + drand(); }
-      } else if (opp === 2) {
-        if (oppT >= .75) { resetGame(i); return; }
-      } else if (opp === "stagger" && oppT >= 1.0) { opp = "walk"; nextWin = g.t + 1.2 + drand(); }
-      if (d <= 0) resetGame(i);
+      if (phase === "show") { phaseT += dt; if (phaseT > 1.25) { phase = "pick"; showP = -1; showO = -1; } }
     };
-    function act(k) {
-      if (phase !== "run" || g.cleared) return;
-      if (opp === 0 || opp === 1 || opp === 2) {
-        if (k === opp) {
-          wins++; g.flash = .5; d = Math.min(110, d + 8);
-          if (wins >= 3) { opp = "stagger"; oppT = 0; } else { opp = "walk"; nextWin = g.t + 1.1 + drand(); }
-        } else {
-          miss++; d -= 12; opp = "walk"; nextWin = g.t + 1.0 + drand();
-          if (miss >= 2) resetGame(i);
-        }
-        return;
-      }
-      if (opp === "stagger") {
-        if (k === 0) { phase = "win"; g.cleared = true; g.flash = 1; }
-        else { miss++; if (miss >= 2) resetGame(i); }
-        return;
-      }
-      d -= 4;
-    }
-    g.down = function (x, y) { if (y < 108) return; act(x < 50 ? 0 : x < 100 ? 1 : 2); };
+    g.down = function (x, y) {
+      if (phase !== "pick" || g.cleared || y < 108) return;
+      g.choose(x < 50 ? 0 : x < 100 ? 1 : 2);
+    };
     g.draw = function (c) {
       cls(c);
-      c.fillStyle = "#231a2e"; c.fillRect(0, 0, 150, 150);
-      c.strokeStyle = "#3a3350"; c.beginPath(); c.moveTo(10, 78); c.lineTo(140, 78); c.stroke();
-      var px = 75 - d / 2, ox = 75 + d / 2;
-      c.fillStyle = "#ffd76a"; c.beginPath(); c.arc(px, 66, 12, 0, 7); c.fill();
-      var oc = "#7fd4c1";
-      if (opp === 0) oc = "#e8b13f"; else if (opp === 1) oc = "#5f8fd0"; else if (opp === 2) oc = "#ff5566"; else if (opp === "stagger") oc = "#ff9ecb";
-      c.fillStyle = oc; c.beginPath(); c.arc(ox, 66, opp === "stagger" ? 15 : 12, 0, 7); c.fill();
-      c.fillStyle = "#fff"; c.font = "bold 10px sans-serif"; c.textAlign = "center";
-      if (opp === 0) c.fillText("溜", ox, 70); else if (opp === 1) c.fillText("守", ox, 70); else if (opp === 2) c.fillText("攻", ox, 70); else if (opp === "stagger") c.fillText("隙", ox, 70);
-      c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif";
-      c.fillText("のこり " + Math.max(0, Math.round(d)) + "  克 " + wins + "/3  ミス " + miss + "/2", 75, 20);
-      var nm = ["攻撃", "チャージ", "ガード"], bx = [25, 75, 125];
+      c.fillStyle = "#20263a"; c.fillRect(0, 0, 150, 150);
+      c.fillStyle = "#ffd76a"; c.beginPath(); c.arc(45, 42, 14, 0, 7); c.fill();
+      c.fillStyle = "#7fd4c1"; c.beginPath(); c.arc(105, 42, 14, 0, 7); c.fill();
+      c.fillStyle = "#fff"; c.font = "bold 12px sans-serif"; c.textAlign = "center";
+      c.fillText(ps + "", 45, 66); c.fillText(os + "", 105, 66);
+      c.fillText("R" + round, 75, 20);
+      if (showP >= 0) { c.fillStyle = "#ffe9a8"; c.fillText(NAME[showP] + " vs " + NAME[showO], 75, 92); }
+      else { c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif"; c.fillText("手を選んでね!", 75, 92); }
+      var bx = [25, 75, 125];
       for (var k = 0; k < 3; k++) {
         c.fillStyle = k === 0 ? "#e2606a" : k === 1 ? "#e8b13f" : "#5f8fd0";
         c.fillRect(bx[k] - 22, 112, 44, 26);
-        c.fillStyle = "#fff"; c.font = "bold 11px sans-serif"; c.fillText(nm[k], bx[k], 129);
+        c.fillStyle = "#fff"; c.font = "bold 11px sans-serif"; c.fillText(NAME[k], bx[k], 129);
       }
       c.textAlign = "left";
     };
     g.ai = function (dt) {
-      if (g.cleared || phase !== "run" || aiWait) return;
-      var idx = -1;
-      if (opp === 0 || opp === 1 || opp === 2) idx = opp;
-      else if (opp === "stagger") idx = 0;
-      if (idx < 0) return;
-      aiWait = true;
-      var rid = runId, tok = wins + (opp === "stagger" ? 100 : 0);
-      setTarget(g.i, [25, 75, 125][idx], 125, function () {
-        aiWait = false;
-        if (rid === runId && tok === wins + (opp === "stagger" ? 100 : 0)) act(idx);
-      });
+      if (g.cleared || phase !== "pick") return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (g.aiT < .85) return;
+      g.aiT = 0;
+      var pick = lastP < 0 ? 2 : beat(beat(lastP));
+      var bx = [25, 75, 125][pick];
+      setTarget(g.i, bx, 125, function (pp) { return function () { g.choose(pp); }; }(pick));
     };
     return g;
   }
 
   function g15(i) {
-    var g = base(i), GOAL = 300, PXM = 4, V = 96, RIV = 19;
-    var px = 0, py = 120, vy = 0, air = false, obs = [], bots = [], got = 0, runId = 0, pend = false, paint = 0, rival = 0, keepRival = -1;
+    var g = base(i), T = 15;
+    var px = 40, py = 110, txx = 40, tyy = 110, cx = 110, cy = 40, pCh = 0, hold = false, aimx = 75, aimy = 75;
+    var shots = [], splats = [], pP = 0, cP = 0, cFire = 0, cNext = 1.2, st = 0, aiWait = false;
+    var obs = [[62, 62, 26, 26], [22, 26, 24, 18], [104, 100, 24, 18]];
     function setup() {
-      runId++; px = 0; py = 120; vy = 0; air = false; got = 0; pend = false;
-      if (keepRival >= 0) { rival = keepRival; keepRival = -1; } else rival = 0;
-      paint = 0;
-      obs = []; bots = [];
-      var x = 320;
-      while (x < GOAL * PXM - 160) {
-        obs.push({ x: x, hit: false });
-        if (drand() < .7) bots.push({ x: x + 70 + drand() * 50, y: 92, got: false });
-        x += 190 + drand() * 150;
-      }
+      g.t = 0; px = 40; py = 110; txx = 40; tyy = 110; cx = 110; cy = 40;
+      pCh = 0; hold = false; aimx = 75; aimy = 75;
+      shots = []; splats = []; pP = 0; cP = 0; cFire = 0; st = 0; aiWait = false;
+      cNext = 1.2 + drand() * .6;
     }
-    g.reset = function () { g.t = 0; setup(); };
-    g.label = function () { return Math.round(paint) + "vs" + Math.round(rival); };
-    function jump() { if (air || g.cleared) return; air = true; vy = -235; }
-    function fail() { keepRival = rival; resetGame(i); }
+    g.reset = function () { setup(); };
+    g.label = function () { return pP + "-" + cP + " " + Math.max(0, Math.ceil(T - g.t)) + "s"; };
+    function splat(x, y, w, big) {
+      splats.push({ x: x, y: y, w: w, r: big ? 7 : 4 });
+      if (splats.length > 90) splats.shift();
+      if (w === 1) pP += big ? 3 : 1; else cP += big ? 3 : 1;
+    }
+    function inObs(x, y) {
+      for (var k = 0; k < obs.length; k++) { var o = obs[k]; if (x > o[0] && x < o[0] + o[2] && y > o[1] && y < o[1] + o[3]) return true; }
+      return false;
+    }
     g.update = function (dt) {
       if (g.cleared) return;
-      g.t += dt; px += V * dt;
-      rival = Math.min(GOAL, rival + RIV * dt);
-      paint = Math.max(paint, px / PXM);
-      if (air) { vy += 640 * dt; py += vy * dt; if (py >= 120) { py = 120; vy = 0; air = false; } }
-      for (var n = 0; n < obs.length; n++) {
-        var o = obs[n];
-        if (!o.hit && Math.abs(o.x - px - 35) < 10 && py > 104) { o.hit = true; fail(); return; }
+      g.t += dt;
+      px += (txx - px) * Math.min(1, dt * 8); py += (tyy - py) * Math.min(1, dt * 8);
+      cx = 105 + Math.sin(g.t * .9) * 22; cy = 42 + Math.cos(g.t * 1.3) * 18;
+      if (hold) pCh = Math.min(1, pCh + dt / .9);
+      cFire += dt;
+      if (cFire >= cNext) {
+        cFire = 0; cNext = 1.5 + drand() * .5;
+        var d2 = Math.atan2(py - cy, px - cx);
+        shots.push({ x: cx, y: cy, vx: Math.cos(d2) * 120, vy: Math.sin(d2) * 120, w: 2 });
       }
-      for (n = 0; n < bots.length; n++) {
-        var b = bots[n];
-        if (!b.got && Math.abs(b.x - px - 35) < 12 && Math.abs(b.y - (py - 10)) < 26) { b.got = true; got++; paint += 6; g.flash = .4; }
+      for (var n = shots.length - 1; n >= 0; n--) {
+        var o = shots[n]; o.x += o.vx * dt; o.y += o.vy * dt;
+        var dead = false;
+        if (o.w === 2 && Math.hypot(o.x - px, o.y - py) < 9) { splat(px, py, 2, true); dead = true; }
+        else if (o.w === 1 && Math.hypot(o.x - cx, o.y - cy) < 9) { splat(cx, cy, 1, true); dead = true; }
+        else if (inObs(o.x, o.y)) { splat(o.x, o.y, o.w, false); dead = true; }
+        else if (o.x < 4 || o.x > 146 || o.y < 4 || o.y > 146) { splat(Math.max(4, Math.min(146, o.x)), Math.max(4, Math.min(146, o.y)), o.w, false); dead = true; }
+        if (dead) shots.splice(n, 1);
       }
-      if (rival >= GOAL) { fail(); return; }
-      if (px / PXM >= GOAL) {
-        if (paint > rival) { g.cleared = true; g.flash = 1; }
-        else fail();
+      if (g.t >= T) {
+        if (pP > cP) { g.cleared = true; g.flash = 1; }
+        else resetGame(i);
       }
     };
-    g.down = function (x, y) { jump(); };
+    g.move = function (x, y) { txx = x; tyy = y; };
+    g.aimSet = function (x, y) { aimx = x; aimy = y; };
+    g.down = function (x, y) { txx = x; tyy = y; hold = true; aimx = x; aimy = y; };
+    g.up = function () {
+      if (!hold) return;
+      hold = false;
+      if (pCh > .15) {
+        var d2 = Math.atan2(aimy - py, aimx - px);
+        shots.push({ x: px, y: py, vx: Math.cos(d2) * 150, vy: Math.sin(d2) * 150, w: 1 });
+      }
+      pCh = 0;
+    };
     g.draw = function (c) {
       cls(c);
-      c.fillStyle = "#101820"; c.fillRect(0, 0, 150, 150);
-      c.fillStyle = "#22303c"; c.fillRect(0, 132, 150, 18);
-      var sx = 35 - px;
-      var gx = GOAL * PXM + sx;
-      if (gx < 160) { c.fillStyle = "#3fe081"; c.fillRect(gx, 92, 3, 40); c.fillRect(gx + 3, 92, 14, 9); }
-      obs.forEach(function (o) { var x = o.x + sx; if (x > -12 && x < 162) { c.fillStyle = "#ff5566"; c.beginPath(); c.arc(x, 126, 8, 0, 7); c.fill(); c.fillStyle = "#7a2530"; c.fillRect(x - 2, 114, 4, 5); } });
-      bots.forEach(function (b) { var x = b.x + sx; if (!b.got && x > -10 && x < 160) { c.fillStyle = "#f2789f"; c.fillRect(x - 4, b.y - 8, 8, 12); c.fillStyle = "#ffd0dd"; c.fillRect(x - 2, b.y - 12, 4, 4); } });
-      c.fillStyle = "#4fc3e8"; c.beginPath(); c.arc(35, py - 8, 9, 0, 7); c.fill();
-      c.fillStyle = "#f2789f"; c.fillRect(21 - (px % 6), py - 2, 14, 3);
-      var tot = Math.max(1, paint + rival);
-      c.fillStyle = "#f2789f"; c.fillRect(0, 4, 150 * paint / tot, 5);
-      c.fillStyle = "#4fc3e8"; c.fillRect(150 * paint / tot, 4, 150 * rival / tot, 5);
-      c.fillStyle = "#8f9a9a"; c.font = "10px sans-serif";
-      c.fillText(Math.min(GOAL, Math.floor(px / PXM)) + "m/" + GOAL + "m  " + Math.round(paint) + " vs " + Math.round(rival), 8, 20);
+      c.fillStyle = "#141a24"; c.fillRect(0, 0, 150, 150);
+      splats.forEach(function (sp) { c.fillStyle = sp.w === 1 ? "rgba(242,120,159,.75)" : "rgba(79,195,232,.75)"; c.beginPath(); c.arc(sp.x, sp.y, sp.r, 0, 7); c.fill(); });
+      c.fillStyle = "#39424e";
+      obs.forEach(function (o) { c.fillRect(o[0], o[1], o[2], o[3]); });
+      c.strokeStyle = "#4a5563"; obs.forEach(function (o) { c.strokeRect(o[0], o[1], o[2], o[3]); });
+      c.fillStyle = "#f2789f"; c.beginPath(); c.arc(px, py, 8, 0, 7); c.fill();
+      c.fillStyle = "#4fc3e8"; c.beginPath(); c.arc(cx, cy, 8, 0, 7); c.fill();
+      if (hold) { c.strokeStyle = "#ffd0dd"; c.lineWidth = 2; c.beginPath(); c.arc(px, py, 11, -Math.PI / 2, -Math.PI / 2 + pCh * Math.PI * 2); c.stroke(); c.lineWidth = 1; }
+      shots.forEach(function (o) { c.fillStyle = o.w === 1 ? "#f2789f" : "#4fc3e8"; c.beginPath(); c.arc(o.x, o.y, 3.5, 0, 7); c.fill(); });
+      c.fillStyle = "#f2789f"; c.font = "bold 11px sans-serif"; c.fillText(pP + "", 8, 14);
+      c.fillStyle = "#4fc3e8"; c.fillText(cP + "", 134, 14);
+      var rem = Math.max(0, T - g.t);
+      c.fillStyle = "#39424e"; c.fillRect(30, 7, 90, 5);
+      c.fillStyle = "#ffd76a"; c.fillRect(30, 7, 90 * rem / T, 5);
     };
     g.ai = function (dt) {
-      if (g.cleared || pend) return;
-      for (var n = 0; n < obs.length; n++) {
-        var rel = obs[n].x - px;
-        if (rel > 26 && rel < 66 && !air) {
-          pend = true;
-          var rid = runId;
-          setTarget(g.i, 75, 75, function () { pend = false; if (rid === runId) jump(); });
-          return;
-        }
+      if (g.cleared || aiWait) return;
+      g.aiT = (g.aiT || 0) + dt;
+      if (st === 0) {
+        if (g.aiT < .35) return;
+        g.aiT = 0; st = 1; aiWait = true;
+        var ang = drand() * 6.283;
+        var sx2 = 75 + Math.cos(ang) * 45, sy2 = 85 + Math.sin(ang) * 40;
+        sx2 = Math.max(14, Math.min(136, sx2)); sy2 = Math.max(14, Math.min(136, sy2));
+        setTarget(g.i, sx2, sy2, function () { aiWait = false; st = 2; }, function (mx, my) { g.move(mx, my); });
+      } else if (st === 2) {
+        if (g.aiT < .1) return;
+        g.aiT = 0; st = 3; aiWait = true;
+        var ax2 = cx, ay2 = cy;
+        setTarget(g.i, ax2, ay2, function () {
+          aiWait = false; g.down(ax2, ay2);
+          setTimeout(function () {
+            var tf = Math.hypot(cx - px, cy - py) / 150 + .05;
+            g.aimSet(105 + Math.sin((g.t + tf) * .9) * 22, 42 + Math.cos((g.t + tf) * 1.3) * 18);
+            g.up(); st = 0;
+          }, 400);
+        });
       }
     };
     return g;
@@ -1740,5 +1749,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4c3618f0d76d76f',t:'MTc5MjI4Mjg2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4c3764f7f50d779',t:'MTc5MjI4MzcxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
