@@ -1,0 +1,3691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大出費MoneyBrothersSP</title>
+  <style>
+    * { box-sizing: border-box; font-family: sans-serif; user-select: none; }
+    body {
+      margin: 0; min-height: 100vh; padding: 10px 0 20px;
+      background: #10101a; color: #fff;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+    }
+    h1 {
+      margin: 4px 0 8px; font-size: clamp(22px, 5vw, 34px);
+      letter-spacing: 2px; text-shadow: 0 0 14px rgba(255, 205, 90, .5);
+    }
+    canvas {
+      display: block; width: min(900px, 96vw); height: auto;
+      border: 3px solid #33334f; border-radius: 8px; background: #303c72;
+      cursor: pointer;
+    }
+    .help {
+      width: min(900px, 96vw); margin-top: 10px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
+      text-align: left; font-size: 13px; line-height: 1.65;
+    }
+    .help div { padding: 9px 12px; border-radius: 8px; background: rgba(255, 255, 255, .06); }
+    .help .wide { grid-column: 1 / -1; color: #dedeee; }
+    @media (max-width: 650px) {
+      .help { grid-template-columns: 1fr; }
+      .help .wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <h1>大出費MoneyBrothersSP</h1>
+  <canvas id="game" width="900" height="500"></canvas>
+  <div class="help">
+    <div>
+      🔴 <b>P1</b><br>
+      WASD：移動・ジャンプ・台降り(S)　F：弱　G：強<br>
+      R：地上シールド / <b>空中N回避</b> / <b>崖回避上がり</b>　Q：つかみ　E：必殺技
+    </div>
+    <div>
+      🔵 <b>P2 / CPU / サンドバッグ</b><br>
+      矢印：移動・ジャンプ・台降り(↓)　Enter：弱　/：強<br>
+      .：地上シールド / <b>空中N回避</b> / <b>崖回避上がり</b>　Shift：つかみ　,：必殺技
+    </div>
+    <div class="wide">
+      【崖上がり】崖つかまり中に <b>R / .（または崖と逆方向キー）で回避上がり</b>、<b>F / G（Enter / /）で攻撃上がり</b>、<b>W / ↑（またはステージ側キー）で通常上がり</b>。<br>
+      【カノン魔人拳】E（P2は ,）で紫の暗黒オーラを溜めて放つ全体100Fの一撃必殺！<b>出始めに後ろ方向キーを押すと「反転魔人拳」になり、全体フレームが伸びる代わりに威力が激増</b>します。<br>
+      【新キャラ】ザマス・クッハ・ピッタ・クラウ.com参戦！<b>クラウ.comは下必殺技を押し続けるとリミットが溜まり、MAXで次の必殺技が強化</b>されます。
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const VIEW_W = canvas.width;
+const VIEW_H = canvas.height;
+const GRAVITY = 0.55;
+const BLAST_X = 260;
+const BLAST_Y = 180;
+const TOP_BLAST_Y = -BLAST_Y * 1.6;
+
+// ---------- ステージデータ ----------
+const STAGES = [
+  {
+    name: "戦場 (バトルフィールド)",
+    desc: "3つのすり抜け床があるスタンダードなステージ",
+    skyTop: "#7ca6ff", skyMid: "#5269b6", skyBot: "#171b35",
+    mainColor1: "#84ce5d", mainColor2: "#527b35", pillarColor: "#49311d", platColor: "#f0ab4c",
+    platforms: [
+      { x: 100, y: 400, w: 700, h: 20, main: true },
+      { x: 200, y: 300, w: 150, h: 12 },
+      { x: 550, y: 300, w: 150, h: 12 },
+      { x: 375, y: 205, w: 150, h: 12 }
+    ]
+  },
+  {
+    name: "終点 (ファイナルステージ)",
+    desc: "浮いている床がないガチンコ平面ステージ",
+    skyTop: "#2b1d52", skyMid: "#4b2d7f", skyBot: "#0c071b",
+    mainColor1: "#c7a4ff", mainColor2: "#6b47b8", pillarColor: "#26174a", platColor: "#ffd27a",
+    platforms: [
+      { x: 110, y: 400, w: 680, h: 22, main: true }
+    ]
+  },
+  {
+    name: "すま村ステージ",
+    desc: "左右に動くすり抜け床が1つあるステージ",
+    skyTop: "#f9b872", skyMid: "#d97762", skyBot: "#2c1d38",
+    mainColor1: "#92d36e", mainColor2: "#558c3b", pillarColor: "#543b28", platColor: "#ffe08a",
+    platforms: [
+      { x: 140, y: 400, w: 620, h: 20, main: true },
+      { x: 360, y: 275, w: 180, h: 12, moveRange: 170, moveSpeed: 0.022 }
+    ]
+  },
+  {
+    name: "スカイタワー",
+    desc: "左右の低い床と中央の高い床がある立体ステージ",
+    skyTop: "#67d8e8", skyMid: "#3c8dbc", skyBot: "#13293d",
+    mainColor1: "#8de0c6", mainColor2: "#449982", pillarColor: "#2b4a4f", platColor: "#ffd166",
+    platforms: [
+      { x: 80,  y: 410, w: 740, h: 20, main: true },
+      { x: 140, y: 325, w: 180, h: 12 },
+      { x: 580, y: 325, w: 180, h: 12 },
+      { x: 340, y: 185, w: 220, h: 12 }
+    ]
+  },
+  {
+    name: "トレーニングルーム (練習場)",
+    desc: "距離メモリとグリッド線が付いた広めの練習用ステージ",
+    trainingGrid: true,
+    skyTop: "#1d2b44", skyMid: "#162035", skyBot: "#0d1322",
+    mainColor1: "#d8e2ef", mainColor2: "#8fa3bf", pillarColor: "#28364a", platColor: "#70c1ff",
+    platforms: [
+      { x: 50,  y: 405, w: 800, h: 22, main: true },
+      { x: 200, y: 295, w: 150, h: 12 },
+      { x: 550, y: 295, w: 150, h: 12 }
+    ]
+  }
+];
+const RANDOM_STAGE_INDEX = STAGES.length;
+
+let currentStage = STAGES[0];
+let platforms = [];
+let mainPlatform = null;
+let stageTimer = 0;
+
+function loadStage(stageIndex) {
+  const idx = stageIndex === RANDOM_STAGE_INDEX
+    ? Math.floor(Math.random() * STAGES.length)
+    : stageIndex;
+  currentStage = STAGES[idx];
+  stageTimer = 0;
+  platforms = currentStage.platforms.map(p => Object.assign({}, p, {
+    baseX: p.x,
+    dx: 0
+  }));
+  mainPlatform = platforms[0];
+}
+loadStage(0);
+
+function updateStagePlatforms() {
+  stageTimer++;
+  for (const p of platforms) {
+    if (p.moveRange) {
+      const prevX = p.x;
+      p.x = p.baseX + Math.sin(stageTimer * p.moveSpeed) * p.moveRange;
+      p.dx = p.x - prevX;
+    } else {
+      p.dx = 0;
+    }
+  }
+}
+
+// ---------- 攻撃フレーム＆性能（ベース） ----------
+const MOVES = {
+  weak:       { total: 12, startup: 4,  active: 4, cooldown: 17 },
+  sideTilt:   { total: 17, startup: 6,  active: 4, cooldown: 22 },
+  upTilt:     { total: 17, startup: 6,  active: 5, cooldown: 23 },
+  downTilt:   { total: 17, startup: 6,  active: 5, cooldown: 23 },
+  heavy:      { total: 23, startup: 10, active: 5, cooldown: 34 },
+  smashSide:  { total: 29, startup: 15, active: 5, cooldown: 43 },
+  smashUp:    { total: 28, startup: 14, active: 6, cooldown: 42 },
+  smashDown:  { total: 28, startup: 14, active: 6, cooldown: 42 },
+  airNeutral: { total: 22, startup: 4,  active: 8, cooldown: 25 },
+  airForward: { total: 24, startup: 7,  active: 5, cooldown: 29 },
+  airBack:    { total: 24, startup: 8,  active: 5, cooldown: 30 },
+  airUp:      { total: 22, startup: 5,  active: 6, cooldown: 27 },
+  airDown:    { total: 26, startup: 8,  active: 6, cooldown: 31 },
+  airHeavy:   { total: 25, startup: 10, active: 5, cooldown: 34 }
+};
+
+const MOVE_STATS = {
+  weak:       { damage: 4.2, kbBase: 2.4, kbScale: .060, maxKnockback: 10.5 },
+  sideTilt:   { damage: 6.0, kbBase: 3.0, kbScale: .070, maxKnockback: 12,   strongEffect: true },
+  upTilt:     { damage: 5.8, kbBase: 3.0, kbScale: .068, maxKnockback: 12,   verticalScale: .85, strongEffect: true },
+  downTilt:   { damage: 5.6, kbBase: 2.8, kbScale: .065, maxKnockback: 11.5, verticalScale: .45, strongEffect: true },
+  heavy:      { damage: 8.0, kbBase: 3.8, kbScale: .078, maxKnockback: 13.5, strongEffect: true },
+  smashSide:  { damage: 10,  kbBase: 4.2, kbScale: .095, maxKnockback: 16,   smash: true, strongEffect: true },
+  smashUp:    { damage: 9,   kbBase: 4.0, kbScale: .090, maxKnockback: 15.5, smash: true, verticalScale: 1.0, horizontalScale: .42, strongEffect: true },
+  smashDown:  { damage: 9,   kbBase: 3.9, kbScale: .088, maxKnockback: 15,   smash: true, verticalScale: .60, horizontalScale: .75, strongEffect: true },
+  airNeutral: { damage: 5.0, kbBase: 2.8, kbScale: .064, maxKnockback: 11 },
+  airForward: { damage: 6.5, kbBase: 3.1, kbScale: .070, maxKnockback: 12,   strongEffect: true },
+  airBack:    { damage: 7.5, kbBase: 3.4, kbScale: .074, maxKnockback: 12.5, strongEffect: true },
+  airUp:      { damage: 5.8, kbBase: 3.0, kbScale: .068, maxKnockback: 12,   verticalScale: .95, strongEffect: true },
+  airDown:    { damage: 7.0, kbBase: 3.2, kbScale: .072, maxKnockback: 12.5, verticalScale: .62, horizontalScale: .5, vySign: 1, strongEffect: true },
+  airHeavy:   { damage: 7.2, kbBase: 3.4, kbScale: .072, maxKnockback: 12.5, strongEffect: true },
+  fThrow:     { damage: 7.5, kbBase: 3.6, kbScale: .072, maxKnockback: 13,   verticalScale: .52, horizontalScale: .95, strongEffect: true },
+  bThrow:     { damage: 9.0, kbBase: 4.0, kbScale: .082, maxKnockback: 14.5, verticalScale: .56, horizontalScale: 1.0, strongEffect: true },
+  upThrow:    { damage: 7.5, kbBase: 3.7, kbScale: .078, maxKnockback: 14,   verticalScale: 1.05, horizontalScale: .25, strongEffect: true },
+  downThrow:  { damage: 6.0, kbBase: 3.0, kbScale: .048, maxKnockback: 9.5,  verticalScale: .88, horizontalScale: .45, strongEffect: false }
+};
+
+function sp(o) {
+  return Object.assign({
+    label: "必殺技",
+    damage: 6, kbBase: 3, kbScale: .07, maxKnockback: 12,
+    verticalScale: .7, horizontalScale: 1, strongEffect: true,
+    startup: 6, active: 6, recovery: 30, range: 46, yOff: 4, extraHeight: 0,
+    movement: null, dashSpeed: 0, riseVy: 0, upBHoriz: 5.0, gravityScale: 1,
+    projectile: null, shockwave: false, dive: false,
+    grab: false, grabDuration: 18, throwDamage: 9,
+    superArmor: false, stoneForm: false, landingWave: null, reflect: false, magicCycle: false,
+    warlockCharge: false, reverseWindow: 0, reverseAddStartup: 0, reverseAddRecovery: 0, reverseMul: 1,
+    limitCharge: false, limitVersion: null
+  }, o);
+}
+
+const controls = {
+  p1: { left: "a", right: "d", up: "w", down: "s", weak: "f", strong: "g", special: "e", shield: "r", grab: "q" },
+  p2: { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown", weak: "Enter", strong: "/", special: ",", shield: ".", grab: "Shift" }
+};
+
+// サンドバッグ専用ステータス
+const SANDBAG_FIGHTER = {
+  name: "サンドバッグくん", role: "トレーニング用", description: "コンボや撃墜の練習相手",
+  color: "#f3e3c3", altColor: "#e8d2a6", style: "sandbag", effectColor: "#fff2b2",
+  weight: 1.02, speed: 3.5, airSpeed: 3.2, jump: 10.5, jumps: 2, gravity: 0.96,
+  damageScale: 0.85, powerScale: 0.85, rangeScale: 0.95, cooldownScale: 1.15, size: 1.06,
+  moves: {}, stats: {},
+  specials: {
+    neutral: sp({ label: "頭突き", range: 40, damage: 5, startup: 10, active: 5, recovery: 30 }),
+    side: sp({ label: "タックル", movement: "dash", dashSpeed: 7, range: 42, damage: 6, startup: 8, active: 6, recovery: 30 }),
+    up: sp({ label: "ハイジャンプ", movement: "up", riseVy: -13.5, gravityScale: .38, range: 42, damage: 6, startup: 5, active: 10, recovery: 30 }),
+    down: sp({ label: "どっすん", shockwave: true, dive: true, range: 48, damage: 6, startup: 12, active: 5, recovery: 32 })
+  }
+};
+
+// ---------- 10体のファイターデータ ----------
+const FIGHTERS = [
+  {
+    name: "オカネ", role: "強欲オールラウンダー", description: "金袋と小判弾で稼ぎまくる強欲ファイター",
+    color: "#e6b422", altColor: "#5596ff", style: "core", effectColor: "#ffd74a", weapon: "fist",
+    weight: 1, speed: 4.45, airSpeed: 3.95, jump: 11.4, jumps: 2, gravity: 1,
+    damageScale: 1, powerScale: 1, rangeScale: 1, cooldownScale: 1, size: 1,
+    moves: {
+      weak: { total: 11, startup: 3, active: 5, cooldown: 15 },
+      heavy: { total: 21, startup: 8, active: 5, cooldown: 30 },
+      smashSide: { total: 30, startup: 14, active: 5, cooldown: 44 },
+      smashUp: { total: 29, startup: 13, active: 6, cooldown: 43 },
+      smashDown: { total: 30, startup: 14, active: 6, cooldown: 44 }
+    },
+    stats: {
+      weak: { label: "強欲ワンツー", damage: 2.5, kbBase: 1.8, kbScale: .052, maxKnockback: 9, hits: 2, hitInterval: 4 },
+      sideTilt: { label: "札束ビンタ", damage: 6.2, kbBase: 3.1, kbScale: .070, maxKnockback: 12.2 },
+      heavy: { label: "金塊ぶん殴り", damage: 8.5, kbBase: 3.9, kbScale: .080, maxKnockback: 14, lunge: 4.5, strongEffect: true },
+      smashSide: { label: "億万札束スマッシュ", damage: 11.5, kbBase: 4.4, kbScale: .098, maxKnockback: 16.5, smash: true, strongEffect: true, lunge: 3.5, rangeMul: 1.1, coinBurst: true },
+      smashUp: { label: "成金ヘッドバット", damage: 10.5, kbBase: 4.2, kbScale: .094, maxKnockback: 16, smash: true, verticalScale: 1.0, horizontalScale: .42, strongEffect: true },
+      smashDown: { label: "金塊地獄車", damage: 10, kbBase: 4.0, kbScale: .092, maxKnockback: 15.5, smash: true, verticalScale: .60, horizontalScale: .75, strongEffect: true, rangeMul: 1.1 }
+    },
+    specials: {
+      neutral: sp({
+        label: "小判投げ", startup: 7, active: 1, recovery: 28,
+        projectile: { speed: 7.6, grav: .02, size: 7, damage: 6, kbBase: 2.6, kbScale: .06, maxKnockback: 11, color: "#ffd74a", coin: true }
+      }),
+      side: sp({
+        label: "強欲タックル", movement: "dash", dashSpeed: 9.8, range: 48,
+        damage: 9.2, kbBase: 3.6, kbScale: .075, maxKnockback: 13, startup: 6, active: 6, recovery: 29
+      }),
+      up: sp({
+        label: "成金ライジング", movement: "up", riseVy: -14.0, upBHoriz: 5.4, gravityScale: .4,
+        range: 48, damage: 7.5, kbBase: 3.4, kbScale: .072, maxKnockback: 12.8, verticalScale: .95, startup: 4, active: 11, recovery: 30
+      }),
+      down: sp({
+        label: "金庫プレス", shockwave: true, dive: true, range: 64,
+        damage: 8.5, kbBase: 3.5, kbScale: .074, maxKnockback: 13, verticalScale: .58, startup: 9, active: 5, recovery: 33
+      })
+    }
+  },
+  {
+    name: "カノン", role: "重量級パワー", description: "100F反転魔人拳・炎獄握・雷神掌の破壊王",
+    color: "#bc623f", altColor: "#5489bd", style: "heavy", effectColor: "#b84dff", weapon: "dark",
+    weight: 1.32, speed: 3.25, airSpeed: 2.8, jump: 12.0, jumps: 2, gravity: 1.1,
+    damageScale: 1.16, powerScale: 1.27, rangeScale: 1.14, cooldownScale: 1.12, size: 1.12,
+    moves: {
+      weak: { total: 14, startup: 5, active: 4, cooldown: 22 },
+      sideTilt: { total: 19, startup: 7, active: 4, cooldown: 26 },
+      upTilt: { total: 26, startup: 12, active: 5, cooldown: 35 },
+      heavy: { total: 27, startup: 12, active: 5, cooldown: 40 },
+      smashSide: { total: 38, startup: 19, active: 6, cooldown: 55 },
+      smashUp: { total: 36, startup: 18, active: 6, cooldown: 53 },
+      smashDown: { total: 38, startup: 17, active: 8, cooldown: 54 }
+    },
+    stats: {
+      weak: { label: "剛掌打", damage: 6.2, kbBase: 3.2, kbScale: .070, maxKnockback: 12.5, strongEffect: true },
+      sideTilt: { label: "スパルタンキック", damage: 7.8, kbBase: 3.6, kbScale: .080, maxKnockback: 13.5, horizontalScale: 1.15, strongEffect: true },
+      upTilt: { label: "かかと落とし", damage: 9.5, kbBase: 4.1, kbScale: .088, maxKnockback: 15, strongEffect: true },
+      heavy: { label: "大魔王斬り", damage: 10.5, kbBase: 4.4, kbScale: .088, maxKnockback: 15, lunge: 3.0, strongEffect: true },
+      smashSide: { label: "魔王大剣斬り", damage: 15.5, kbBase: 5.2, kbScale: .112, maxKnockback: 19, smash: true, strongEffect: true, sword: true, rangeMul: 1.4, lunge: 2.0, horizontalScale: 1.05 },
+      smashUp: { label: "魔王天上剣", damage: 14, kbBase: 5.0, kbScale: .108, maxKnockback: 18.5, smash: true, verticalScale: 1.0, horizontalScale: .45, strongEffect: true, sword: true, rangeMul: 1.25 },
+      smashDown: { label: "魔王双剣薙ぎ払い", damage: 13.5, kbBase: 4.8, kbScale: .105, maxKnockback: 18, smash: true, verticalScale: .62, horizontalScale: .8, strongEffect: true, sword: true, rangeMul: 1.3 },
+      airDown: { label: "雷撃踏み(メテオ)", damage: 9.5, kbBase: 3.9, kbScale: .085, maxKnockback: 15, verticalScale: .85, horizontalScale: .35, vySign: 1, strongEffect: true },
+      fThrow: { damage: 10, kbBase: 4.1, kbScale: .082, maxKnockback: 15 }
+    },
+    specials: {
+      neutral: sp({
+        label: "魔人拳", superArmor: true, warlockCharge: true,
+        reverseWindow: 30, reverseAddStartup: 12, reverseAddRecovery: 6, reverseMul: 1.28,
+        range: 64, damage: 24, kbBase: 6.2, kbScale: .125, maxKnockback: 22,
+        startup: 68, active: 6, recovery: 26
+      }),
+      side: sp({
+        label: "炎獄握 (ガード不能)", movement: "dash", dashSpeed: 7.6, range: 52,
+        grab: true, grabDuration: 16, throwDamage: 11.5, kbBase: 3.8, kbScale: .078, maxKnockback: 14,
+        verticalScale: .45, startup: 8, active: 7, recovery: 34
+      }),
+      up: sp({
+        label: "雷神掌 (掴み再使用可)", movement: "up", riseVy: -11.6, upBHoriz: 5.0, gravityScale: .48, range: 52,
+        damage: 2, kbBase: 3.6, kbScale: .082, maxKnockback: 15,
+        grab: true, grabDuration: 19, throwDamage: 11.5, verticalScale: .95, startup: 6, active: 12, recovery: 35
+      }),
+      down: sp({
+        label: "烈鬼脚", movement: "dash", dashSpeed: 8.5, shockwave: true, dive: true, range: 76,
+        damage: 11.5, kbBase: 4.2, kbScale: .088, maxKnockback: 15, verticalScale: .55, startup: 12, active: 6, recovery: 36
+      })
+    }
+  },
+  {
+    name: "マリノ", role: "オールラウンダー", description: "跳ねる火球・マント・メテオの達人",
+    color: "#e54b38", altColor: "#4ab4ab", style: "craft", effectColor: "#ff8a3a", weapon: "fire",
+    weight: 1, speed: 4.65, airSpeed: 4.1, jump: 11.6, jumps: 2, gravity: 1,
+    damageScale: 1, powerScale: 1.04, rangeScale: 1.02, cooldownScale: .95, size: 1,
+    moves: {
+      weak: { total: 10, startup: 3, active: 5, cooldown: 14 },
+      upTilt: { total: 14, startup: 4, active: 5, cooldown: 18 },
+      heavy: { total: 20, startup: 8, active: 5, cooldown: 29 },
+      smashSide: { total: 28, startup: 12, active: 5, cooldown: 41 },
+      smashUp: { total: 24, startup: 9, active: 6, cooldown: 38 },
+      smashDown: { total: 27, startup: 11, active: 8, cooldown: 40 }
+    },
+    stats: {
+      weak: { label: "ワンツー・キック", damage: 2.3, kbBase: 1.7, kbScale: .05, maxKnockback: 8.5, hits: 2, hitInterval: 4 },
+      upTilt: { label: "アッパーカット", damage: 5.5, kbBase: 2.9, kbScale: .062, maxKnockback: 11, verticalScale: .95 },
+      heavy: { label: "ファイア掌底", damage: 8.4, kbBase: 3.9, kbScale: .082, maxKnockback: 14, strongEffect: true },
+      smashSide: { label: "ファイアスマッシュ", damage: 11.5, kbBase: 4.3, kbScale: .098, maxKnockback: 16.5, smash: true, strongEffect: true, fire: true, lunge: 4.2, rangeMul: 1.05, cleanHit: { frames: 2, damageMul: 1.25, kbMul: 1.2, lateMul: 0.85 } },
+      smashUp: { label: "スーパー頭突き", damage: 10.8, kbBase: 4.4, kbScale: .10, maxKnockback: 16.8, smash: true, verticalScale: 1.05, horizontalScale: .4, strongEffect: true },
+      smashDown: { label: "スピンブレイク", damage: 10.2, kbBase: 4.0, kbScale: .094, maxKnockback: 15.8, smash: true, verticalScale: .55, horizontalScale: .8, strongEffect: true, rangeMul: 1.15 },
+      airForward: { label: "メテオナックル", damage: 8.0, kbBase: 3.4, kbScale: .076, maxKnockback: 13.5, verticalScale: .72, horizontalScale: .55, vySign: 1, strongEffect: true },
+      bThrow: { damage: 11, kbBase: 4.3, kbScale: .092, maxKnockback: 16 }
+    },
+    specials: {
+      neutral: sp({
+        label: "ファイアボール", startup: 6, active: 1, recovery: 25,
+        projectile: { speed: 6.4, grav: .22, bounce: true, size: 7, damage: 5.5, kbBase: 2.4, kbScale: .058, maxKnockback: 10.2, color: "#ff7828" }
+      }),
+      side: sp({
+        label: "スーパーマント", movement: "dash", dashSpeed: 4.5, reflect: true, range: 52,
+        damage: 7.5, kbBase: 3.1, kbScale: .068, maxKnockback: 12, startup: 5, active: 8, recovery: 25
+      }),
+      up: sp({
+        label: "スーパージャンプパンチ", movement: "up", riseVy: -14.8, upBHoriz: 5.5, gravityScale: .35,
+        range: 46, damage: 8.5, kbBase: 3.6, kbScale: .075, maxKnockback: 13.2, verticalScale: .95, startup: 4, active: 11, recovery: 30
+      }),
+      down: sp({
+        label: "マリノトルネード", movement: "dash", dashSpeed: 5.8, shockwave: true, dive: false, range: 56,
+        damage: 8.0, kbBase: 3.4, kbScale: .072, maxKnockback: 12.5, verticalScale: .82, startup: 6, active: 8, recovery: 28
+      })
+    }
+  },
+  {
+    name: "カズマ", role: "格闘・連撃型", description: "雷神拳・デビルビーム・高火力格闘",
+    color: "#9164d8", altColor: "#d668a1", style: "combo", effectColor: "#66e0ff", weapon: "electric",
+    weight: 1.06, speed: 4.55, airSpeed: 4.0, jump: 10.9, jumps: 2, gravity: 1.02,
+    damageScale: .98, powerScale: 1.06, rangeScale: .96, cooldownScale: .95, size: .99,
+    moves: {
+      weak: { total: 14, startup: 4, active: 4, cooldown: 20 },
+      sideTilt: { total: 18, startup: 6, active: 4, cooldown: 23 },
+      heavy: { total: 20, startup: 7, active: 5, cooldown: 29 },
+      smashSide: { total: 32, startup: 14, active: 6, cooldown: 46 },
+      smashUp: { total: 30, startup: 13, active: 10, cooldown: 44 },
+      smashDown: { total: 30, startup: 13, active: 6, cooldown: 44 }
+    },
+    stats: {
+      weak: { label: "閃光烈拳", damage: 3.6, kbBase: 2.6, kbScale: .062, maxKnockback: 10.5 },
+      sideTilt: { label: "左踵落とし", damage: 6.2, kbBase: 3.1, kbScale: .070, maxKnockback: 12.2, strongEffect: true },
+      downTilt: { label: "腿砕き", damage: 6.0, kbBase: 2.9, kbScale: .066, maxKnockback: 11.5, verticalScale: .4 },
+      heavy: { label: "最速風神拳", damage: 9.2, kbBase: 4.1, kbScale: .086, maxKnockback: 14.8, verticalScale: .95, lunge: 5.2, strongEffect: true },
+      smashSide: { label: "崩拳・奈落旋風脚", damage: 11, kbBase: 4.2, kbScale: .096, maxKnockback: 16.2, smash: true, strongEffect: true, electric: true, lunge: 4.0, rangeMul: 1.1, cleanHit: { frames: 2, damageMul: 1.45, kbMul: 1.4, lateMul: 0.7 } },
+      smashUp: { label: "羅生旋風脚", damage: 8.8, kbBase: 4.3, kbScale: .098, maxKnockback: 16.5, smash: true, verticalScale: 1.05, horizontalScale: .4, strongEffect: true, electric: true, hits: 2, hitInterval: 6, linkDamage: 4.5 },
+      smashDown: { label: "地獄車スイープ", damage: 10.5, kbBase: 4.1, kbScale: .095, maxKnockback: 16, smash: true, verticalScale: .55, horizontalScale: .8, strongEffect: true, rangeMul: 1.15 },
+      downThrow: { damage: 6.5, kbBase: 3.0, kbScale: .046, maxKnockback: 9.2, verticalScale: .88, horizontalScale: .42 }
+    },
+    specials: {
+      neutral: sp({
+        label: "デビルブラスター", startup: 8, active: 1, recovery: 30,
+        projectile: { speed: 11.2, grav: 0, beam: true, size: 7, damage: 7.0, kbBase: 3.0, kbScale: .065, maxKnockback: 12, color: "#df80ff" }
+      }),
+      side: sp({
+        label: "六腑凶襲拳", movement: "dash", dashSpeed: 9.4, range: 46,
+        damage: 9.5, kbBase: 3.6, kbScale: .074, maxKnockback: 12.8, verticalScale: .8, startup: 6, active: 6, recovery: 30
+      }),
+      up: sp({
+        label: "デビルウイング", movement: "up", riseVy: -14.0, upBHoriz: 5.6, gravityScale: .38,
+        range: 48, damage: 9.0, kbBase: 3.6, kbScale: .076, maxKnockback: 13.2, verticalScale: .95, startup: 4, active: 11, recovery: 30
+      }),
+      down: sp({
+        label: "ヘブンズドア (アーマー)", superArmor: true, shockwave: true, dive: true, range: 56,
+        damage: 10.5, kbBase: 3.9, kbScale: .082, maxKnockback: 14, verticalScale: .68, startup: 10, active: 6, recovery: 34
+      })
+    }
+  },
+  {
+    name: "ソアラ", role: "空中・リーチ型", description: "鍵剣コンボ＆3属性魔法(火・雷・氷)",
+    color: "#48b9c6", altColor: "#e58dcd", style: "aerial", effectColor: "#9ff2ff", weapon: "sword",
+    weight: .86, speed: 4.35, airSpeed: 4.6, jump: 11.2, jumps: 3, gravity: .75,
+    damageScale: .94, powerScale: .97, rangeScale: 1.26, cooldownScale: .94, size: .96,
+    moves: {
+      weak: { total: 12, startup: 4, active: 5, cooldown: 16 },
+      heavy: { total: 21, startup: 8, active: 6, cooldown: 30 },
+      airNeutral: { total: 19, startup: 3, active: 9, cooldown: 21 },
+      smashSide: { total: 34, startup: 12, active: 16, cooldown: 46 },
+      smashUp: { total: 30, startup: 12, active: 12, cooldown: 44 },
+      smashDown: { total: 32, startup: 13, active: 10, cooldown: 45 }
+    },
+    stats: {
+      weak: { label: "スラッシュコンボ", damage: 2.4, kbBase: 1.8, kbScale: .054, maxKnockback: 9, hits: 2, hitInterval: 4 },
+      sideTilt: { label: "ワイドスラッシュ", damage: 6.4, kbBase: 3.1, kbScale: .070, maxKnockback: 12.2, strongEffect: true },
+      heavy: { label: "マジックブリッツ", damage: 8.2, kbBase: 3.8, kbScale: .078, maxKnockback: 13.6, lunge: 4.0, strongEffect: true },
+      smashSide: { label: "3連斬りスマッシュ", damage: 7.5, kbBase: 4.3, kbScale: .098, maxKnockback: 16.2, smash: true, strongEffect: true, sword: true, rangeMul: 1.2, hits: 3, hitInterval: 5, linkDamage: 3.2 },
+      smashUp: { label: "ライジングブレイド", damage: 7.0, kbBase: 4.1, kbScale: .095, maxKnockback: 16, smash: true, verticalScale: 1.05, horizontalScale: .4, strongEffect: true, sword: true, hits: 2, hitInterval: 6, linkDamage: 3.5 },
+      smashDown: { label: "サークルレイヴ", damage: 10.5, kbBase: 4.1, kbScale: .095, maxKnockback: 16, smash: true, verticalScale: .60, horizontalScale: .8, strongEffect: true, sword: true, rangeMul: 1.2 },
+      airNeutral: { label: "エリアルスピン", damage: 2.6, kbBase: 2.0, kbScale: .056, maxKnockback: 9.5, hits: 2, hitInterval: 5 },
+      airUp: { label: "クレセントムーン", damage: 6.5, kbBase: 3.2, kbScale: .072, maxKnockback: 12.8, verticalScale: .95, strongEffect: true }
+    },
+    specials: {
+      neutral: sp({
+        label: "3種魔法(火/雷/氷)", magicCycle: true, startup: 6, active: 1, recovery: 26,
+        projectile: { speed: 8.5, grav: 0, size: 7, damage: 6.5, kbBase: 2.8, kbScale: .064, maxKnockback: 11.5, color: "#ff7247" }
+      }),
+      side: sp({
+        label: "ソニックレイヴ", movement: "dash", dashSpeed: 10.8, range: 54,
+        damage: 8.2, kbBase: 3.3, kbScale: .070, maxKnockback: 12.5, startup: 5, active: 7, recovery: 28
+      }),
+      up: sp({
+        label: "エリアルスイープ", movement: "up", riseVy: -14.5, upBHoriz: 5.8, gravityScale: .3,
+        range: 58, damage: 8.2, kbBase: 3.4, kbScale: .072, maxKnockback: 12.8, verticalScale: .95, startup: 4, active: 12, recovery: 30
+      }),
+      down: sp({
+        label: "マジックバースト", shockwave: true, dive: true, range: 58,
+        damage: 8.8, kbBase: 3.6, kbScale: .076, maxKnockback: 13, verticalScale: .68, startup: 7, active: 7, recovery: 30
+      })
+    }
+  },
+  {
+    name: "カビィ", role: "初心者向け", description: "5段ジャンプ・火炎ハンマー・無敵ストーン",
+    color: "#ef83b2", altColor: "#8ab7ff", style: "blob", effectColor: "#ffaad5", weapon: "star",
+    weight: .9, speed: 4.2, airSpeed: 4.05, jump: 10.6, jumps: 5, gravity: .66,
+    damageScale: .94, powerScale: .95, rangeScale: 1.04, cooldownScale: .92, size: .96,
+    moves: {
+      weak: { total: 12, startup: 3, active: 7, cooldown: 14 },
+      heavy: { total: 22, startup: 9, active: 5, cooldown: 30 },
+      smashSide: { total: 32, startup: 15, active: 6, cooldown: 47 },
+      smashUp: { total: 27, startup: 11, active: 6, cooldown: 41 },
+      smashDown: { total: 28, startup: 12, active: 8, cooldown: 42 }
+    },
+    stats: {
+      weak: { label: "バルカンジャブ", damage: 1.6, kbBase: 1.4, kbScale: .045, maxKnockback: 8, hits: 3, hitInterval: 3 },
+      sideTilt: { label: "スピニングキック", damage: 5.8, kbBase: 2.9, kbScale: .068, maxKnockback: 11.8 },
+      downTilt: { label: "スライディング", damage: 5.4, kbBase: 2.7, kbScale: .062, maxKnockback: 11, lunge: 4.2, verticalScale: .45 },
+      heavy: { label: "ぽよんハンマー", damage: 9.2, kbBase: 4.0, kbScale: .082, maxKnockback: 14.2, strongEffect: true },
+      smashSide: { label: "鬼殺しハンマー", damage: 11, kbBase: 4.2, kbScale: .096, maxKnockback: 16.2, smash: true, strongEffect: true, fire: true, hammer: true, lunge: 3.2, rangeMul: 1.15, cleanHit: { frames: 2, damageMul: 1.5, kbMul: 1.45, lateMul: 0.65 } },
+      smashUp: { label: "スクリューフリップ", damage: 10.5, kbBase: 4.3, kbScale: .098, maxKnockback: 16.5, smash: true, verticalScale: 1.05, horizontalScale: .42, strongEffect: true },
+      smashDown: { label: "ダブルスプリット", damage: 9.8, kbBase: 3.9, kbScale: .092, maxKnockback: 15.5, smash: true, verticalScale: .55, horizontalScale: .8, strongEffect: true, rangeMul: 1.2 },
+      airDown: { label: "スクリュードライバー", damage: 2.5, kbBase: 2.2, kbScale: .060, maxKnockback: 10.5, hits: 3, hitInterval: 4, verticalScale: .65, vySign: 1 }
+    },
+    specials: {
+      neutral: sp({
+        label: "スタースピット", startup: 6, active: 1, recovery: 24,
+        projectile: { speed: 6.8, grav: .02, size: 8, damage: 5.5, kbBase: 2.5, kbScale: .060, maxKnockback: 11, color: "#ffe869", star: true }
+      }),
+      side: sp({
+        label: "鬼殺し火炎ハンマー", movement: "dash", dashSpeed: 7.5, range: 52,
+        damage: 11.5, kbBase: 4.1, kbScale: .086, maxKnockback: 15, startup: 8, active: 6, recovery: 28
+      }),
+      up: sp({
+        label: "ファイナルカッター", movement: "up", riseVy: -13.0, upBHoriz: 5.2, gravityScale: .32, range: 48,
+        damage: 7.5, kbBase: 3.3, kbScale: .070, maxKnockback: 12.2, verticalScale: .95, startup: 5, active: 11, recovery: 28,
+        landingWave: { speed: 7.5, grav: 0, size: 8, damage: 5.0, kbBase: 2.5, kbScale: .058, maxKnockback: 10.5, color: "#8ef7ff" }
+      }),
+      down: sp({
+        label: "ストーン (無敵変身)", movement: "dive", stoneForm: true, superArmor: true, shockwave: true, dive: true, range: 56,
+        damage: 11.5, kbBase: 4.1, kbScale: .086, maxKnockback: 14.8, verticalScale: .68, startup: 8, active: 10, recovery: 28
+      })
+    }
+  },
+  {
+    name: "ザマス", role: "射撃・パワードスーツ", description: "チャージショットとミサイルの賞金稼ぎ",
+    color: "#f08a24", altColor: "#7a6cf0", style: "armor", effectColor: "#7dff9a", weapon: "fire",
+    weight: 1.08, speed: 4.0, airSpeed: 3.6, jump: 11.4, jumps: 2, gravity: .92,
+    damageScale: 1, powerScale: 1.05, rangeScale: 1.1, cooldownScale: 1, size: 1.06,
+    moves: {
+      weak: { total: 13, startup: 4, active: 4, cooldown: 18 },
+      upTilt: { total: 22, startup: 10, active: 5, cooldown: 30 },
+      heavy: { total: 22, startup: 9, active: 5, cooldown: 32 },
+      smashSide: { total: 30, startup: 13, active: 5, cooldown: 44 },
+      smashUp: { total: 34, startup: 12, active: 16, cooldown: 46 },
+      smashDown: { total: 30, startup: 12, active: 8, cooldown: 43 },
+      airNeutral: { total: 24, startup: 5, active: 10, cooldown: 26 }
+    },
+    stats: {
+      weak: { label: "アームキャノン殴り", damage: 4.0, kbBase: 2.3, kbScale: .058, maxKnockback: 10 },
+      sideTilt: { label: "フォワードキック", damage: 6.6, kbBase: 3.1, kbScale: .070, maxKnockback: 12.2, strongEffect: true },
+      upTilt: { label: "アックスキック", damage: 9.5, kbBase: 4.0, kbScale: .086, maxKnockback: 14.5, verticalScale: .5, strongEffect: true },
+      heavy: { label: "キャノンブロー", damage: 8.6, kbBase: 3.9, kbScale: .080, maxKnockback: 14, lunge: 3.0, strongEffect: true },
+      smashSide: { label: "ブラスター爆炎", damage: 12, kbBase: 4.5, kbScale: .100, maxKnockback: 16.8, smash: true, strongEffect: true, fire: true, rangeMul: 1.1, cleanHit: { frames: 2, damageMul: 1.2, kbMul: 1.15, lateMul: 0.9 } },
+      smashUp: { label: "ファイアウェーブ5連", damage: 6.5, kbBase: 4.3, kbScale: .098, maxKnockback: 16.2, smash: true, verticalScale: 1.05, horizontalScale: .35, strongEffect: true, fire: true, hits: 5, hitInterval: 3, linkDamage: 1.8 },
+      smashDown: { label: "回転スイープキック", damage: 10.5, kbBase: 4.0, kbScale: .094, maxKnockback: 15.8, smash: true, verticalScale: .55, horizontalScale: .8, strongEffect: true, rangeMul: 1.15 },
+      airNeutral: { label: "スピンキック", damage: 3.0, kbBase: 2.2, kbScale: .058, maxKnockback: 10, hits: 2, hitInterval: 5 },
+      airDown: { label: "メテオストンプ", damage: 8.5, kbBase: 3.6, kbScale: .080, maxKnockback: 14, verticalScale: .8, horizontalScale: .35, vySign: 1, strongEffect: true }
+    },
+    specials: {
+      neutral: sp({
+        label: "チャージショット", startup: 14, active: 1, recovery: 30,
+        projectile: { speed: 9.0, grav: 0, size: 11, damage: 11, kbBase: 3.8, kbScale: .082, maxKnockback: 14, color: "#9dff6b", charge: true }
+      }),
+      side: sp({
+        label: "ミサイル", startup: 10, active: 1, recovery: 26,
+        projectile: { speed: 6.5, grav: 0, size: 6, damage: 6.5, kbBase: 2.8, kbScale: .064, maxKnockback: 11.5, color: "#ff8f3d", missile: true }
+      }),
+      up: sp({
+        label: "スクリューアタック", movement: "up", riseVy: -14.5, upBHoriz: 5.0, gravityScale: .38,
+        range: 54, damage: 9.0, kbBase: 3.6, kbScale: .076, maxKnockback: 13.2, verticalScale: .95, startup: 4, active: 14, recovery: 30
+      }),
+      down: sp({
+        label: "ボム", startup: 4, active: 1, recovery: 22,
+        projectile: { speed: 0.4, grav: 0, size: 9, damage: 5.5, kbBase: 2.6, kbScale: .060, maxKnockback: 11, color: "#ff4ad8", bomb: true, life: 45 }
+      })
+    }
+  },
+  {
+    name: "クッハ", role: "大魔王・超重量級", description: "炎のブレスと甲羅で押しつぶす大魔王",
+    color: "#e8a33a", altColor: "#4f8fd6", style: "koopa", effectColor: "#ff7a2f", weapon: "fire",
+    weight: 1.48, speed: 3.35, airSpeed: 2.9, jump: 11.6, jumps: 2, gravity: 1.12,
+    damageScale: 1.2, powerScale: 1.3, rangeScale: 1.18, cooldownScale: 1.15, size: 1.2,
+    moves: {
+      weak: { total: 15, startup: 5, active: 4, cooldown: 22 },
+      sideTilt: { total: 22, startup: 9, active: 5, cooldown: 30 },
+      upTilt: { total: 22, startup: 8, active: 6, cooldown: 30 },
+      heavy: { total: 28, startup: 13, active: 5, cooldown: 42 },
+      smashSide: { total: 38, startup: 20, active: 5, cooldown: 56 },
+      smashUp: { total: 34, startup: 16, active: 7, cooldown: 50 },
+      smashDown: { total: 36, startup: 16, active: 12, cooldown: 52 },
+      airDown: { total: 30, startup: 10, active: 12, cooldown: 34 }
+    },
+    stats: {
+      weak: { label: "クローひっかき", damage: 5.5, kbBase: 3.0, kbScale: .066, maxKnockback: 12, strongEffect: true },
+      sideTilt: { label: "ヘビークロー", damage: 9.0, kbBase: 3.9, kbScale: .084, maxKnockback: 14, strongEffect: true },
+      upTilt: { label: "ツノアッパー", damage: 8.5, kbBase: 3.8, kbScale: .082, maxKnockback: 14, verticalScale: .95, strongEffect: true },
+      downTilt: { label: "テールスイープ", damage: 7.5, kbBase: 3.3, kbScale: .074, maxKnockback: 12.5, verticalScale: .45, strongEffect: true },
+      heavy: { label: "ヘビーヘッドバット", damage: 11.5, kbBase: 4.5, kbScale: .090, maxKnockback: 15.5, lunge: 3.0, strongEffect: true },
+      smashSide: { label: "クッハヘッドバット", damage: 16, kbBase: 5.2, kbScale: .112, maxKnockback: 19, smash: true, strongEffect: true, rangeMul: 1.15, lunge: 2.5 },
+      smashUp: { label: "シェルブレイク", damage: 15, kbBase: 5.0, kbScale: .108, maxKnockback: 18.5, smash: true, verticalScale: 1.05, horizontalScale: .42, strongEffect: true, rangeMul: 1.2 },
+      smashDown: { label: "スピンシェル", damage: 12, kbBase: 4.6, kbScale: .102, maxKnockback: 17.5, smash: true, verticalScale: .6, horizontalScale: .85, strongEffect: true, rangeMul: 1.25, hits: 2, hitInterval: 8, linkDamage: 5 },
+      airDown: { label: "ドリルシェル", damage: 3.0, kbBase: 2.4, kbScale: .062, maxKnockback: 11, hits: 3, hitInterval: 4, verticalScale: .65, vySign: 1 },
+      fThrow: { damage: 11, kbBase: 4.2, kbScale: .084, maxKnockback: 15 }
+    },
+    specials: {
+      neutral: sp({
+        label: "ファイアブレス", startup: 6, active: 1, recovery: 24,
+        projectile: { speed: 5.2, grav: -.01, size: 10, damage: 5.0, kbBase: 2.2, kbScale: .050, maxKnockback: 9.5, color: "#ff6a1f", fireBreath: true, life: 38 }
+      }),
+      side: sp({
+        label: "ダイビングプレス (掴み)", movement: "dash", dashSpeed: 6.8, range: 54,
+        grab: true, grabDuration: 22, throwDamage: 14, kbBase: 4.2, kbScale: .086, maxKnockback: 15,
+        verticalScale: .5, startup: 9, active: 8, recovery: 38
+      }),
+      up: sp({
+        label: "スピニングシェル", movement: "up", riseVy: -10.5, upBHoriz: 6.0, gravityScale: .55,
+        range: 60, damage: 9.0, kbBase: 3.6, kbScale: .076, maxKnockback: 13.2, verticalScale: .9, startup: 4, active: 16, recovery: 32
+      }),
+      down: sp({
+        label: "クッハドロップ", superArmor: true, shockwave: true, dive: true, range: 78,
+        damage: 13, kbBase: 4.4, kbScale: .090, maxKnockback: 15.5, verticalScale: .6, startup: 12, active: 6, recovery: 38
+      })
+    }
+  },
+  {
+    name: "ピッタ", role: "天使・空中機動", description: "神弓とオービタで戦う光の天使",
+    color: "#8fd0ff", altColor: "#ff9fbe", style: "angel", effectColor: "#ffe27a", weapon: "sword",
+    weight: .95, speed: 4.5, airSpeed: 4.2, jump: 11.2, jumps: 4, gravity: .82,
+    damageScale: .97, powerScale: 1, rangeScale: 1.12, cooldownScale: .94, size: .98,
+    moves: {
+      weak: { total: 12, startup: 3, active: 8, cooldown: 15 },
+      heavy: { total: 21, startup: 8, active: 5, cooldown: 30 },
+      smashSide: { total: 30, startup: 12, active: 10, cooldown: 44 },
+      smashUp: { total: 30, startup: 11, active: 13, cooldown: 44 },
+      smashDown: { total: 27, startup: 10, active: 6, cooldown: 41 },
+      airNeutral: { total: 24, startup: 4, active: 12, cooldown: 26 }
+    },
+    stats: {
+      weak: { label: "神弓連斬", damage: 1.8, kbBase: 1.5, kbScale: .046, maxKnockback: 8.5, hits: 3, hitInterval: 3 },
+      sideTilt: { label: "神弓突き", damage: 6.0, kbBase: 3.0, kbScale: .070, maxKnockback: 12, strongEffect: true },
+      upTilt: { label: "蹴り上げ", damage: 5.5, kbBase: 2.9, kbScale: .064, maxKnockback: 11.5, verticalScale: .95 },
+      heavy: { label: "神弓スラッシュ", damage: 8.0, kbBase: 3.8, kbScale: .078, maxKnockback: 13.5, lunge: 3.8, strongEffect: true },
+      smashSide: { label: "神弓連撃", damage: 9.0, kbBase: 4.3, kbScale: .098, maxKnockback: 16.2, smash: true, strongEffect: true, sword: true, rangeMul: 1.15, hits: 2, hitInterval: 5, linkDamage: 4 },
+      smashUp: { label: "三段斬り上げ", damage: 7.0, kbBase: 4.2, kbScale: .096, maxKnockback: 16, smash: true, verticalScale: 1.05, horizontalScale: .4, strongEffect: true, sword: true, hits: 3, hitInterval: 4, linkDamage: 2.5 },
+      smashDown: { label: "開脚斬り", damage: 10.5, kbBase: 4.0, kbScale: .094, maxKnockback: 15.8, smash: true, verticalScale: .5, horizontalScale: .85, strongEffect: true, sword: true, rangeMul: 1.15 },
+      airNeutral: { label: "神弓回転", damage: 2.2, kbBase: 1.9, kbScale: .054, maxKnockback: 9.5, hits: 3, hitInterval: 4 }
+    },
+    specials: {
+      neutral: sp({
+        label: "パルテナアロー", startup: 9, active: 1, recovery: 28,
+        projectile: { speed: 10.5, grav: 0, size: 6, damage: 5.5, kbBase: 2.5, kbScale: .058, maxKnockback: 10.5, color: "#7fe8ff", arrow: true }
+      }),
+      side: sp({
+        label: "豪腕ダッシュアッパー", movement: "dash", dashSpeed: 9.0, range: 50,
+        damage: 11, kbBase: 4.0, kbScale: .084, maxKnockback: 14.5, verticalScale: 1.15, horizontalScale: .35, startup: 9, active: 7, recovery: 34
+      }),
+      up: sp({
+        label: "飛翔の奇跡", movement: "up", riseVy: -17.0, upBHoriz: 6.0, gravityScale: .28,
+        range: 30, damage: 1, kbBase: 1, kbScale: .02, maxKnockback: 4, startup: 6, active: 2, recovery: 32
+      }),
+      down: sp({
+        label: "ガードオービタ (反射)", reflect: true, range: 48,
+        damage: 3, kbBase: 2.4, kbScale: .05, maxKnockback: 9, startup: 3, active: 18, recovery: 24
+      })
+    }
+  },
+  {
+    name: "クラウ.com", role: "大剣・リミット", description: "バスターソードとリミット技の元ソルジャー",
+    color: "#5b6ee1", altColor: "#c0392b", style: "buster", effectColor: "#7ec8ff", weapon: "sword",
+    limitBreak: true,
+    weight: 1.02, speed: 4.6, airSpeed: 3.9, jump: 11.0, jumps: 2, gravity: 1.0,
+    damageScale: 1.02, powerScale: 1.08, rangeScale: 1.22, cooldownScale: 1, size: 1.04,
+    moves: {
+      weak: { total: 13, startup: 4, active: 6, cooldown: 17 },
+      heavy: { total: 23, startup: 9, active: 5, cooldown: 33 },
+      smashSide: { total: 36, startup: 13, active: 16, cooldown: 50 },
+      smashUp: { total: 30, startup: 12, active: 7, cooldown: 44 },
+      smashDown: { total: 30, startup: 12, active: 8, cooldown: 44 }
+    },
+    stats: {
+      weak: { label: "バスター連斬", damage: 2.6, kbBase: 1.9, kbScale: .054, maxKnockback: 9.5, hits: 2, hitInterval: 4 },
+      sideTilt: { label: "バスタースイング", damage: 7.0, kbBase: 3.3, kbScale: .074, maxKnockback: 12.8, strongEffect: true, sword: true },
+      upTilt: { label: "斬り上げ", damage: 6.5, kbBase: 3.1, kbScale: .070, maxKnockback: 12.2, verticalScale: .95, strongEffect: true, sword: true },
+      heavy: { label: "叩き斬り", damage: 9.5, kbBase: 4.1, kbScale: .084, maxKnockback: 14.5, lunge: 3.5, strongEffect: true, sword: true },
+      smashSide: { label: "バスター三段斬", damage: 9.5, kbBase: 4.5, kbScale: .100, maxKnockback: 16.8, smash: true, strongEffect: true, sword: true, rangeMul: 1.25, hits: 3, hitInterval: 5, linkDamage: 3 },
+      smashUp: { label: "天昇斬", damage: 12, kbBase: 4.5, kbScale: .100, maxKnockback: 17, smash: true, verticalScale: 1.05, horizontalScale: .4, strongEffect: true, sword: true, rangeMul: 1.15 },
+      smashDown: { label: "回転斬り", damage: 11.5, kbBase: 4.2, kbScale: .096, maxKnockback: 16.2, smash: true, verticalScale: .55, horizontalScale: .85, strongEffect: true, sword: true, rangeMul: 1.2 },
+      airDown: { label: "メテオバスター", damage: 9.0, kbBase: 3.7, kbScale: .082, maxKnockback: 14.5, verticalScale: .82, horizontalScale: .35, vySign: 1, strongEffect: true, sword: true }
+    },
+    specials: {
+      neutral: sp({
+        label: "破晄撃", startup: 10, active: 1, recovery: 30,
+        projectile: { speed: 7.5, grav: 0, size: 10, damage: 7.0, kbBase: 3.0, kbScale: .066, maxKnockback: 12, color: "#8ad7ff", wave: true, life: 70 }
+      }),
+      side: sp({
+        label: "凶斬り", movement: "dash", dashSpeed: 8.5, range: 56,
+        damage: 10, kbBase: 3.8, kbScale: .080, maxKnockback: 14, startup: 8, active: 8, recovery: 30
+      }),
+      up: sp({
+        label: "クライムハザード", movement: "up", riseVy: -13.5, upBHoriz: 5.0, gravityScale: .36,
+        range: 54, damage: 9.0, kbBase: 3.6, kbScale: .076, maxKnockback: 13.2, verticalScale: .95, startup: 4, active: 12, recovery: 30
+      }),
+      down: sp({
+        label: "リミットチャージ", limitCharge: true, range: 1, damage: 0,
+        startup: 70, active: 1, recovery: 6,
+        limitVersion: sp({
+          label: "画竜点睛", movement: "dash", dashSpeed: 6.0, range: 58,
+          damage: 12, kbBase: 4.4, kbScale: .092, maxKnockback: 16, startup: 6, active: 8, recovery: 28
+        })
+      })
+    }
+  }
+];
+const RANDOM_INDEX = FIGHTERS.length;
+const SOARA_MAGICS = [
+  { name: "ファイガ", color: "#ff6b3d", speed: 8.5, grav: 0, size: 8, damage: 6.5, kbBase: 2.8, kbScale: .065, maxKnockback: 11.5 },
+  { name: "サンダガ", color: "#ffe95b", speed: 4.8, grav: .28, bounce: true, size: 10, damage: 8.5, kbBase: 3.5, kbScale: .076, maxKnockback: 13.5 },
+  { name: "ブリザガ", color: "#8ef7ff", speed: 6.2, grav: 0, size: 11, damage: 7.2, kbBase: 3.1, kbScale: .068, maxKnockback: 12.2 }
+];
+
+function getMove(f, t) {
+  const b = MOVES[t] || MOVES.weak, o = (f.moves && f.moves[t]) || {};
+  return Object.assign({}, b, o);
+}
+function getMoveStats(f, t) {
+  const b = MOVE_STATS[t] || MOVE_STATS.weak, o = (f.stats && f.stats[t]) || {};
+  return Object.assign({}, b, o);
+}
+function getSpecialData(f, k) { return f.specials[k] || null; }
+
+let effects = [], projectiles = [];
+
+function rectOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+function drawRoundRect(x, y, w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.lineTo(x + w - rad, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+  ctx.lineTo(x + w, y + h - rad);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+  ctx.lineTo(x + rad, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+  ctx.lineTo(x, y + rad);
+  ctx.quadraticCurveTo(x, y, x + rad, y);
+  ctx.closePath();
+}
+
+function spawnParticles(x, y, color, count, speed, size, grav = .12) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2, vel = speed * (.45 + Math.random() * .8);
+    effects.push({
+      x, y, vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel,
+      life: 20 + Math.random() * 16, maxLife: 36, color, size: size * (.6 + Math.random() * .8), gravity: grav
+    });
+  }
+}
+function spawnHitEffect(x, y, s) { spawnParticles(x, y, s ? "#ffbd45" : "#fff2a8", s ? 13 : 7, s ? 6 : 4, s ? 5 : 3, .12); }
+function spawnBurstEffect(x, y, c) { spawnParticles(x, y, c, 30, 8, 5, .10); }
+function spawnParryEffect(x, y) { spawnParticles(x, y, "#fff27c", 18, 6, 5, .04); }
+function spawnShieldBreakEffect(x, y, c) { spawnParticles(x, y, c, 24, 7, 5, .12); }
+
+function spawnProjectile(owner, data) {
+  projectiles.push({
+    owner,
+    x: owner.x + owner.w / 2 + owner.facing * (owner.w / 2 + 6),
+    y: owner.y + owner.h * .42,
+    vx: owner.facing * data.speed, vy: data.bounce ? -1.5 : 0,
+    grav: data.grav || 0, bounce: !!data.bounce, beam: !!data.beam, star: !!data.star, coin: !!data.coin,
+    missile: !!data.missile, arrow: !!data.arrow, bomb: !!data.bomb, wave: !!data.wave,
+    fireBreath: !!data.fireBreath, charge: !!data.charge,
+    size: data.size,
+    damage: data.damage, kbBase: data.kbBase, kbScale: data.kbScale, maxKnockback: data.maxKnockback,
+    color: data.color, life: data.life || 105
+  });
+}
+
+function updateProjectiles(players) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const s = projectiles[i];
+    s.x += s.vx; s.y += s.vy; s.vy += s.grav; s.life--;
+
+    if (s.bounce && s.vy >= 0) {
+      for (const pl of platforms) {
+        if (s.x >= pl.x && s.x <= pl.x + pl.w && s.y + s.size >= pl.y && s.y - s.vy <= pl.y + 8) {
+          s.y = pl.y - s.size;
+          s.vy = -4.2;
+          spawnParticles(s.x, s.y, s.color, 3, 2, 2, .05);
+          break;
+        }
+      }
+    }
+
+    let dead = s.life <= 0 || s.x < -BLAST_X || s.x > VIEW_W + BLAST_X || s.y > VIEW_H + BLAST_Y || s.y < TOP_BLAST_Y;
+    if (!dead) {
+      for (const p of players) {
+        if (!p.alive || p === s.owner) continue;
+        if (p.invincible > 0 || p.dodgeInvincible > 0) continue;
+
+        const box = { x: s.x - s.size, y: s.y - s.size, w: s.size * 2, h: s.size * 2 };
+        if (p.special && p.special.data.reflect && rectOverlap(box, p.getBody())) {
+          s.owner = p;
+          s.vx = -s.vx * 1.25;
+          s.damage *= 1.2;
+          s.life = 90;
+          spawnParryEffect(s.x, s.y);
+          continue;
+        }
+
+        if (rectOverlap(box, p.getBody())) {
+          applyHit(s.owner, p, box, {
+            damage: s.damage, kbBase: s.kbBase, kbScale: s.kbScale,
+            maxKnockback: s.maxKnockback, strongEffect: false, direction: s.vx >= 0 ? 1 : -1
+          });
+          dead = true; break;
+        }
+      }
+    }
+    if (dead) {
+      spawnParticles(s.x, s.y, s.color, s.bomb ? 16 : 6, s.bomb ? 5 : 3, 3, .05);
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+function applyHit(attacker, target, hitbox, stats) {
+  if (!target.alive || target.invincible > 0 || target.dodgeInvincible > 0) return false;
+
+  if (target.special && target.special.data.stoneForm && target.special.frame >= 5) {
+    spawnParryEffect(target.x + target.w / 2, target.y + target.h / 2);
+    return false;
+  }
+
+  const isSmash = !!stats.smash, charge = isSmash ? (attacker.smashChargeScale || 1) : 1;
+  const damage = stats.damage * attacker.fighter.damageScale * charge;
+
+  if (!stats.ignoreShield && target.shieldActive) {
+    const r = target.handleShieldHit(damage, attacker);
+    if (r !== "break") return false;
+  }
+
+  if (target.special && target.special.data.superArmor && !stats.ignoreShield) {
+    target.damage += damage * 0.65;
+    spawnParticles(target.x + target.w / 2, target.y + target.h / 2, "#b84dff", 8, 4, 4, .06);
+    return true;
+  }
+
+  if (target.holdingTarget) { target.holdingTarget.grabbedBy = null; target.holdingTarget = null; target.throwState = null; }
+  if (target.grabbedBy) { target.grabbedBy.holdingTarget = null; target.grabbedBy.throwState = null; target.grabbedBy = null; }
+  if (target.commandGrabParent) { target.commandGrabParent.special = null; target.commandGrabParent = null; }
+
+  target.damage += damage;
+
+  if (attacker.fighter.limitBreak) attacker.limit = Math.min(100, (attacker.limit || 0) + damage * 1.1);
+  if (target.fighter.limitBreak) target.limit = Math.min(100, (target.limit || 0) + damage * 0.9);
+
+  const dir = stats.direction ?? attacker.attackFacing ?? attacker.facing;
+  const weight = Math.max(.65, target.fighter.weight);
+  let kb = (stats.kbBase + target.damage * stats.kbScale) * attacker.fighter.powerScale * charge / weight;
+  const maxKb = (stats.maxKnockback || 15) * attacker.fighter.powerScale / weight;
+  kb = Math.min(kb, maxKb);
+
+  target.vx = dir * kb * (stats.horizontalScale ?? 1);
+  target.vy = (stats.vySign ?? -1) * kb * (stats.verticalScale ?? .62);
+  target.hitstun = Math.max(target.hitstun, Math.min(52, Math.floor(10 + kb * 1.35)));
+  if (target.shieldBroken) target.hitstun = Math.max(target.hitstun, 40);
+
+  target.onGround = false; target.standingPlatform = null;
+  target.ledgeGrab = false; target.ledgeAction = null; target.ledgeSide = 0; target.ledgeCooldown = 16;
+  target.attackTimer = 0; target.attackType = null; target.attackFrame = 0;
+  target.hitRegistered = false; target.lastHitFrame = -99; target.smashCharge = null;
+  target.special = null; target.specialEndlag = 0; target.grabTimer = 0;
+  target.shieldActive = false; target.justGuardActive = false; target.dodgeTimer = 0; target.dodgeType = null;
+
+  spawnHitEffect(hitbox.x + hitbox.w / 2, hitbox.y + hitbox.h / 2, stats.strongEffect || isSmash);
+  if (stats.fire) spawnParticles(hitbox.x + hitbox.w / 2, hitbox.y + hitbox.h / 2, "#ff5a1f", 10, 5, 4, .08);
+  if (stats.electric) spawnParticles(hitbox.x + hitbox.w / 2, hitbox.y + hitbox.h / 2, "#7df9ff", 10, 6, 3, .02);
+  if (stats.sword) spawnParticles(hitbox.x + hitbox.w / 2, hitbox.y + hitbox.h / 2, "#ffffff", 8, 5, 3, .05);
+  if (stats.coinBurst) spawnParticles(hitbox.x + hitbox.w / 2, hitbox.y + hitbox.h / 2, "#ffd700", 12, 5, 4, .15);
+  return true;
+}
+
+// ---------- キャラクターデザイン描画 ----------
+function drawAvatar(x, y, w, h, fighter, color, facing = 1, isStone = false) {
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.scale(facing, 1);
+  const lx = -w / 2, ly = -h / 2;
+
+  if (isStone) {
+    ctx.fillStyle = "#6e737b";
+    drawRoundRect(lx - 2, ly + 4, w + 4, h - 4, 8);
+    ctx.fill();
+    ctx.strokeStyle = "#393c42"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#9aa0a8";
+    ctx.fillRect(lx + 4, ly + 10, w - 12, 8);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "sandbag") {
+    ctx.fillStyle = color;
+    drawRoundRect(lx + w * .06, ly + h * .08, w * .88, h * .92, w * .28);
+    ctx.fill();
+    ctx.strokeStyle = "#8a6d46"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#d9534f";
+    ctx.fillRect(lx + w * .08, ly + h * .55, w * .84, h * .12);
+    ctx.fillStyle = "#2b2218";
+    ctx.fillRect(lx + w * .52, ly + h * .30, Math.max(3, w * .10), Math.max(4, h * .09));
+    ctx.fillRect(lx + w * .70, ly + h * .30, Math.max(3, w * .10), Math.max(4, h * .09));
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "armor") {
+    ctx.fillStyle = "#b8452a";
+    drawRoundRect(lx + w * .2, ly + h * .62, w * .6, h * .36, 5); ctx.fill();
+    ctx.fillStyle = color;
+    drawRoundRect(lx + w * .16, ly + h * .36, w * .68, h * .34, 6); ctx.fill();
+    ctx.beginPath(); ctx.arc(lx + w * .16, ly + h * .42, w * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(lx + w * .84, ly + h * .42, w * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#8c96a0";
+    drawRoundRect(lx + w * .6, ly + h * .48, w * .62, h * .16, 4); ctx.fill();
+    ctx.fillStyle = "#3a4048";
+    ctx.beginPath(); ctx.arc(lx + w * 1.2, ly + h * .56, w * .07, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#7dff9a";
+    ctx.beginPath(); ctx.arc(lx + w * 1.2, ly + h * .56, w * .035, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, ly + h * .22, w * .28, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#b8452a";
+    ctx.fillRect(lx + w * .26, ly + h * .02, w * .48, h * .05);
+    ctx.fillStyle = "#3ee07a";
+    drawRoundRect(lx + w * .46, ly + h * .15, w * .34, h * .12, 3); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.6)";
+    ctx.fillRect(lx + w * .52, ly + h * .17, w * .1, h * .03);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "koopa") {
+    ctx.fillStyle = "#2f8f3a";
+    ctx.beginPath(); ctx.ellipse(lx + w * .22, ly + h * .58, w * .36, h * .34, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f5f0e0"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#f5f0e0";
+    for (let i = 0; i < 3; i++) {
+      const sx = lx + w * (.02 + i * .1), sy = ly + h * (.36 + i * .16);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - w * .16, sy + h * .04); ctx.lineTo(sx + w * .02, sy + h * .1); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = color;
+    drawRoundRect(lx + w * .24, ly + h * .34, w * .64, h * .62, 8); ctx.fill();
+    ctx.fillStyle = "#f6e7b0";
+    ctx.beginPath(); ctx.ellipse(lx + w * .66, ly + h * .66, w * .2, h * .24, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#c9a95a"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(lx + w * .5, ly + h * .6); ctx.lineTo(lx + w * .82, ly + h * .6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx + w * .5, ly + h * .72); ctx.lineTo(lx + w * .82, ly + h * .72); ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(lx + w * .62, ly + h * .22, w * .32, h * .2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f6e7b0";
+    ctx.beginPath(); ctx.ellipse(lx + w * .86, ly + h * .28, w * .16, h * .09, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#d1342a";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .3, ly + h * .16);
+    ctx.lineTo(lx + w * .14, ly - h * .04);
+    ctx.lineTo(lx + w * .4, ly + h * .04);
+    ctx.lineTo(lx + w * .38, ly - h * .1);
+    ctx.lineTo(lx + w * .58, ly + h * .05);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fffbe8";
+    ctx.beginPath(); ctx.moveTo(lx + w * .52, ly + h * .08); ctx.lineTo(lx + w * .5, ly - h * .08); ctx.lineTo(lx + w * .62, ly + h * .06); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(lx + w * .7, ly + h * .08); ctx.lineTo(lx + w * .74, ly - h * .07); ctx.lineTo(lx + w * .8, ly + h * .08); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(lx + w * .7, ly + h * .14, w * .11, h * .07);
+    ctx.fillStyle = "#c0392b";
+    ctx.fillRect(lx + w * .76, ly + h * .15, w * .05, h * .05);
+    ctx.strokeStyle = "#d1342a"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx + w * .66, ly + h * .11); ctx.lineTo(lx + w * .84, ly + h * .14); ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "angel") {
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.ellipse(lx - w * .05, ly + h * .44, w * .3, h * .2, -.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(lx - w * .12, ly + h * .58, w * .26, h * .14, -.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#cfd8e6"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = "#f7f7f2";
+    drawRoundRect(lx + w * .18, ly + h * .38, w * .64, h * .48, 5); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillRect(lx + w * .18, ly + h * .58, w * .64, h * .07);
+    ctx.fillStyle = "#ffdfc4";
+    ctx.fillRect(lx + w * .26, ly + h * .84, w * .14, h * .12);
+    ctx.fillRect(lx + w * .6, ly + h * .84, w * .14, h * .12);
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(lx + w * .22, ly + h * .94, w * .22, h * .06);
+    ctx.fillRect(lx + w * .56, ly + h * .94, w * .22, h * .06);
+    ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(lx + w * .92, ly + h * .58, h * .2, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(lx + w * .92, ly + h * .38); ctx.lineTo(lx + w * .92, ly + h * .78); ctx.stroke();
+    ctx.fillStyle = "#ffdfc4";
+    ctx.beginPath(); ctx.arc(0, ly + h * .22, w * .25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#6b3e1e";
+    ctx.beginPath(); ctx.arc(0, ly + h * .16, w * .27, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = "#ffd23f"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, ly + h * .15, w * .28, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+    ctx.fillStyle = "#2962ff";
+    ctx.fillRect(lx + w * .58, ly + h * .21, 4, 5);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "buster") {
+    ctx.save();
+    ctx.translate(lx + w * .2, ly + h * .5);
+    ctx.rotate(-0.6);
+    ctx.fillStyle = "#aeb6c0";
+    ctx.fillRect(-w * .12, -h * .7, w * .24, h * .9);
+    ctx.strokeStyle = "#5d6670"; ctx.lineWidth = 1.5;
+    ctx.strokeRect(-w * .12, -h * .7, w * .24, h * .9);
+    ctx.fillStyle = "#4a3426";
+    ctx.fillRect(-w * .06, h * .2, w * .12, h * .2);
+    ctx.restore();
+    ctx.fillStyle = color;
+    drawRoundRect(lx + w * .18, ly + h * .38, w * .64, h * .34, 5); ctx.fill();
+    ctx.fillStyle = "#2b2f45";
+    drawRoundRect(lx + w * .2, ly + h * .68, w * .6, h * .3, 4); ctx.fill();
+    ctx.fillStyle = "#6b4a2b";
+    ctx.fillRect(lx + w * .18, ly + h * .66, w * .64, h * .05);
+    ctx.fillStyle = "#9aa3ad";
+    ctx.beginPath(); ctx.arc(lx + w * .2, ly + h * .42, w * .16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffdfc4";
+    ctx.beginPath(); ctx.arc(0, ly + h * .24, w * .24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffe066";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .18, ly + h * .26);
+    ctx.lineTo(lx - w * .08, ly + h * .08);
+    ctx.lineTo(lx + w * .22, ly + h * .06);
+    ctx.lineTo(lx + w * .18, ly - h * .12);
+    ctx.lineTo(lx + w * .44, ly + h * .02);
+    ctx.lineTo(lx + w * .56, ly - h * .12);
+    ctx.lineTo(lx + w * .66, ly + h * .04);
+    ctx.lineTo(lx + w * .94, ly + h * .0);
+    ctx.lineTo(lx + w * .78, ly + h * .14);
+    ctx.lineTo(lx + w * .84, ly + h * .24);
+    ctx.lineTo(lx + w * .6, ly + h * .14);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#4fc3ff";
+    ctx.fillRect(lx + w * .58, ly + h * .22, 4, 4);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "blob") {
+    ctx.fillStyle = "#d82949";
+    ctx.beginPath();
+    ctx.ellipse(lx + w * .30, ly + h * .90, w * .24, h * .11, 0, 0, Math.PI * 2);
+    ctx.ellipse(lx + w * .72, ly + h * .90, w * .24, h * .11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, ly + h * .52, w * .54, h * .44, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.ellipse(lx - w * .02, ly + h * .54, w * .15, h * .12, -.3, 0, Math.PI * 2);
+    ctx.ellipse(lx + w * 1.02, ly + h * .50, w * .15, h * .12, .3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#1a1f36";
+    ctx.beginPath();
+    ctx.ellipse(lx + w * .56, ly + h * .42, w * .06, h * .12, 0, 0, Math.PI * 2);
+    ctx.ellipse(lx + w * .76, ly + h * .42, w * .06, h * .12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(lx + w * .56, ly + h * .37, w * .035, 0, Math.PI * 2);
+    ctx.arc(lx + w * .76, ly + h * .37, w * .035, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff4f79";
+    ctx.beginPath();
+    ctx.ellipse(lx + w * .44, ly + h * .53, w * .08, h * .045, 0, 0, Math.PI * 2);
+    ctx.ellipse(lx + w * .85, ly + h * .53, w * .08, h * .045, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "heavy") {
+    ctx.fillStyle = "#5c1d2e";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .1, ly + h * .28);
+    ctx.lineTo(lx - w * .22, ly + h * .96);
+    ctx.lineTo(lx + w * .45, ly + h * .92);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#2b2938";
+    drawRoundRect(lx + w * .05, ly + h * .34, w * .90, h * .64, 6);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillRect(lx + w * .16, ly + h * .44, w * .68, h * .28);
+
+    ctx.fillStyle = "#d4a84f";
+    ctx.beginPath();
+    ctx.arc(lx + w * .08, ly + h * .40, w * .18, 0, Math.PI * 2);
+    ctx.arc(lx + w * .92, ly + h * .40, w * .18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#6c7a5c";
+    ctx.beginPath(); ctx.arc(0, ly + h * .22, w * .26, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#d13b27";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .20, ly + h * .18);
+    ctx.lineTo(lx + w * .35, ly - h * .02);
+    ctx.lineTo(lx + w * .55, ly + h * .05);
+    ctx.lineTo(lx + w * .78, ly - h * .01);
+    ctx.lineTo(lx + w * .76, ly + h * .18);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = "#ffd74a";
+    ctx.fillRect(lx + w * .58, ly + h * .12, w * .12, h * .06);
+    ctx.fillStyle = "#ffea59";
+    ctx.fillRect(lx + w * .55, ly + h * .21, w * .16, h * .07);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "craft") {
+    ctx.fillStyle = color;
+    drawRoundRect(lx + w * .14, ly + h * .38, w * .72, h * .58, 5);
+    ctx.fill();
+    ctx.fillStyle = "#2b59c3";
+    drawRoundRect(lx + w * .16, ly + h * .56, w * .68, h * .42, 4);
+    ctx.fill();
+    ctx.fillRect(lx + w * .26, ly + h * .42, w * .12, h * .18);
+    ctx.fillRect(lx + w * .62, ly + h * .42, w * .12, h * .18);
+    ctx.fillStyle = "#ffe047";
+    ctx.beginPath();
+    ctx.arc(lx + w * .32, ly + h * .60, 3, 0, Math.PI * 2);
+    ctx.arc(lx + w * .68, ly + h * .60, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffdfc4";
+    ctx.beginPath(); ctx.arc(0, ly + h * .24, w * .25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, ly + h * .17, w * .27, Math.PI, 0); ctx.fill();
+    ctx.fillRect(lx + w * .22, ly + h * .14, w * .72, h * .07);
+
+    ctx.fillStyle = "#1b2436";
+    ctx.fillRect(lx + w * .56, ly + h * .21, 4, 5);
+    ctx.fillStyle = "#4a2c18";
+    ctx.fillRect(lx + w * .50, ly + h * .29, w * .30, h * .06);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "combo") {
+    ctx.fillStyle = "#e8eef5";
+    drawRoundRect(lx + w * .14, ly + h * .60, w * .72, h * .38, 4);
+    ctx.fill();
+    ctx.fillStyle = "#1a1a24";
+    ctx.fillRect(lx + w * .14, ly + h * .56, w * .72, h * .08);
+
+    ctx.fillStyle = "#e6b89c";
+    drawRoundRect(lx + w * .14, ly + h * .35, w * .72, h * .25, 4);
+    ctx.fill();
+    ctx.strokeStyle = "#a3524b"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(lx + w * .35, ly + h * .40); ctx.lineTo(lx + w * .65, ly + h * .54); ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(lx + w * .10, ly + h * .55, w * .14, 0, Math.PI * 2);
+    ctx.arc(lx + w * .90, ly + h * .52, w * .14, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#e6b89c";
+    ctx.beginPath(); ctx.arc(0, ly + h * .22, w * .24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1c1b29";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .22, ly + h * .18);
+    ctx.lineTo(lx + w * .10, ly + h * .02);
+    ctx.lineTo(lx + w * .45, ly + h * .04);
+    ctx.lineTo(lx + w * .70, ly - h * .02);
+    ctx.lineTo(lx + w * .75, ly + h * .16);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = "#ff2a2a";
+    ctx.fillRect(lx + w * .56, ly + h * .20, 5, 4);
+    ctx.restore();
+    return;
+  }
+
+  if (fighter.style === "aerial") {
+    ctx.strokeStyle = "#d9e8f5"; ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .15, ly + h * .65);
+    ctx.lineTo(lx - w * .22, ly + h * .12);
+    ctx.stroke();
+    ctx.strokeStyle = "#ffd74a"; ctx.lineWidth = 2.5;
+    ctx.strokeRect(lx + w * .08, ly + h * .56, 8, 8);
+
+    ctx.fillStyle = "#23273d";
+    drawRoundRect(lx + w * .16, ly + h * .36, w * .68, h * .54, 5);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillRect(lx + w * .16, ly + h * .36, w * .20, h * .34);
+    ctx.fillRect(lx + w * .64, ly + h * .36, w * .20, h * .34);
+
+    ctx.fillStyle = "#ffd23f";
+    drawRoundRect(lx + w * .12, ly + h * .86, w * .34, h * .13, 5); ctx.fill();
+    drawRoundRect(lx + w * .56, ly + h * .86, w * .34, h * .13, 5); ctx.fill();
+
+    ctx.fillStyle = "#ffdfc4";
+    ctx.beginPath(); ctx.arc(0, ly + h * .22, w * .24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#8c5332";
+    ctx.beginPath();
+    ctx.moveTo(lx + w * .18, ly + h * .22);
+    ctx.lineTo(lx + w * .06, ly + h * .05);
+    ctx.lineTo(lx + w * .35, ly + h * .09);
+    ctx.lineTo(lx + w * .52, ly - h * .05);
+    ctx.lineTo(lx + w * .68, ly + h * .08);
+    ctx.lineTo(lx + w * .92, ly + h * .03);
+    ctx.lineTo(lx + w * .78, ly + h * .20);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = "#2962ff";
+    ctx.fillRect(lx + w * .56, ly + h * .21, 4, 5);
+    ctx.restore();
+    return;
+  }
+
+  ctx.fillStyle = "#c89d54";
+  ctx.beginPath();
+  ctx.ellipse(lx - w * .02, ly + h * .58, w * .34, h * .32, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#6e4e1e"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = "#ffd700";
+  ctx.font = `bold ${Math.max(10, Math.round(w * .34))}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("￥", lx - w * .04, ly + h * .66);
+
+  ctx.fillStyle = "#3b1747";
+  drawRoundRect(lx + w * .14, ly + h * .38, w * .74, h * .58, 5);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillRect(lx + w * .18, ly + h * .40, w * .66, h * .22);
+  ctx.fillStyle = "#ffd700";
+  ctx.fillRect(lx + w * .14, ly + h * .62, w * .74, h * .10);
+  ctx.beginPath(); ctx.arc(lx + w * .62, ly + h * .67, w * .12, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = "#ffdfc4";
+  ctx.beginPath(); ctx.arc(0, ly + h * .24, w * .26, 0, Math.PI * 2); ctx.fill();
+
+  ctx.strokeStyle = "#221208"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(lx + w * .45, ly + h * .16);
+  ctx.lineTo(lx + w * .75, ly + h * .19);
+  ctx.stroke();
+
+  ctx.fillStyle = "#191924";
+  ctx.beginPath(); ctx.arc(lx + w * .62, ly + h * .23, w * .11, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ffd700";
+  ctx.font = `bold ${Math.max(9, Math.round(w * .28))}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("$", lx + w * .62, ly + h * .29);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(lx + w * .44, ly + h * .31, w * .28, h * .06);
+  ctx.fillStyle = "#ffd700";
+  ctx.fillRect(lx + w * .56, ly + h * .31, w * .09, h * .06);
+  ctx.strokeStyle = "#3a1f10"; ctx.lineWidth = 1;
+  ctx.strokeRect(lx + w * .44, ly + h * .31, w * .28, h * .06);
+
+  ctx.fillStyle = "#24192e";
+  ctx.fillRect(lx + w * .12, ly + h * .10, w * .78, h * .06);
+  drawRoundRect(lx + w * .24, ly - h * .10, w * .54, h * .22, 3);
+  ctx.fill();
+  ctx.fillStyle = "#ffd700";
+  ctx.fillRect(lx + w * .24, ly + h * .03, w * .54, h * .06);
+  ctx.beginPath(); ctx.arc(lx + w * .66, ly + h * .05, 4, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+}
+// ---------- プレイヤー ----------
+class Player {
+  constructor(spawnX, fighterIndex, side, wasRandom = false, isCPU = false, cpuLevel = 2, isSandbag = false) {
+    this.spawnX = spawnX;
+    this.fighterIndex = fighterIndex;
+    this.fighter = isSandbag ? SANDBAG_FIGHTER : FIGHTERS[fighterIndex];
+    this.side = side;
+    this.wasRandom = wasRandom;
+    this.isCPU = isCPU;
+    this.cpuLevel = cpuLevel;
+    this.isSandbag = isSandbag;
+    this.sandbagBehavior = 0;
+    this.aiCooldown = 0;
+    this.magicIndex = 0;
+    this.limit = 0;
+    this.moveLabel = "";
+    this.moveLabelTimer = 0;
+    this.color = side === 0 ? this.fighter.color : this.fighter.altColor;
+    this.keys = side === 0 ? controls.p1 : controls.p2;
+    this.stocks = 3;
+    this.respawn();
+  }
+
+  get alive() { return this.stocks > 0; }
+
+  respawn() {
+    this.x = this.spawnX; this.y = 90;
+    this.w = 34 * this.fighter.size; this.h = 46 * this.fighter.size;
+    this.vx = 0; this.vy = 0;
+
+    this.damage = 0;
+    this.facing = this.side === 0 ? 1 : -1;
+    this.onGround = false;
+    this.standingPlatform = null;
+    this.dropThroughTimer = 0;
+    this.dropBuffer = 0;
+    this.jumpsLeft = this.fighter.jumps;
+
+    this.attackTimer = 0; this.attackFrame = 0; this.attackType = null;
+    this.attackFacing = this.facing; this.attackCooldown = 0;
+    this.hitRegistered = false; this.lastHitFrame = -99;
+    this.attackHitsLanded = 0;
+    this.smashCharge = null; this.smashChargeScale = 1;
+
+    this.hitstun = 0; this.invincible = this.isSandbag ? 20 : 95;
+    this.special = null; this.specialEndlag = 0; this.specialCooldown = 0;
+    this.upBUsed = false; this.sideBUsed = false;
+    this.commandGrabParent = null;
+
+    this.grabTimer = 0; this.grabCooldown = 0;
+    this.holdingTarget = null; this.holdTimer = 0;
+    this.grabbedBy = null; this.throwState = null; this.pummelCooldown = 0;
+
+    this.airDodgeUsed = false; this.dodgeTimer = 0; this.dodgeType = null;
+    this.dodgeInvincible = 0; this.dodgeCooldown = 0;
+
+    this.shieldActive = false; this.shieldHP = 100;
+    this.shieldBroken = false; this.shieldBreakTimer = 0;
+    this.justGuardActive = false; this.justGuardTimer = 0; this.parryFlash = 0;
+
+    this.ledgeGrab = false; this.ledgeSide = 0; this.ledgeX = 0; this.ledgeY = 0;
+    this.ledgeAction = null; this.ledgeCooldown = 0;
+    this.moveLabel = ""; this.moveLabelTimer = 0;
+  }
+
+  showMoveLabel(text) {
+    if (!text) return;
+    this.moveLabel = text;
+    this.moveLabelTimer = 36;
+  }
+
+  getBody() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
+  getHorizontalDirection(i) {
+    const l = !!i[this.keys.left], r = !!i[this.keys.right];
+    if (l && !r) return -1;
+    if (r && !l) return 1;
+    if (l && r) return this.facing;
+    return 0;
+  }
+  getVerticalDirection(i) {
+    const u = !!i[this.keys.up], d = !!i[this.keys.down];
+    if (u && !d) return -1;
+    if (d && !u) return 1;
+    return 0;
+  }
+  getDodgeVector(i) {
+    let x = this.getHorizontalDirection(i), y = this.getVerticalDirection(i);
+    const len = Math.hypot(x, y);
+    if (len > 0) { x /= len; y /= len; }
+    return { x, y };
+  }
+
+  tickTimers() {
+    if (this.invincible > 0) this.invincible--;
+    if (this.dodgeInvincible > 0) this.dodgeInvincible--;
+    if (this.attackCooldown > 0) this.attackCooldown--;
+    if (this.specialCooldown > 0) this.specialCooldown--;
+    if (this.specialEndlag > 0) this.specialEndlag--;
+    if (this.grabCooldown > 0) this.grabCooldown--;
+    if (this.pummelCooldown > 0) this.pummelCooldown--;
+    if (this.hitstun > 0) this.hitstun--;
+    if (this.ledgeCooldown > 0) this.ledgeCooldown--;
+    if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this.dropThroughTimer > 0) this.dropThroughTimer--;
+    if (this.parryFlash > 0) this.parryFlash--;
+    if (this.aiCooldown > 0) this.aiCooldown--;
+    if (this.moveLabelTimer > 0) this.moveLabelTimer--;
+
+    if (this.justGuardTimer > 0) {
+      this.justGuardTimer--;
+      if (this.justGuardTimer <= 0) this.justGuardActive = false;
+    }
+
+    if (!this.onGround && this.shieldActive) {
+      this.shieldActive = false;
+      this.justGuardActive = false;
+      this.justGuardTimer = 0;
+    }
+
+    if (this.shieldActive) {
+      const drain = this.isSandbag ? 0.02 : 0.11;
+      this.shieldHP = Math.max(0, this.shieldHP - drain);
+    } else if (!this.shieldBroken) {
+      this.shieldHP = Math.min(100, this.shieldHP + .34);
+    }
+
+    if (this.shieldHP <= 0 && !this.shieldBroken) this.breakShield();
+    if (this.shieldBroken) {
+      this.shieldBreakTimer--;
+      if (this.shieldBreakTimer <= 0) { this.shieldBroken = false; this.shieldHP = 50; }
+    }
+  }
+
+  update(input, opponent) {
+    if (!this.alive) return;
+    this.tickTimers();
+
+    if (this.commandGrabParent && (!this.commandGrabParent.alive || this.commandGrabParent.special?.grabTarget !== this)) {
+      this.commandGrabParent = null;
+    }
+    if (this.commandGrabParent) return;
+    if (this.grabbedBy) {
+      if (!this.grabbedBy.alive || this.grabbedBy.holdingTarget !== this) this.grabbedBy = null;
+      else return;
+    }
+    if (this.throwState) { this.updateThrowState(); return; }
+    if (this.holdingTarget) { this.updateHolding(input); return; }
+    if (this.grabTimer > 0) { this.updateGrabAttempt(opponent); return; }
+    if (this.ledgeGrab) { this.updateLedge(input); return; }
+    if (this.ledgeAction) { this.updateLedgeAction(opponent); return; }
+    if (this.special) { this.updateSpecial(opponent, input); return; }
+    if (this.dodgeTimer > 0) { this.updateDodge(); return; }
+    if (this.hitstun > 0) { this.smashCharge = null; this.dropBuffer = 0; this.moveAndCollide(); return; }
+
+    const shieldHeld = !!input[this.keys.shield];
+    const direction = this.getDodgeVector(input);
+    const hasDir = direction.x !== 0 || direction.y !== 0;
+    const dirPressed = [this.keys.left, this.keys.right, this.keys.up, this.keys.down].some(k => !!input.pressed[k]);
+
+    if (!this.onGround && input.pressed[this.keys.shield]) {
+      if (this.startDodge(direction)) return;
+    }
+
+    const grabTrig = input.pressed[this.keys.grab] || (this.onGround && shieldHeld && input.pressed[this.keys.weak]);
+    if (grabTrig && this.startGrab()) return;
+
+    const groundShieldDodge = this.onGround && (
+      (shieldHeld && dirPressed) ||
+      (input.pressed[this.keys.shield] && hasDir)
+    );
+    if (groundShieldDodge && !this.shieldBroken && this.startDodge(direction)) return;
+
+    if (this.shieldActive && (!shieldHeld || !this.onGround)) {
+      this.shieldActive = false;
+      this.justGuardActive = false;
+      this.justGuardTimer = 0;
+    }
+
+    if (this.shieldActive) {
+      this.moveAndCollide(.55);
+      return;
+    }
+
+    if (
+      this.onGround &&
+      input.pressed[this.keys.shield] &&
+      shieldHeld &&
+      !this.shieldBroken &&
+      this.attackTimer <= 0 &&
+      !this.upBActive() &&
+      this.specialCooldown <= 0 &&
+      this.specialEndlag <= 0
+    ) {
+      this.startShield();
+      this.moveAndCollide(.55);
+      return;
+    }
+
+    if (this.smashCharge) {
+      this.dropBuffer = 0;
+      if (input.pressed[this.keys.special]) {
+        this.smashCharge = null;
+      } else if (input[this.keys.strong]) {
+        this.smashCharge.frames = Math.min(45, this.smashCharge.frames + 1);
+        this.vx *= .55;
+        this.moveAndCollide(.25);
+        return;
+      } else {
+        const c = this.smashCharge;
+        this.smashCharge = null;
+        this.startAttack(c.type, c.frames, c.facing);
+      }
+    }
+
+    let acted = false;
+
+    if (
+      input.pressed[this.keys.special] &&
+      this.specialCooldown <= 0 &&
+      this.specialEndlag <= 0 &&
+      this.attackTimer <= 0 &&
+      this.attackCooldown <= 0
+    ) {
+      const v = this.getVerticalDirection(input);
+      const h = this.getHorizontalDirection(input);
+      let k = "neutral";
+      if (v < 0) k = "up";
+      else if (v > 0) k = "down";
+      else if (h !== 0) k = "side";
+
+      if (h !== 0) this.facing = h;
+      acted = this.startSpecial(k, h);
+      if (acted) this.dropBuffer = 0;
+    }
+
+    if (!acted && this.attackTimer <= 0 && this.attackCooldown <= 0 && this.specialEndlag <= 0) {
+      if (input.pressed[this.keys.weak]) {
+        this.dropBuffer = 0;
+        const h = this.getHorizontalDirection(input), v = this.getVerticalDirection(input);
+        if (!this.onGround) {
+          if (v < 0) this.startAttack("airUp");
+          else if (v > 0) this.startAttack("airDown");
+          else if (h !== 0) this.startAttack(h === this.facing ? "airForward" : "airBack", 0, this.facing);
+          else this.startAttack("airNeutral");
+        } else if (h !== 0) {
+          this.facing = h;
+          this.startAttack("sideTilt", 0, h);
+        } else if (v < 0) {
+          this.startAttack("upTilt");
+        } else if (v > 0) {
+          this.startAttack("downTilt");
+        } else {
+          this.startAttack("weak");
+        }
+        acted = true;
+      } else if (input.pressed[this.keys.strong]) {
+        this.dropBuffer = 0;
+        if (!this.onGround) {
+          this.startAttack("airHeavy");
+          acted = true;
+        } else {
+          const h = this.getHorizontalDirection(input), v = this.getVerticalDirection(input);
+          let s = null;
+          if (h !== 0) s = { type: "smashSide", facing: h };
+          else if (v < 0) s = { type: "smashUp", facing: this.facing };
+          else if (v > 0) s = { type: "smashDown", facing: this.facing };
+          if (s) {
+            if (s.type === "smashSide") this.facing = s.facing;
+            this.smashCharge = { type: s.type, facing: s.facing, frames: 0 };
+            this.vx *= .45;
+            this.moveAndCollide(.25);
+            return;
+          }
+          this.startAttack("heavy");
+          acted = true;
+        }
+      }
+    }
+
+    const onPassablePlatform = this.onGround && this.standingPlatform && !this.standingPlatform.main;
+    if (onPassablePlatform && !acted && !this.smashCharge && this.attackTimer <= 0 && !this.special && this.specialEndlag <= 0) {
+      if (input.pressed[this.keys.down]) {
+        this.dropBuffer = 3;
+      }
+      if (this.dropBuffer > 0) {
+        if (input[this.keys.down]) {
+          this.dropBuffer--;
+          if (this.dropBuffer <= 0) {
+            this.dropThroughTimer = 14;
+            this.onGround = false;
+            this.standingPlatform = null;
+            this.y += 4;
+            this.vy = Math.max(this.vy, 2.2);
+          }
+        } else {
+          this.dropBuffer = 0;
+        }
+      }
+    } else {
+      this.dropBuffer = 0;
+    }
+
+    if (!acted && !this.smashCharge && input.pressed[this.keys.up] && this.jumpsLeft > 0) {
+      this.vy = -this.fighter.jump;
+      this.jumpsLeft--;
+      this.onGround = false;
+      this.standingPlatform = null;
+    }
+
+    const canSteer = this.attackTimer <= 0 && !this.smashCharge && !this.special && this.specialEndlag <= 0;
+    if (canSteer) {
+      if (input[this.keys.left] && !input[this.keys.right]) {
+        const sp = this.onGround ? this.fighter.speed : this.fighter.airSpeed;
+        this.vx = -sp; this.facing = -1;
+      } else if (input[this.keys.right] && !input[this.keys.left]) {
+        const sp = this.onGround ? this.fighter.speed : this.fighter.airSpeed;
+        this.vx = sp; this.facing = 1;
+      } else if (this.onGround) {
+        this.vx *= .72;
+      } else {
+        this.vx *= .985;
+      }
+    } else if (!this.onGround) {
+      this.vx *= .99;
+    }
+
+    this.updateAttack(opponent);
+    this.moveAndCollide(this.special ? this.special.data.gravityScale : 1);
+  }
+
+  startGrab() {
+    if (!this.onGround || this.grabCooldown > 0 || this.attackTimer > 0 || this.special || this.specialEndlag > 0 || this.smashCharge || this.shieldBroken) return false;
+    this.shieldActive = false; this.justGuardActive = false; this.justGuardTimer = 0;
+    this.grabTimer = 22; this.grabCooldown = 32; this.vx *= .25;
+    return true;
+  }
+
+  getGrabBox() {
+    if (this.grabTimer < 11 || this.grabTimer > 17) return null;
+    const r = 34 * this.fighter.rangeScale;
+    return { x: this.facing > 0 ? this.x + this.w - 2 : this.x - r + 2, y: this.y + 8, w: r, h: this.h - 14 };
+  }
+
+  updateGrabAttempt(op) {
+    this.vx *= .75;
+    const box = this.getGrabBox();
+    if (box && op.alive && op.invincible <= 0 && op.dodgeInvincible <= 0 && !op.ledgeGrab && !op.ledgeAction && !op.grabbedBy && rectOverlap(box, op.getBody())) {
+      this.grabTimer = 0;
+      this.holdingTarget = op;
+      this.holdTimer = Math.min(115, Math.floor(52 + op.damage * .45));
+      if (op.holdingTarget) { op.holdingTarget.grabbedBy = null; op.holdingTarget = null; }
+      op.grabbedBy = this; op.shieldActive = false; op.justGuardActive = false;
+      op.attackTimer = 0; op.attackType = null; op.special = null; op.specialEndlag = 0;
+      op.smashCharge = null; op.hitstun = 0; op.vx = 0; op.vy = 0;
+      spawnParticles(op.x + op.w / 2, op.y + op.h / 2, "#9ef7ff", 10, 4, 4, .04);
+      return;
+    }
+    this.grabTimer--;
+    this.moveAndCollide();
+  }
+
+  updateHolding(input) {
+    const t = this.holdingTarget;
+    if (!t || !t.alive || t.grabbedBy !== this) { this.holdingTarget = null; return; }
+    this.vx = 0; this.vy = 0;
+    t.x = this.facing > 0 ? this.x + this.w + 2 : this.x - t.w - 2;
+    t.y = this.y + (this.h - t.h);
+    t.vx = 0; t.vy = 0; t.facing = -this.facing;
+
+    if (input.pressed[this.keys.weak] && this.pummelCooldown <= 0) {
+      this.pummelCooldown = 14;
+      t.damage += 1.6 * this.fighter.damageScale;
+      spawnHitEffect(t.x + t.w / 2, t.y + t.h / 2, false);
+    }
+    if (input.pressed[this.keys.up]) { this.startThrow("upThrow"); return; }
+    if (input.pressed[this.keys.down]) { this.startThrow("downThrow"); return; }
+    if (input.pressed[this.keys.left]) { this.startThrow(this.facing === -1 ? "fThrow" : "bThrow"); return; }
+    if (input.pressed[this.keys.right]) { this.startThrow(this.facing === 1 ? "fThrow" : "bThrow"); return; }
+
+    this.holdTimer--;
+    if (this.holdTimer <= 0) {
+      t.grabbedBy = null; t.vx = this.facing * 3.2; t.vy = -3; t.hitstun = 10;
+      this.holdingTarget = null; this.attackCooldown = 16;
+    }
+  }
+
+  startThrow(type) {
+    if (!this.holdingTarget) return;
+    this.throwState = { type, frame: 0, duration: 14, target: this.holdingTarget };
+  }
+
+  updateThrowState() {
+    const s = this.throwState, t = s && s.target;
+    if (!s || !t || !t.alive) {
+      if (t) t.grabbedBy = null;
+      this.holdingTarget = null; this.throwState = null; return;
+    }
+    s.frame++;
+    const p = s.frame / s.duration;
+    if (s.type === "upThrow") {
+      t.x = this.x + (this.w - t.w) / 2; t.y = this.y - 10 - p * 26;
+    } else if (s.type === "downThrow") {
+      t.x = this.x + this.facing * 18; t.y = this.y - 12 + Math.sin(p * Math.PI) * 26;
+    } else if (s.type === "bThrow") {
+      const off = Math.cos(p * Math.PI) * (this.w + 4);
+      t.x = this.x + this.facing * off; t.y = this.y - Math.sin(p * Math.PI) * 16;
+    } else {
+      t.x = this.x + this.facing * (this.w + p * 14); t.y = this.y - Math.sin(p * Math.PI) * 8;
+    }
+    if (s.frame >= s.duration) {
+      let dir = this.facing;
+      if (s.type === "bThrow") { this.facing = -this.facing; dir = this.facing; }
+      const st = Object.assign({}, getMoveStats(this.fighter, s.type), { direction: dir, ignoreShield: true });
+      t.grabbedBy = null; this.holdingTarget = null; this.throwState = null; this.attackCooldown = 14;
+      applyHit(this, t, t.getBody(), st);
+    }
+  }
+
+  upBActive() { return !!(this.special && this.special.kind === "up"); }
+  startShield() { this.shieldActive = true; this.justGuardActive = true; this.justGuardTimer = 8; this.smashCharge = null; }
+  breakShield() {
+    if (this.shieldBroken) return;
+    this.shieldHP = 0; this.shieldBroken = true; this.shieldBreakTimer = 110;
+    this.shieldActive = false; this.justGuardActive = false; this.justGuardTimer = 0;
+    this.hitstun = Math.max(this.hitstun, 38); this.vy = -4.5;
+    spawnShieldBreakEffect(this.x + this.w / 2, this.y + this.h / 2, this.color);
+  }
+
+  handleShieldHit(d, a) {
+    if (this.justGuardActive && this.justGuardTimer > 0) {
+      this.justGuardActive = false; this.justGuardTimer = 0; this.parryFlash = 22;
+      this.shieldHP = Math.min(100, this.shieldHP + 6);
+      a.hitstun = Math.max(a.hitstun, 20); a.vx = -a.facing * 3; a.vy = -2;
+      a.attackTimer = 0; a.attackType = null; a.smashCharge = null;
+      a.special = null; a.specialEndlag = Math.max(a.specialEndlag, 12);
+      spawnParryEffect(this.x + this.w / 2, this.y + this.h / 2);
+      return "parry";
+    }
+    this.shieldHP = Math.max(0, this.shieldHP - d * 4.2);
+    this.vx += a.facing * .8; this.vy -= .35;
+    if (this.shieldHP <= 0) { this.breakShield(); return "break"; }
+    return "block";
+  }
+
+  startDodge(dir) {
+    if (
+      this.hitstun > 0 || this.attackTimer > 0 || this.special ||
+      this.specialEndlag > 0 || this.smashCharge || this.shieldBroken ||
+      this.grabTimer > 0 || this.holdingTarget
+    ) return false;
+
+    const air = !this.onGround;
+    if (air && this.airDodgeUsed) return false;
+    if (!air && this.dodgeCooldown > 0) return false;
+
+    const x = dir.x || 0, y = dir.y || 0;
+    const isNeutralAirDodge = air && x === 0 && y === 0;
+
+    this.dodgeTimer = isNeutralAirDodge ? 16 : (air ? 15 : 12);
+    this.dodgeInvincible = isNeutralAirDodge ? 12 : 9;
+    this.dodgeType = "neutral";
+
+    if (air) this.airDodgeUsed = true;
+    else this.dodgeCooldown = 20;
+
+    if (Math.abs(y) > Math.abs(x) && y < 0) {
+      this.dodgeType = "up"; this.vx = x * 3.2; this.vy = -7;
+    } else if (Math.abs(y) > Math.abs(x) && y > 0) {
+      this.dodgeType = "down"; this.vx = x * 3.2; this.vy = 6;
+    } else if (x !== 0) {
+      this.dodgeType = "side"; this.vx = x * 9.2; this.vy = y * 3;
+    } else {
+      this.vx *= .35;
+      this.vy *= .25;
+    }
+
+    this.shieldActive = false; this.justGuardActive = false; this.justGuardTimer = 0;
+    this.attackTimer = 0; this.attackType = null; this.attackFrame = 0; this.smashCharge = null;
+    spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#d8f3ff", 7, 3, 3, .03);
+    return true;
+  }
+
+  updateDodge() {
+    this.dodgeTimer--;
+    if (this.dodgeType === "side") this.vx *= .88;
+    else this.vx *= .94;
+    const g = this.dodgeType === "up" ? .75 : (this.dodgeType === "neutral" && !this.onGround ? .45 : .9);
+    this.moveAndCollide(g);
+    if (this.dodgeTimer <= 0) { this.dodgeTimer = 0; this.dodgeType = null; }
+  }
+
+  startSpecial(kind, horizInput = 0) {
+    let data = getSpecialData(this.fighter, kind);
+    if (!data) return false;
+    if (kind === "up") {
+      if (this.specialCooldown > 0) return false;
+      if (!this.onGround && this.upBUsed) return false;
+      if (!this.onGround) this.upBUsed = true;
+    } else if (kind === "side") {
+      if (this.specialCooldown > 0) return false;
+      if (!this.onGround && this.sideBUsed) return false;
+      if (!this.onGround) this.sideBUsed = true;
+    } else if (this.specialCooldown > 0) return false;
+
+    let limitUsed = false;
+    if (this.fighter.limitBreak && this.limit >= 100) {
+      if (kind === "down" && data.limitVersion) {
+        data = data.limitVersion;
+      } else {
+        data = Object.assign({}, data, {
+          label: data.label + " (リミット)",
+          damage: data.damage * 1.35,
+          kbBase: data.kbBase * 1.2,
+          kbScale: data.kbScale * 1.15,
+          maxKnockback: data.maxKnockback * 1.15,
+          riseVy: data.riseVy ? data.riseVy * 1.15 : data.riseVy,
+          dashSpeed: data.dashSpeed ? data.dashSpeed * 1.2 : data.dashSpeed,
+          projectile: data.projectile ? Object.assign({}, data.projectile, {
+            damage: data.projectile.damage * 1.4,
+            kbBase: data.projectile.kbBase * 1.2,
+            size: data.projectile.size * 1.4,
+            speed: data.projectile.speed * 1.15
+          }) : null
+        });
+      }
+      this.limit = 0;
+      limitUsed = true;
+    }
+
+    this.specialCooldown = 22;
+    this.special = {
+      kind, frame: 0, data, hit: false,
+      grabTarget: null, grabTimer: 0,
+      reversed: false,
+      startup: data.startup,
+      active: data.active,
+      recovery: data.recovery,
+      powerMul: 1
+    };
+    this.attackTimer = 0; this.attackType = null; this.smashCharge = null;
+
+    if (kind === "up") {
+      this.vy = data.riseVy || -13;
+      if (horizInput !== 0) {
+        this.facing = horizInput;
+        this.vx = horizInput * (data.upBHoriz || 5.2);
+      } else {
+        this.vx = this.facing * 2.1;
+      }
+      this.onGround = false; this.standingPlatform = null;
+    } else if (kind === "side") {
+      this.vy *= .2;
+    } else if (kind === "down" && !this.onGround && data.dive) {
+      this.vy = Math.max(this.vy, 5);
+    }
+
+    if (data.magicCycle) {
+      const m = SOARA_MAGICS[this.magicIndex % SOARA_MAGICS.length];
+      this.magicIndex = (this.magicIndex + 1) % SOARA_MAGICS.length;
+      spawnProjectile(this, m);
+      this.showMoveLabel(m.name);
+    } else {
+      if (data.projectile) spawnProjectile(this, data.projectile);
+      this.showMoveLabel(data.label);
+    }
+
+    if (limitUsed) {
+      spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#7ec8ff", 26, 7, 5, .02);
+    }
+    spawnParticles(this.x + this.w / 2, this.y + this.h / 2, this.fighter.effectColor || this.color, 10, 4, 4, .04);
+    return true;
+  }
+
+  updateSpecial(op, input) {
+    const s = this.special, d = s.data;
+    s.frame++;
+
+    if (d.limitCharge) {
+      this.vx *= .8;
+      const holding = input && input[this.keys.special];
+      if (holding && this.limit < 100 && s.frame < 240) {
+        this.limit = Math.min(100, this.limit + 1.4);
+        if (s.frame % 3 === 0) {
+          spawnParticles(this.x + this.w / 2, this.y + this.h, "#7ec8ff", 3, 3, 3, -.08);
+        }
+        if (this.limit >= 100) {
+          this.showMoveLabel("リミットMAX!!");
+          spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#bfe6ff", 24, 6, 5, .02);
+        }
+      } else {
+        this.special = null;
+        this.specialEndlag = d.recovery;
+        this.moveAndCollide(1);
+        return;
+      }
+      this.moveAndCollide(1);
+      return;
+    }
+
+    if (d.warlockCharge) {
+      this.vx *= 0.82;
+      const hDir = input ? this.getHorizontalDirection(input) : 0;
+      if (!s.reversed && s.frame <= d.reverseWindow && hDir === -this.facing) {
+        s.reversed = true;
+        this.facing = -this.facing;
+        s.startup += d.reverseAddStartup;
+        s.recovery += d.reverseAddRecovery;
+        s.powerMul = d.reverseMul;
+        this.showMoveLabel("反転魔人拳!! (全体118F)");
+        spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#e066ff", 18, 5, 5, 0.02);
+      }
+      if (s.frame < s.startup && s.frame % 2 === 0) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 28 + Math.random() * 24;
+        const px = this.x + this.w / 2 + Math.cos(ang) * dist;
+        const py = this.y + this.h / 2 + Math.sin(ang) * dist;
+        effects.push({
+          x: px, y: py,
+          vx: -Math.cos(ang) * 2.4,
+          vy: -Math.sin(ang) * 2.4,
+          life: 14, maxLife: 14,
+          color: Math.random() < 0.65 ? "#b83dff" : "#4a0e78",
+          size: s.reversed ? 6 : 4.5,
+          gravity: 0
+        });
+      }
+      if (s.frame === s.startup) {
+        this.vx = this.facing * (s.reversed ? 6.5 : 4.8);
+        spawnParticles(this.x + this.w / 2 + this.facing * 28, this.y + this.h / 2, "#d56bff", 24, 7, 6, 0.04);
+      }
+    } else if (d.movement === "dash") {
+      this.vx = this.facing * d.dashSpeed;
+    } else if (d.movement === "dive") {
+      this.vy = Math.min(this.vy + .9, 15);
+      this.vx *= .94;
+    } else if (s.kind === "up") {
+      const hDir = input ? this.getHorizontalDirection(input) : 0;
+      if (hDir !== 0 && !s.grabTarget) {
+        this.facing = hDir;
+        const maxAir = d.upBHoriz || 5.4;
+        this.vx = Math.max(-maxAir, Math.min(maxAir, this.vx + hDir * 0.55));
+      } else {
+        this.vx *= .96;
+      }
+    } else if (!d.projectile) {
+      this.vx *= .85;
+    }
+
+    if (s.grabTarget) {
+      const t = s.grabTarget;
+      if (!t.alive) {
+        s.grabTarget = null; t.commandGrabParent = null;
+        this.special = null; this.specialEndlag = s.recovery; return;
+      }
+      s.grabTimer--;
+      t.x = this.x + (this.facing > 0 ? this.w + 2 : -t.w - 2);
+      t.y = this.y + 2; t.vx = 0; t.vy = 0; t.facing = -this.facing;
+      if (s.kind === "up") {
+        this.vy = Math.min(this.vy, -1.5); this.vx *= .92;
+      } else {
+        this.vx *= .5; this.vy = 0;
+      }
+      if (s.grabTimer <= 0) {
+        const stats = {
+          damage: d.throwDamage, kbBase: d.kbBase, kbScale: d.kbScale + .01,
+          maxKnockback: d.maxKnockback + 2, verticalScale: d.verticalScale || .95,
+          horizontalScale: .9, strongEffect: true, direction: this.facing, ignoreShield: true
+        };
+        t.commandGrabParent = null; s.grabTarget = null;
+        applyHit(this, t, t.getBody(), stats);
+        if (this.fighter.name === "カノン" && s.kind === "up") {
+          this.upBUsed = false; this.specialCooldown = 10;
+          spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#ff7a3a", 12, 5, 4, .05);
+        }
+        this.special = null; this.specialEndlag = s.recovery; this.vx *= .2; return;
+      }
+      this.moveAndCollide(d.gravityScale); return;
+    }
+
+    const isAirDive = s.kind === "down" && !this.onGround && d.dive;
+    const active = s.frame >= s.startup && s.frame < s.startup + s.active;
+    if (active && !s.hit) {
+      const hb = this.getSpecialHitbox(isAirDive);
+      if (hb && op.alive && op.invincible <= 0 && op.dodgeInvincible <= 0 && rectOverlap(hb, op.getBody())) {
+        if (d.grab) {
+          if (op.commandGrabParent || op.special?.grabTarget || this.commandGrabParent || op.grabbedBy) {
+          } else {
+            s.grabTarget = op; s.grabTimer = d.grabDuration;
+            op.commandGrabParent = this;
+            op.shieldActive = false; op.justGuardActive = false;
+            op.special = null; op.specialEndlag = 0;
+            op.attackTimer = 0; op.attackType = null;
+            op.smashCharge = null; op.hitstun = 0;
+            op.vx = 0; op.vy = 0;
+            s.hit = true;
+            spawnParticles(op.x + op.w / 2, op.y + op.h / 2, "#ff9a3a", 12, 5, 4, .04);
+          }
+        } else {
+          s.hit = true;
+          if (d.reflect) op.facing = -op.facing;
+          let launchDir = this.facing;
+          if (d.shockwave || s.kind === "down" || s.kind === "up") {
+            const myCenter = this.x + this.w / 2;
+            const opCenter = op.x + op.w / 2;
+            launchDir = opCenter >= myCenter ? 1 : -1;
+          }
+          const mul = s.powerMul || 1;
+          applyHit(this, op, hb, {
+            damage: d.damage * mul,
+            kbBase: d.kbBase * mul,
+            kbScale: d.kbScale * mul,
+            maxKnockback: d.maxKnockback * mul,
+            verticalScale: d.verticalScale,
+            horizontalScale: d.horizontalScale,
+            vySign: isAirDive ? 1 : (d.vySign ?? -1),
+            strongEffect: d.strongEffect,
+            direction: launchDir
+          });
+        }
+      }
+    }
+    this.moveAndCollide(d.gravityScale);
+    if (this.special && s.frame >= s.startup + s.active) {
+      if (!s.grabTarget) { this.special = null; this.specialEndlag = s.recovery; this.vx *= .4; }
+    }
+  }
+
+  getSpecialHitbox(isAirDive) {
+    const s = this.special; if (!s) return null;
+    const d = s.data; if (d.projectile || d.magicCycle || d.limitCharge) return null;
+    if (s.frame < s.startup || s.frame >= s.startup + s.active) return null;
+    if (s.kind === "down" && isAirDive) return { x: this.x - 6, y: this.y + this.h - 8, w: this.w + 12, h: 28 };
+    if (d.shockwave) {
+      const r = d.range * this.fighter.rangeScale;
+      return { x: this.x + this.w / 2 - r, y: this.y + this.h - 16, w: r * 2, h: 24 };
+    }
+    if (s.kind === "up") {
+      const r = d.range * this.fighter.rangeScale;
+      return { x: this.x + this.w / 2 - r / 2, y: this.y - r * .55, w: r, h: r * 1.05 };
+    }
+    if (d.reflect && s.kind === "down") {
+      const r = d.range * this.fighter.rangeScale;
+      return { x: this.x + this.w / 2 - r / 2 - 10, y: this.y - 6, w: r + 20, h: this.h + 12 };
+    }
+    const r = d.range * this.fighter.rangeScale;
+    return { x: this.facing > 0 ? this.x + this.w - 2 : this.x - r + 2, y: this.y + d.yOff, w: r, h: this.h + d.extraHeight - 10 };
+  }
+
+  startAttack(type, charge = 0, facing = this.facing) {
+    const m = getMove(this.fighter, type);
+    const st = getMoveStats(this.fighter, type);
+    this.attackType = type; this.attackTimer = m.total; this.attackFrame = 0;
+    this.attackFacing = facing || this.facing; this.hitRegistered = false; this.lastHitFrame = -99;
+    this.attackHitsLanded = 0;
+    const c = Math.min(45, Math.max(0, charge));
+    this.smashChargeScale = type.startsWith("smash") ? 1 + (c / 45) * .55 : 1;
+    this.attackCooldown = Math.round(m.cooldown * this.fighter.cooldownScale);
+    if (st.lunge && this.onGround) {
+      this.vx = this.attackFacing * st.lunge;
+    }
+    if (st.label) this.showMoveLabel(st.label);
+  }
+
+  getAttackStats(t) { return getMoveStats(this.fighter, t); }
+
+  getHitbox() {
+    if (!this.attackType || this.attackTimer <= 0) return null;
+    const m = getMove(this.fighter, this.attackType);
+    if (this.attackFrame < m.startup || this.attackFrame >= m.startup + m.active) return null;
+    const st = getMoveStats(this.fighter, this.attackType);
+    const rm = st.rangeMul || 1;
+    const sc = this.fighter.rangeScale, fac = this.attackFacing, cx = this.x + this.w / 2;
+    const fwd = (r, y, h) => ({ x: fac > 0 ? this.x + this.w - 2 : this.x - r + 2, y, w: r, h });
+    switch (this.attackType) {
+      case "weak":       return fwd(34 * sc, this.y + 10, this.h - 16);
+      case "sideTilt":   return fwd(46 * sc, this.y + 7, this.h - 12);
+      case "upTilt":     return { x: cx - 23 * sc, y: this.y - 19, w: 46 * sc, h: 36 };
+      case "downTilt":   return { x: cx - 25 * sc, y: this.y + this.h - 12, w: 50 * sc, h: 24 };
+      case "heavy":      return fwd(50 * sc, this.y + 4, this.h - 8);
+      case "smashSide":  return fwd(60 * sc * rm, this.y + 2, this.h - 5);
+      case "smashUp":    return { x: cx - 28 * sc * rm, y: this.y - 26 - (rm - 1) * 12, w: 56 * sc * rm, h: 43 + (rm - 1) * 12 };
+      case "smashDown":  return { x: cx - 38 * sc * rm, y: this.y + this.h - 7, w: 76 * sc * rm, h: 30 };
+      case "airNeutral": return { x: cx - 25 * sc, y: this.y + 3, w: 50 * sc, h: this.h - 5 };
+      case "airForward": return fwd(46 * sc, this.y + 5, this.h - 10);
+      case "airBack":    { const r = 46 * sc, bf = -fac; return { x: bf > 0 ? this.x + this.w - 2 : this.x - r + 2, y: this.y + 5, w: r, h: this.h - 10 }; }
+      case "airUp":      return { x: cx - 23 * sc, y: this.y - 17, w: 46 * sc, h: 34 };
+      case "airDown":    return { x: cx - 22 * sc, y: this.y + this.h - 8, w: 44 * sc, h: 35 };
+      case "airHeavy":   return fwd(50 * sc, this.y + 4, this.h - 8);
+      default:           return null;
+    }
+  }
+
+  updateAttack(op) {
+    if (this.attackTimer <= 0 || !this.attackType) return;
+    this.attackFrame++;
+    const m = getMove(this.fighter, this.attackType), st = this.getAttackStats(this.attackType);
+    const active = this.attackFrame >= m.startup && this.attackFrame < m.startup + m.active;
+    const box = active ? this.getHitbox() : null;
+    if (box && op.alive && rectOverlap(box, op.getBody())) {
+      const multi = st.hits && st.hits > 1;
+      const ready = multi ? (this.attackFrame - this.lastHitFrame) >= (st.hitInterval || 6) : !this.hitRegistered;
+      const underLimit = !multi || (this.attackHitsLanded || 0) < st.hits;
+      if (ready && underLimit) {
+        this.lastHitFrame = this.attackFrame; this.hitRegistered = true;
+        let dir = this.attackType === "airBack" ? -this.attackFacing : this.attackFacing;
+        if (this.attackType === "smashDown" || this.attackType === "airNeutral" || this.attackType === "downTilt") {
+          const myCenter = this.x + this.w / 2;
+          const opCenter = op.x + op.w / 2;
+          dir = opCenter >= myCenter ? 1 : -1;
+        }
+        let hitStats;
+        const landed = this.attackHitsLanded || 0;
+        const isLinkHit = multi && st.linkDamage && landed < st.hits - 1;
+        if (isLinkHit) {
+          const myCenter = this.x + this.w / 2;
+          const opCenter = op.x + op.w / 2;
+          const pullDir = opCenter >= myCenter ? -1 : 1;
+          hitStats = Object.assign({}, st, {
+            damage: st.linkDamage,
+            kbBase: 0.9, kbScale: 0.012, maxKnockback: 3.2,
+            verticalScale: 0.25, horizontalScale: 0.7,
+            direction: pullDir, smash: false, strongEffect: false
+          });
+        } else {
+          hitStats = Object.assign({}, st, { direction: dir });
+          if (st.cleanHit) {
+            const since = this.attackFrame - m.startup;
+            if (since < st.cleanHit.frames) {
+              hitStats.damage = st.damage * st.cleanHit.damageMul;
+              hitStats.kbBase = st.kbBase * st.cleanHit.kbMul;
+              hitStats.kbScale = st.kbScale * st.cleanHit.kbMul;
+              hitStats.maxKnockback = st.maxKnockback * st.cleanHit.kbMul;
+              hitStats.isClean = true;
+            } else {
+              const late = st.cleanHit.lateMul ?? 1;
+              hitStats.damage = st.damage * late;
+              hitStats.kbBase = st.kbBase * late;
+              hitStats.kbScale = st.kbScale * late;
+              hitStats.maxKnockback = st.maxKnockback * late;
+            }
+          }
+        }
+        this.attackHitsLanded = landed + 1;
+        applyHit(this, op, box, hitStats);
+        if (hitStats.isClean) {
+          this.showMoveLabel((st.label || "スマッシュ") + " クリーン!");
+          const hx = box.x + box.w / 2, hy = box.y + box.h / 2;
+          if (st.electric) spawnParticles(hx, hy, "#e8fdff", 16, 7, 4, .02);
+          else if (st.fire) spawnParticles(hx, hy, "#ffd23f", 14, 6, 5, .06);
+          else spawnParticles(hx, hy, "#ffffff", 12, 6, 4, .04);
+        }
+      }
+    }
+    this.attackTimer--;
+    if (this.attackTimer <= 0) {
+      this.attackTimer = 0; this.attackType = null; this.attackFrame = 0; this.lastHitFrame = -99;
+      this.attackHitsLanded = 0;
+    }
+  }
+
+  moveAndCollide(gf = 1) {
+    const prevY = this.y, wasGround = this.onGround;
+    if (wasGround && this.standingPlatform && this.standingPlatform.dx) {
+      this.x += this.standingPlatform.dx;
+    }
+    this.vy += GRAVITY * this.fighter.gravity * gf;
+    this.vy = Math.max(-18, Math.min(15, this.vy));
+    this.vx = Math.max(-18, Math.min(18, this.vx));
+    this.x += this.vx; this.y += this.vy;
+    this.onGround = false; this.standingPlatform = null;
+    for (const pl of platforms) {
+      if (!pl.main && this.dropThroughTimer > 0) continue;
+      const overH = this.x + this.w > pl.x + 2 && this.x < pl.x + pl.w - 2;
+      const oldF = prevY + this.h, newF = this.y + this.h;
+      if (this.vy >= 0 && overH && oldF <= pl.y + 16 && newF >= pl.y) {
+        this.y = pl.y - this.h;
+        this.vy = 0;
+        this.onGround = true;
+        this.standingPlatform = pl;
+        if (!wasGround) {
+          this.jumpsLeft = this.fighter.jumps;
+          this.airDodgeUsed = false;
+          this.upBUsed = false;
+          this.sideBUsed = false;
+          this.dodgeCooldown = 0;
+          this.ledgeCooldown = 0;
+          if (this.special && !this.special.data.warlockCharge && !this.special.data.limitCharge) {
+            if (this.special.data.landingWave) spawnProjectile(this, this.special.data.landingWave);
+            this.specialEndlag = Math.max(this.specialEndlag, 14);
+            if (!this.special.grabTarget) this.special = null;
+          }
+        }
+        break;
+      }
+    }
+    if (!this.onGround) this.tryGrabLedge();
+    const outL = this.x + this.w < -BLAST_X;
+    const outR = this.x > VIEW_W + BLAST_X;
+    const outB = this.y > VIEW_H + BLAST_Y;
+    const outT = (this.y + this.h < TOP_BLAST_Y) && (this.hitstun > 0 || this.commandGrabParent);
+    if (outL || outR || outB || outT) {
+      if (this.holdingTarget) { this.holdingTarget.grabbedBy = null; this.holdingTarget = null; }
+      if (this.grabbedBy) { this.grabbedBy.holdingTarget = null; this.grabbedBy.throwState = null; this.grabbedBy = null; }
+      if (this.commandGrabParent) { this.commandGrabParent.special = null; this.commandGrabParent = null; }
+      if (this.special?.grabTarget) { this.special.grabTarget.commandGrabParent = null; }
+      spawnBurstEffect(Math.max(30, Math.min(VIEW_W - 30, this.x + this.w / 2)), Math.max(30, Math.min(VIEW_H - 30, this.y + this.h / 2)), this.color);
+      if (trainingMode) {
+        this.respawn();
+      } else {
+        this.stocks--;
+        if (this.stocks > 0) this.respawn();
+      }
+    }
+  }
+
+  tryGrabLedge() {
+    if (this.isSandbag || this.ledgeCooldown > 0 || this.vy < 0) return;
+    const ey = mainPlatform.y, nearH = this.y <= ey + 62 && this.y + this.h >= ey - 6;
+    if (!nearH) return;
+    const le = mainPlatform.x, re = mainPlatform.x + mainPlatform.w;
+    const nearL = this.x <= le + 8 && this.x + this.w >= le - 16;
+    const nearR = this.x <= re + 16 && this.x + this.w >= re - 8;
+    if (nearL) this.grabLedge(-1, le);
+    else if (nearR) this.grabLedge(1, re);
+  }
+
+  grabLedge(side, ex) {
+    this.ledgeGrab = true; this.ledgeSide = side; this.ledgeX = ex; this.ledgeY = mainPlatform.y;
+    this.x = side < 0 ? ex - this.w + 10 : ex - 10; this.y = this.ledgeY + 4;
+    this.facing = -side; this.vx = 0; this.vy = 0; this.onGround = false; this.standingPlatform = null;
+    this.hitstun = 0; this.attackTimer = 0; this.attackType = null;
+    this.smashCharge = null; this.special = null; this.specialEndlag = 0; this.ledgeAction = null;
+  }
+
+  updateLedge(input) {
+    const away = this.ledgeSide < 0 ? this.keys.left : this.keys.right;
+    const toward = this.ledgeSide < 0 ? this.keys.right : this.keys.left;
+    if (input.pressed[this.keys.weak] || input.pressed[this.keys.strong]) {
+      this.startLedgeAction("attack");
+      return;
+    }
+    if (input.pressed[this.keys.shield] || input.pressed[away]) {
+      this.startLedgeAction("roll");
+      return;
+    }
+    if (input.pressed[this.keys.up] || input.pressed[toward]) {
+      this.startLedgeAction("climb");
+    }
+  }
+
+  startLedgeAction(type) {
+    const inward = -this.ledgeSide;
+    const settings = {
+      climb:  { distance: 8,   duration: 14, invincible: 20, label: "通常上がり" },
+      roll:   { distance: 105, duration: 22, invincible: 34, label: "回避上がり" },
+      attack: { distance: 42,  duration: 20, invincible: 24, label: "攻撃上がり" }
+    }[type];
+    const tx = inward > 0 ? this.ledgeX + settings.distance : this.ledgeX - this.w - settings.distance;
+    this.ledgeGrab = false;
+    this.ledgeAction = {
+      type, frame: 0, duration: settings.duration,
+      startX: this.x, startY: this.y, targetX: tx, targetY: this.ledgeY - this.h,
+      inward, hit: false
+    };
+    this.vx = 0; this.vy = 0; this.facing = inward;
+    this.invincible = Math.max(this.invincible, settings.invincible);
+    this.showMoveLabel(settings.label);
+  }
+
+  getLedgeAttackHitbox() {
+    const a = this.ledgeAction;
+    if (!a || a.type !== "attack" || a.frame < 5 || a.frame > 13) return null;
+    const r = 48;
+    return { x: this.facing > 0 ? this.x + this.w - 2 : this.x - r + 2, y: this.y + 7, w: r, h: this.h - 12 };
+  }
+
+  updateLedgeAction(op) {
+    const a = this.ledgeAction; if (!a) return;
+    a.frame++;
+    const t = Math.min(1, a.frame / a.duration), e = t * t * (3 - 2 * t);
+    this.x = a.startX + (a.targetX - a.startX) * e;
+    this.y = a.startY + (a.targetY - a.startY) * e - Math.sin(t * Math.PI) * (a.type === "roll" ? 16 : 6);
+    if (a.type === "roll" && a.frame % 3 === 0) {
+      spawnParticles(this.x + this.w / 2, this.y + this.h / 2, "#b8f2ff", 3, 2, 3, .02);
+    }
+    if (a.type === "attack" && a.frame >= 5 && a.frame <= 13 && !a.hit && op.alive) {
+      const hb = this.getLedgeAttackHitbox();
+      if (hb && rectOverlap(hb, op.getBody())) {
+        a.hit = true;
+        applyHit(this, op, hb, { damage: 7, kbBase: 3.3, kbScale: .07, maxKnockback: 12, strongEffect: true, direction: a.inward });
+      }
+    }
+    if (a.frame >= a.duration) {
+      this.x = a.targetX; this.y = a.targetY; this.vx = 0; this.vy = 0;
+      this.ledgeAction = null; this.ledgeSide = 0; this.onGround = true; this.standingPlatform = mainPlatform;
+      this.jumpsLeft = this.fighter.jumps; this.airDodgeUsed = false;
+      this.upBUsed = false; this.sideBUsed = false; this.ledgeCooldown = 0;
+    }
+  }
+
+  draw() {
+    if (!this.alive) return;
+    ctx.save();
+    if (this.invincible > 0 && Math.floor(this.invincible / 4) % 2 === 0) ctx.globalAlpha *= .42;
+    if (this.dodgeInvincible > 0) ctx.globalAlpha *= .55;
+
+    if (this.fighter.limitBreak && this.limit >= 100) {
+      ctx.save();
+      const pulse = 0.35 + Math.sin(Date.now() / 90) * 0.15;
+      ctx.globalAlpha *= pulse;
+      ctx.fillStyle = "#5fb8ff";
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.y + this.h / 2, this.w * .85, this.h * .72, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.dodgeTimer > 0 || (this.ledgeAction && this.ledgeAction.type === "roll")) {
+      ctx.save();
+      ctx.strokeStyle = "#b8f2ff";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.y + this.h / 2, this.w * .68, this.h * .62, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.shieldActive && this.onGround) {
+      ctx.save();
+      const sc = .6 + .4 * (this.shieldHP / 100);
+      ctx.globalAlpha *= this.justGuardActive ? .55 : .36;
+      ctx.fillStyle = this.justGuardActive ? "#fff06a" : "#e7f8ff";
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.y + this.h / 2, (this.w / 2 + 9) * sc, (this.h / 2 + 9) * sc, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.shieldBroken) {
+      ctx.save();
+      ctx.globalAlpha *= .35; ctx.fillStyle = "#ff3030";
+      ctx.fillRect(this.x - 4, this.y - 4, this.w + 8, this.h + 8);
+      ctx.restore();
+    }
+
+    const isStone = !!(this.special && this.special.data.stoneForm);
+    drawAvatar(this.x, this.y, this.w, this.h, this.fighter, this.hitstun > 0 ? "#fff2f2" : this.color, this.facing, isStone);
+
+    if (this.special && this.special.data.limitCharge) {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = "#7ec8ff"; ctx.lineWidth = 3;
+      const r = 20 + (this.special.frame % 12) * 2;
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.y + this.h - 2, r, r * .3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (this.special && this.special.data.warlockCharge) {
+      const s = this.special;
+      const ratio = Math.min(1, s.frame / s.startup);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + ratio * 0.45;
+      ctx.fillStyle = s.reversed ? "#e040fb" : "#9c27b0";
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2 - this.facing * 12, this.y + this.h * 0.48, 8 + ratio * 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+    } else if (this.special && this.special.data.reflect && this.special.kind === "down") {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = "#ffe27a";
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+      const off = this.w * .7;
+      for (const sx of [-1, 1]) {
+        drawRoundRect(this.x + this.w / 2 + sx * off - 8, this.y - 2, 16, this.h + 4, 6);
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    } else if (this.special) {
+      ctx.save();
+      ctx.globalAlpha *= .7;
+      ctx.strokeStyle = this.special.data.superArmor ? "#ff9f2e" : (this.fighter.effectColor || "#c8f3ff");
+      ctx.lineWidth = this.special.data.superArmor ? 4 : 3;
+      ctx.beginPath(); ctx.ellipse(this.x + this.w / 2, this.y + this.h / 2, this.w * .78, this.h * .68, 0, 0, Math.PI * 2);
+      ctx.stroke(); ctx.restore();
+    }
+
+    const gb = this.getGrabBox();
+    if (gb) {
+      ctx.save();
+      ctx.globalAlpha *= .5; ctx.strokeStyle = "#7ef9ff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(gb.x + gb.w / 2, gb.y + gb.h / 2, gb.w / 2, gb.h / 2, 0, 0, Math.PI * 2);
+      ctx.stroke(); ctx.restore();
+    }
+
+    const hb = this.getHitbox() || this.getLedgeAttackHitbox() || this.getSpecialHitbox(false);
+    const curStats = this.attackType ? getMoveStats(this.fighter, this.attackType) : null;
+    if (hb) {
+      ctx.save();
+      ctx.globalAlpha *= .52;
+      let hbColor = this.fighter.effectColor || "#fff0ad";
+      if (this.special && this.special.data.warlockCharge) hbColor = "#c63dff";
+      else if (curStats?.electric) hbColor = "#7df9ff";
+      else if (curStats?.fire) hbColor = "#ff6a2a";
+      else if (curStats?.sword) hbColor = "#e9e4ff";
+      else if (curStats?.coinBurst) hbColor = "#ffd700";
+      else if (this.attackType && this.attackType.startsWith("smash")) hbColor = "#ff9e35";
+      ctx.fillStyle = hbColor;
+      ctx.beginPath(); ctx.ellipse(hb.x + hb.w / 2, hb.y + hb.h / 2, hb.w / 2, hb.h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (curStats?.sword || this.fighter.weapon === "sword" || this.fighter.weapon === "dark") {
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2.5; ctx.stroke();
+      }
+      if (curStats?.electric) {
+        ctx.strokeStyle = "#e8fdff"; ctx.lineWidth = 2; ctx.stroke();
+      }
+      ctx.restore();
+
+      if (curStats?.sword && this.attackType) {
+        const m = getMove(this.fighter, this.attackType);
+        const prog = Math.max(0, Math.min(1, (this.attackFrame - m.startup) / Math.max(1, m.active)));
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.lineCap = "round";
+        const cx = this.x + this.w / 2, cy = this.y + this.h / 2;
+        const dir = this.attackFacing;
+        const bladeMain = this.fighter.name === "カノン" ? "#8a2be2" : (this.fighter.style === "buster" ? "#aeb6c0" : "#dfe9ff");
+        const bladeArc = this.fighter.name === "カノン" ? "#c07bff" : (this.fighter.style === "buster" ? "#7ec8ff" : "#ffffff");
+        if (this.attackType === "smashUp" || this.attackType === "upTilt") {
+          ctx.strokeStyle = bladeArc;
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.moveTo(cx - 22, cy + 12);
+          ctx.quadraticCurveTo(cx + dir * 6, cy - 46 - prog * 14, cx + 22, cy + 12);
+          ctx.stroke();
+          ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx - 18, cy + 10);
+          ctx.quadraticCurveTo(cx + dir * 6, cy - 40 - prog * 14, cx + 18, cy + 10);
+          ctx.stroke();
+        } else if (this.attackType === "smashDown") {
+          ctx.strokeStyle = bladeArc;
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          ctx.ellipse(cx, this.y + this.h - 4, 58 * (curStats.rangeMul || 1), 13, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          const len = 62 * (curStats.rangeMul || 1);
+          const yOff = -12 + prog * 24;
+          ctx.strokeStyle = bladeMain;
+          ctx.lineWidth = this.fighter.style === "buster" ? 12 : 9;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy + yOff - 20);
+          ctx.lineTo(cx + dir * len, cy + yOff + 12);
+          ctx.stroke();
+          ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy + yOff - 16);
+          ctx.lineTo(cx + dir * len, cy + yOff + 8);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      if (curStats?.hammer) {
+        ctx.save();
+        const dir = this.attackFacing;
+        const hx = dir > 0 ? this.x + this.w + 22 : this.x - 22;
+        const hy = this.y + 12;
+        ctx.fillStyle = "#7a4a1f";
+        ctx.fillRect(dir > 0 ? this.x + this.w - 6 : hx - 2, hy + 6, 28, 7);
+        const m2 = getMove(this.fighter, this.attackType);
+        const isCleanFrame = (this.attackFrame - m2.startup) < 2;
+        ctx.fillStyle = (curStats.fire && isCleanFrame) ? "#ff7a1f" : "#c9ced6";
+        ctx.fillRect(hx - 15, hy - 12, 30, 26);
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+        ctx.strokeRect(hx - 15, hy - 12, 30, 26);
+        if (curStats.fire && isCleanFrame) {
+          ctx.fillStyle = "#ffd23f";
+          ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      if (curStats?.electric) {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = "#e8fdff"; ctx.lineWidth = 2;
+        for (let i = 0; i < 5; i++) {
+          const ex = hb.x + Math.random() * hb.w;
+          const ey = hb.y + Math.random() * hb.h;
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex + (Math.random() - .5) * 26, ey + (Math.random() - .5) * 26);
+          ctx.lineTo(ex + (Math.random() - .5) * 40, ey + (Math.random() - .5) * 40);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      if (curStats?.fire && !curStats?.hammer) {
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = "#ff7a1f";
+        for (let i = 0; i < 3; i++) {
+          const fx = hb.x + Math.random() * hb.w;
+          const fy = hb.y + Math.random() * hb.h;
+          ctx.beginPath(); ctx.arc(fx, fy, 5 + Math.random() * 5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = "#ffd23f";
+        ctx.beginPath(); ctx.arc(hb.x + hb.w / 2, hb.y + hb.h / 2, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      if (curStats?.coinBurst) {
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = "#ffd700";
+        for (let i = 0; i < 4; i++) {
+          const fx = hb.x + 10 + Math.random() * Math.max(10, hb.w - 20);
+          const fy = hb.y + 10 + Math.random() * Math.max(10, hb.h - 20);
+          ctx.beginPath(); ctx.arc(fx, fy, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#8a6d00"; ctx.lineWidth = 1; ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    if (this.smashCharge) {
+      ctx.save();
+      ctx.globalAlpha = .35 + Math.min(.4, this.smashCharge.frames / 100);
+      ctx.strokeStyle = "#ffd45b"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * .82 + this.smashCharge.frames * .12, 0, Math.PI * 2);
+      ctx.stroke(); ctx.restore();
+    }
+
+    if (this.specialEndlag > 12) {
+      ctx.save();
+      ctx.globalAlpha = .55; ctx.strokeStyle = "rgba(255,90,90,.8)"; ctx.lineWidth = 2;
+      ctx.strokeRect(this.x - 3, this.y - 3, this.w + 6, this.h + 6);
+      ctx.restore();
+    }
+
+    if (this.moveLabelTimer > 0 && this.moveLabel) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.moveLabelTimer / 12);
+      ctx.textAlign = "center"; ctx.font = "bold 11px sans-serif";
+      ctx.fillStyle = this.fighter.effectColor || "#ffe88a";
+      ctx.fillText(this.moveLabel, this.x + this.w / 2, this.y - 10);
+      ctx.restore();
+    }
+
+    if (this.holdingTarget) {
+      ctx.save();
+      ctx.textAlign = "center"; ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#8ef7ff";
+      ctx.fillText("GRAB! 方向で投げ", this.x + this.w / 2, this.y - 10);
+      ctx.restore();
+    }
+    if (this.special?.grabTarget) {
+      ctx.save();
+      ctx.textAlign = "center"; ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#ffb86a";
+      ctx.fillText(this.special.data.label, this.x + this.w / 2, this.y - 14);
+      ctx.restore();
+    }
+    if (this.parryFlash > 0) {
+      ctx.save();
+      ctx.textAlign = "center"; ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#fff06a";
+      ctx.fillText("JUST GUARD!", this.x + this.w / 2, this.y - 12);
+      ctx.restore();
+    }
+    if (this.ledgeGrab) {
+      ctx.save();
+      ctx.textAlign = "center"; ctx.font = "bold 10px sans-serif"; ctx.fillStyle = "#ffe88a";
+      ctx.fillText("崖 [R/.:回避 / F:攻撃 / W:登る]", this.x + this.w / 2, this.y - 8);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+}
+
+// ---------- サンドバッグAI ----------
+function createSandbagInput(sb, target) {
+  const ai = { pressed: Object.create(null) };
+  if (!sb.alive) return ai;
+  const k = sb.keys;
+  const mode = sb.sandbagBehavior || 0;
+  const cx = sb.x + sb.w / 2, cy = sb.y + sb.h / 2;
+  const stageCenter = mainPlatform.x + mainPlatform.w / 2;
+  const offStage = cx < mainPlatform.x + 20 || cx > mainPlatform.x + mainPlatform.w - 20;
+  if (offStage && !sb.onGround) {
+    if (cx < stageCenter) ai[k.right] = true;
+    else ai[k.left] = true;
+    if (sb.vy > 1 && cy > mainPlatform.y - 20) {
+      if (sb.jumpsLeft > 0) ai.pressed[k.up] = true;
+      else if (!sb.upBUsed) {
+        ai[k.up] = true;
+        if (cx < stageCenter) ai[k.right] = true; else ai[k.left] = true;
+        ai.pressed[k.special] = true;
+      }
+    }
+    return ai;
+  }
+  if (mode === 1 && sb.onGround) {
+    ai[k.shield] = true;
+    if (!sb.shieldActive) ai.pressed[k.shield] = true;
+  } else if (mode === 2 && sb.onGround) {
+    ai.pressed[k.up] = true;
+  } else if (mode === 3) {
+    if (Math.abs((target.x + target.w / 2) - cx) < 70 && Math.random() < 0.08) {
+      ai.pressed[k.weak] = true;
+    }
+  }
+  return ai;
+}
+// ---------- CPU AI ----------
+function createCPUInput(cpu, target) {
+  if (cpu.isSandbag) return createSandbagInput(cpu, target);
+
+  const ai = { pressed: Object.create(null) };
+  if (!cpu.alive || !target.alive) return ai;
+
+  const k = cpu.keys;
+  const lv = cpu.cpuLevel || 2;
+  const reactChance = lv === 1 ? 0.015 : (lv === 2 ? 0.065 : 0.11);
+
+  const cx = cpu.x + cpu.w / 2, cy = cpu.y + cpu.h / 2;
+  const tx = target.x + target.w / 2, ty = target.y + target.h / 2;
+  const dx = tx - cx, dy = ty - cy;
+  const absX = Math.abs(dx), absY = Math.abs(dy);
+
+  if (cpu.special && cpu.special.data.limitCharge) {
+    if (absX > 110 && cpu.limit < 100) ai[k.special] = true;
+    return ai;
+  }
+
+  if (cpu.ledgeGrab) {
+    const ledgeChance = lv === 1 ? 0.03 : 0.08;
+    if (Math.random() < ledgeChance) {
+      const r = Math.random();
+      if (r < 0.45) ai.pressed[k.up] = true;
+      else if (r < 0.78) ai.pressed[k.shield] = true;
+      else ai.pressed[k.weak] = true;
+    }
+    return ai;
+  }
+
+  if (cpu.holdingTarget) {
+    if (lv > 1 && Math.random() < 0.14 && cpu.holdTimer > 30) {
+      ai.pressed[k.weak] = true;
+    } else if (Math.random() < (lv === 1 ? 0.06 : 0.15) || cpu.holdTimer <= 25) {
+      if (target.damage < 45) ai.pressed[k.down] = true;
+      else if (target.damage > 95 && Math.random() < 0.5) ai.pressed[cpu.facing === 1 ? k.left : k.right] = true;
+      else ai.pressed[k.up] = true;
+    }
+    return ai;
+  }
+
+  if (cpu.smashCharge) {
+    const holdLimit = lv === 3 ? 14 : 7;
+    if (cpu.smashCharge.frames < holdLimit && absX < 85 && Math.random() < 0.7) {
+      ai[k.strong] = true;
+    }
+    return ai;
+  }
+
+  const stageLeft = mainPlatform.x + 25;
+  const stageRight = mainPlatform.x + mainPlatform.w - 25;
+  const offStage = cx < stageLeft || cx > stageRight || cy > mainPlatform.y + 10;
+
+  if (offStage && !cpu.onGround) {
+    const stageCenter = mainPlatform.x + mainPlatform.w / 2;
+    if (cx < stageCenter - 15) ai[k.right] = true;
+    else if (cx > stageCenter + 15) ai[k.left] = true;
+
+    const recChance = lv === 1 ? 0.09 : 0.25;
+    if (cpu.vy > 1.0 && cy > mainPlatform.y - 25) {
+      if (cpu.jumpsLeft > 0 && Math.random() < recChance) {
+        ai.pressed[k.up] = true;
+      } else if (!cpu.upBUsed && cy > mainPlatform.y + 10 && Math.random() < recChance * 1.3) {
+        ai[k.up] = true;
+        if (cx < stageCenter) ai[k.right] = true; else ai[k.left] = true;
+        ai.pressed[k.special] = true;
+      }
+    }
+    return ai;
+  }
+
+  if (cpu.fighter.limitBreak && lv >= 2 && cpu.onGround && cpu.limit < 100 && absX > 220 &&
+      cpu.specialCooldown <= 0 && cpu.specialEndlag <= 0 && Math.random() < 0.03) {
+    ai[k.down] = true;
+    ai[k.special] = true;
+    ai.pressed[k.special] = true;
+    return ai;
+  }
+
+  const opponentDoingBigMove =
+    (target.special && (target.special.data.shockwave || target.special.data.warlockCharge || target.special.kind === "down" || target.special.kind === "side")) ||
+    target.smashCharge;
+
+  if (opponentDoingBigMove && absX < 135 && absY < 60 && lv >= 2) {
+    if (cpu.onGround && Math.random() < (lv === 2 ? 0.18 : 0.32)) {
+      if (Math.random() < 0.65 && cpu.jumpsLeft > 0) {
+        ai.pressed[k.up] = true;
+      } else {
+        ai[k.shield] = true;
+        ai.pressed[k.shield] = true;
+      }
+      return ai;
+    }
+  }
+
+  if (lv >= 2 && (target.attackTimer > 0 || target.special) && absX < 85 && absY < 60) {
+    if (Math.random() < reactChance * 0.85) {
+      if (!cpu.onGround) {
+        ai.pressed[k.shield] = true;
+        return ai;
+      } else {
+        ai[k.shield] = true;
+        ai.pressed[k.shield] = true;
+        if (Math.random() < 0.4) {
+          const dodgeKey = dx > 0 ? k.left : k.right;
+          ai[dodgeKey] = true;
+          ai.pressed[dodgeKey] = true;
+        }
+        return ai;
+      }
+    }
+  }
+
+  const moveProb = lv === 1 ? 0.45 : (lv === 2 ? 0.82 : 0.95);
+  const stopDist = lv === 1 ? 52 : 38;
+  if (Math.random() < moveProb) {
+    if (dx > stopDist) ai[k.right] = true;
+    else if (dx < -stopDist) ai[k.left] = true;
+  }
+
+  if (dy < -55 && cpu.onGround && Math.random() < (lv === 1 ? 0.02 : 0.05)) {
+    ai.pressed[k.up] = true;
+  }
+
+  if (dy > 55 && cpu.onGround && cpu.standingPlatform && !cpu.standingPlatform.main && Math.random() < 0.07) {
+    ai[k.down] = true;
+    ai.pressed[k.down] = true;
+    return ai;
+  }
+
+  if (cpu.aiCooldown <= 0 && Math.random() < reactChance) {
+    if (absX < 62 && absY < 52) {
+      if (lv >= 2 && cpu.onGround && target.shieldActive && Math.random() < 0.38) {
+        ai.pressed[k.grab] = true;
+        cpu.aiCooldown = lv === 2 ? 28 : 20;
+      } else if (lv >= 2 && cpu.onGround && target.damage > 75 && Math.random() < 0.32) {
+        if (dy < -18) { ai[k.up] = true; ai.pressed[k.strong] = true; }
+        else if (Math.random() < 0.5) { ai[dx >= 0 ? k.right : k.left] = true; ai.pressed[k.strong] = true; }
+        else { ai.pressed[k.strong] = true; }
+        cpu.aiCooldown = 30;
+      } else {
+        if (dy < -20) ai[k.up] = true;
+        else if (dy > 20 && !cpu.onGround) ai[k.down] = true;
+        else if (absX > 28) ai[dx >= 0 ? k.right : k.left] = true;
+        ai.pressed[k.weak] = true;
+        cpu.aiCooldown = lv === 1 ? 45 : (lv === 2 ? 24 : 16);
+      }
+    } else if (absX >= 62 && absX < 190 && absY < 50 && Math.random() < (lv === 1 ? 0.15 : 0.32)) {
+      if ((cpu.fighter.specials.neutral.projectile || cpu.fighter.specials.neutral.magicCycle) && Math.random() < 0.65) {
+        ai[k.left] = false; ai[k.right] = false;
+        ai.pressed[k.special] = true;
+      } else if (cpu.onGround && lv >= 2) {
+        ai[dx >= 0 ? k.right : k.left] = true;
+        ai.pressed[k.special] = true;
+      }
+      cpu.aiCooldown = lv === 1 ? 50 : 28;
+    }
+  }
+
+  return ai;
+}
+
+// ---------- 入力・メニュー管理 ----------
+const input = { pressed: Object.create(null) };
+
+function normalizeKey(k) {
+  if (k === " ") return "Space";
+  if (k.startsWith("Arrow") || k === "Enter" || k === "Shift" || k === "Escape" || k === "Backspace" || k === "Tab") return k;
+  return k.toLowerCase();
+}
+
+window.addEventListener("keydown", e => {
+  const k = normalizeKey(e.key);
+  if (!input[k]) input.pressed[k] = true;
+  input[k] = true;
+  if (k.startsWith("Arrow") || k === "Space" || k === "Enter" || k === "Tab") e.preventDefault();
+});
+window.addEventListener("keyup", e => { input[normalizeKey(e.key)] = false; });
+window.addEventListener("blur", () => {
+  for (const k of Object.keys(input)) { if (k !== "pressed") input[k] = false; }
+  input.pressed = Object.create(null);
+});
+
+let screen = "title";
+let titleCursor = 0;
+let vsCPU = false;
+let trainingMode = false;
+let cpuLevel = 1;
+let players = [];
+let selectedFighters = [0, RANDOM_INDEX];
+let selectTurn = 0;
+let selectedStage = 0;
+let camX = 0, camY = 0;
+let mouseClick = null;
+
+const SELECT_COLS = 5;
+
+canvas.addEventListener("click", e => {
+  const r = canvas.getBoundingClientRect();
+  mouseClick = {
+    x: (e.clientX - r.left) * VIEW_W / r.width,
+    y: (e.clientY - r.top) * VIEW_H / r.height
+  };
+});
+
+function startCharacterSelect() {
+  screen = "select";
+  selectTurn = 0;
+}
+
+function startStageSelect() {
+  if (trainingMode) {
+    selectedStage = 4;
+  }
+  screen = "stage";
+}
+
+function resolveFighterIndex(sel) {
+  if (sel === RANDOM_INDEX) return Math.floor(Math.random() * FIGHTERS.length);
+  return sel;
+}
+
+function startMatch() {
+  loadStage(selectedStage);
+  const p1 = resolveFighterIndex(selectedFighters[0]);
+  const p2 = resolveFighterIndex(selectedFighters[1]);
+  players = [
+    new Player(280, p1, 0, selectedFighters[0] === RANDOM_INDEX, false, cpuLevel, false),
+    new Player(560, p2, 1, selectedFighters[1] === RANDOM_INDEX, vsCPU || trainingMode, cpuLevel, trainingMode)
+  ];
+  effects = [];
+  projectiles = [];
+  camX = 0; camY = 0;
+  screen = "fight";
+}
+
+function moveCursor(idx, dir) {
+  const rows = Math.ceil(FIGHTERS.length / SELECT_COLS);
+  if (idx === RANDOM_INDEX) {
+    if (dir === "up") return Math.min(FIGHTERS.length - 1, (rows - 1) * SELECT_COLS + 2);
+    if (dir === "down") return 2;
+    if (dir === "left") return (rows - 1) * SELECT_COLS;
+    if (dir === "right") return Math.min(FIGHTERS.length - 1, rows * SELECT_COLS - 1);
+    return RANDOM_INDEX;
+  }
+  let row = Math.floor(idx / SELECT_COLS), col = idx % SELECT_COLS;
+  if (dir === "left") col = (col + SELECT_COLS - 1) % SELECT_COLS;
+  if (dir === "right") col = (col + 1) % SELECT_COLS;
+  if (dir === "up") { if (row === 0) return RANDOM_INDEX; row--; }
+  if (dir === "down") { if (row === rows - 1) return RANDOM_INDEX; row++; }
+  const n = row * SELECT_COLS + col;
+  return n < FIGHTERS.length ? n : FIGHTERS.length - 1;
+}
+
+function cardPosition(idx) {
+  if (idx === RANDOM_INDEX) return { x: 330, y: 338, w: 240, h: 62 };
+  const col = idx % SELECT_COLS, row = Math.floor(idx / SELECT_COLS);
+  return { x: 22 + col * 173, y: 94 + row * 120, w: 164, h: 112 };
+}
+
+function cardAt(x, y) {
+  for (let i = 0; i <= RANDOM_INDEX; i++) {
+    const c = cardPosition(i);
+    if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) return i;
+  }
+  return -1;
+}
+
+function stageCardPosition(idx) {
+  const col = idx % 3, row = Math.floor(idx / 3);
+  return { x: 30 + col * 285, y: 98 + row * 145, w: 270, h: 125 };
+}
+
+function stageCardAt(x, y) {
+  for (let i = 0; i <= RANDOM_STAGE_INDEX; i++) {
+    const c = stageCardPosition(i);
+    if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) return i;
+  }
+  return -1;
+}
+
+function moveStageCursor(idx, dir) {
+  let row = Math.floor(idx / 3), col = idx % 3;
+  if (dir === "left") col = (col + 2) % 3;
+  if (dir === "right") col = (col + 1) % 3;
+  if (dir === "up" || dir === "down") row = 1 - row;
+  return row * 3 + col;
+}
+
+function cycleCPUMode() {
+  if (trainingMode) {
+    trainingMode = false; vsCPU = false;
+  } else if (!vsCPU) {
+    vsCPU = true; cpuLevel = 1;
+  } else if (cpuLevel < 3) {
+    cpuLevel++;
+  } else {
+    trainingMode = true; vsCPU = true;
+  }
+}
+
+function updateMenus() {
+  if (screen === "title") {
+    if (input.pressed["w"] || input.pressed["ArrowUp"] || input.pressed["a"] || input.pressed["ArrowLeft"]) {
+      titleCursor = (titleCursor + 2) % 3;
+    }
+    if (input.pressed["s"] || input.pressed["ArrowDown"] || input.pressed["d"] || input.pressed["ArrowRight"]) {
+      titleCursor = (titleCursor + 1) % 3;
+    }
+
+    if (mouseClick) {
+      for (let i = 0; i < 3; i++) {
+        const r = getTitleButtonRect(i);
+        if (mouseClick.x >= r.x && mouseClick.x <= r.x + r.w &&
+            mouseClick.y >= r.y && mouseClick.y <= r.y + r.h) {
+          titleCursor = i;
+          applyTitleMode(i);
+          startCharacterSelect();
+          return;
+        }
+      }
+    }
+
+    const startPressed = input.pressed["Enter"] || input.pressed["f"] || input.pressed["Space"];
+    if (startPressed) {
+      applyTitleMode(titleCursor);
+      startCharacterSelect();
+    }
+  } else if (screen === "select") {
+    if (input.pressed["Escape"]) {
+      if (selectTurn === 1 && !trainingMode) selectTurn = 0;
+      else screen = "title";
+      return;
+    }
+    if (input.pressed["Tab"]) {
+      cycleCPUMode();
+      if (trainingMode && selectTurn === 1) selectTurn = 0;
+    }
+    if (mouseClick && mouseClick.x >= 600 && mouseClick.x <= 875 && mouseClick.y >= 22 && mouseClick.y <= 64) {
+      cycleCPUMode();
+      if (trainingMode && selectTurn === 1) selectTurn = 0;
+      return;
+    }
+
+    const p1Move = { left: "a", right: "d", up: "w", down: "s" };
+    const p2Move = { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown" };
+    const cur = selectedFighters[selectTurn];
+
+    const leftTrig = selectTurn === 0 ? input.pressed[p1Move.left] : (input.pressed[p2Move.left] || (vsCPU && input.pressed[p1Move.left]));
+    const rightTrig = selectTurn === 0 ? input.pressed[p1Move.right] : (input.pressed[p2Move.right] || (vsCPU && input.pressed[p1Move.right]));
+    const upTrig = selectTurn === 0 ? input.pressed[p1Move.up] : (input.pressed[p2Move.up] || (vsCPU && input.pressed[p1Move.up]));
+    const downTrig = selectTurn === 0 ? input.pressed[p1Move.down] : (input.pressed[p2Move.down] || (vsCPU && input.pressed[p1Move.down]));
+
+    if (leftTrig) selectedFighters[selectTurn] = moveCursor(cur, "left");
+    else if (rightTrig) selectedFighters[selectTurn] = moveCursor(cur, "right");
+    else if (upTrig) selectedFighters[selectTurn] = moveCursor(cur, "up");
+    else if (downTrig) selectedFighters[selectTurn] = moveCursor(cur, "down");
+
+    if (mouseClick) {
+      const cc = cardAt(mouseClick.x, mouseClick.y);
+      if (cc >= 0) {
+        selectedFighters[selectTurn] = cc;
+        confirmSelection();
+      }
+    }
+
+    if (selectTurn === 0 && input.pressed["f"]) confirmSelection();
+    else if (selectTurn === 1 && (input.pressed["Enter"] || (vsCPU && input.pressed["f"]))) confirmSelection();
+  } else if (screen === "stage") {
+    if (input.pressed["Escape"]) {
+      screen = "select";
+      selectTurn = trainingMode ? 0 : 1;
+      return;
+    }
+    if (input.pressed["a"] || input.pressed["ArrowLeft"]) selectedStage = moveStageCursor(selectedStage, "left");
+    else if (input.pressed["d"] || input.pressed["ArrowRight"]) selectedStage = moveStageCursor(selectedStage, "right");
+    else if (input.pressed["w"] || input.pressed["ArrowUp"]) selectedStage = moveStageCursor(selectedStage, "up");
+    else if (input.pressed["s"] || input.pressed["ArrowDown"]) selectedStage = moveStageCursor(selectedStage, "down");
+
+    if (mouseClick) {
+      const sc = stageCardAt(mouseClick.x, mouseClick.y);
+      if (sc >= 0) {
+        selectedStage = sc;
+        startMatch();
+        return;
+      }
+    }
+
+    if (input.pressed["f"] || input.pressed["Enter"] || input.pressed["Space"]) {
+      startMatch();
+    }
+  } else if (screen === "results") {
+    if (input.pressed["r"]) startMatch();
+    else if (input.pressed["Enter"] || input.pressed["f"] || mouseClick) startCharacterSelect();
+  }
+}
+
+function confirmSelection() {
+  if (trainingMode) {
+    startStageSelect();
+  } else if (selectTurn === 0) {
+    selectTurn = 1;
+  } else {
+    startStageSelect();
+  }
+}
+
+// ---------- 描画 ----------
+function drawArenaBackground() {
+  const st = currentStage || STAGES[0];
+  const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  g.addColorStop(0, st.skyTop);
+  g.addColorStop(.48, st.skyMid);
+  g.addColorStop(1, st.skyBot);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  ctx.save();
+  ctx.globalAlpha = .38;
+  for (let i = 0; i < 34; i++) {
+    const x = (i * 139 + 41) % VIEW_W, y = (i * 71 + 23) % 245, r = 1 + (i % 3);
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawStage() {
+  const st = currentStage || STAGES[0];
+
+  if (st.trainingGrid) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(140, 190, 255, 0.14)";
+    ctx.lineWidth = 1;
+    for (let x = -200; x <= 1100; x += 50) {
+      ctx.beginPath(); ctx.moveTo(x, -250); ctx.lineTo(x, 550); ctx.stroke();
+    }
+    for (let y = -200; y <= 500; y += 50) {
+      ctx.beginPath(); ctx.moveTo(-200, y); ctx.lineTo(1100, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  for (const pl of platforms) {
+    if (pl.main) {
+      const g = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y + 90);
+      g.addColorStop(0, st.mainColor1);
+      g.addColorStop(1, st.mainColor2);
+      ctx.fillStyle = g;
+      ctx.fillRect(pl.x, pl.y, pl.w, pl.h);
+      ctx.fillStyle = st.pillarColor;
+      ctx.fillRect(pl.x, pl.y + pl.h, pl.w, 70);
+      ctx.fillStyle = "rgba(255,255,255,.22)";
+      ctx.fillRect(pl.x, pl.y, pl.w, 2);
+
+      if (st.trainingGrid) {
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,.55)";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "center";
+        const center = pl.x + pl.w / 2;
+        for (let d = -350; d <= 350; d += 100) {
+          ctx.fillText((d >= 0 ? "+" : "") + d, center + d, pl.y + 15);
+        }
+        ctx.restore();
+      }
+    } else {
+      ctx.fillStyle = st.platColor;
+      ctx.fillRect(pl.x, pl.y, pl.w, pl.h);
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+      ctx.fillRect(pl.x, pl.y + pl.h - 3, pl.w, 3);
+      ctx.fillStyle = "rgba(255,255,255,.28)";
+      ctx.fillRect(pl.x, pl.y, pl.w, 2);
+    }
+  }
+  ctx.fillStyle = "#ffe28c";
+  ctx.fillRect(mainPlatform.x - 2, mainPlatform.y - 4, 8, 4);
+  ctx.fillRect(mainPlatform.x + mainPlatform.w - 6, mainPlatform.y - 4, 8, 4);
+}
+
+function drawEffects(up) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const e = effects[i];
+    if (up) { e.x += e.vx; e.y += e.vy; e.vy += e.gravity; e.life--; }
+    if (e.life <= 0) { effects.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, e.life / e.maxLife);
+    ctx.fillStyle = e.color;
+    ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    ctx.restore();
+  }
+}
+
+function drawProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const s = projectiles[i];
+    const dir = s.vx >= 0 ? 1 : -1;
+    ctx.save();
+    ctx.globalAlpha = .92;
+    ctx.fillStyle = s.color;
+    if (s.beam) {
+      ctx.fillRect(s.x - 16, s.y - 4, 32, 8);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(s.x - 14, s.y - 2, 28, 4);
+    } else if (s.star) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    } else if (s.coin) {
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.size, s.size * 1.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 1.5; ctx.stroke();
+    } else if (s.missile) {
+      ctx.fillStyle = "#d9dde3";
+      ctx.fillRect(s.x - 10, s.y - 4, 20, 8);
+      ctx.fillStyle = "#e0453a";
+      ctx.beginPath();
+      ctx.moveTo(s.x + dir * 10, s.y - 4);
+      ctx.lineTo(s.x + dir * 17, s.y);
+      ctx.lineTo(s.x + dir * 10, s.y + 4);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ffb43a";
+      ctx.beginPath(); ctx.arc(s.x - dir * 13, s.y, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+    } else if (s.arrow) {
+      ctx.strokeStyle = s.color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(s.x - dir * 14, s.y); ctx.lineTo(s.x + dir * 10, s.y); ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(s.x + dir * 16, s.y);
+      ctx.lineTo(s.x + dir * 8, s.y - 5);
+      ctx.lineTo(s.x + dir * 8, s.y + 5);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = .4;
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x - dir * 26, s.y - 2, 12, 4);
+    } else if (s.bomb) {
+      const blink = Math.floor(s.life / 5) % 2 === 0;
+      ctx.fillStyle = blink ? "#ffffff" : s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#7a1a6a"; ctx.lineWidth = 2; ctx.stroke();
+    } else if (s.wave) {
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y + 6, s.size * .9, s.size * 1.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(s.x + dir * 2, s.y + 6, s.size * .35, s.size * 1.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (s.fireBreath) {
+      const t = 1 - s.life / 38;
+      ctx.globalAlpha = Math.max(.2, .9 - t * .6);
+      ctx.fillStyle = "#ff6a1f";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size * (1 + t), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffd23f";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size * .5 * (1 + t), 0, Math.PI * 2); ctx.fill();
+    } else if (s.charge) {
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size * .5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = .35;
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x - dir * 10, s.y, s.size * .8, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function isPlayerOffstage(p) {
+  if (!p.alive) return false;
+  const cx = p.x + p.w / 2, cy = p.y + p.h / 2, sx = cx - camX, sy = cy - camY;
+  return sx < 20 || sx > VIEW_W - 20 || sy < 20 || sy > VIEW_H - 20 ||
+         p.x + p.w < mainPlatform.x - 10 || p.x > mainPlatform.x + mainPlatform.w + 10 || p.y > mainPlatform.y + 10;
+}
+
+function drawOffscreenLoupes() {
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    if (!p.alive || !isPlayerOffstage(p)) continue;
+    const cx = p.x + p.w / 2, cy = p.y + p.h / 2, sx = cx - camX, sy = cy - camY;
+    const isOutScreen = sx < 16 || sx > VIEW_W - 16 || sy < 16 || sy > VIEW_H - 16;
+    if (!isOutScreen) continue;
+
+    const margin = 44;
+    const lx = Math.max(margin, Math.min(VIEW_W - margin, sx));
+    const ly = Math.max(margin, Math.min(VIEW_H - margin, sy));
+    const ang = Math.atan2(sy - ly, sx - lx), rad = 26;
+    const dist = Math.min(
+      (p.x + p.w) - (-BLAST_X),
+      (VIEW_W + BLAST_X) - p.x,
+      (VIEW_H + BLAST_Y) - p.y,
+      p.hitstun > 0 ? (p.y + p.h) - TOP_BLAST_Y : 999
+    );
+    const danger = dist < 95;
+
+    ctx.save();
+    const tipX = lx + Math.cos(ang) * (rad + 11), tipY = ly + Math.sin(ang) * (rad + 11);
+    ctx.fillStyle = danger ? "#ff3b3b" : p.color;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(lx + Math.cos(ang + .35) * (rad - 1), ly + Math.sin(ang + .35) * (rad - 1));
+    ctx.lineTo(lx + Math.cos(ang - .35) * (rad - 1), ly + Math.sin(ang - .35) * (rad - 1));
+    ctx.closePath(); ctx.fill();
+
+    ctx.beginPath(); ctx.arc(lx, ly, rad, 0, Math.PI * 2);
+    ctx.fillStyle = danger ? "rgba(75,12,18,.92)" : "rgba(14,18,38,.9)";
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(lx, ly, rad - 3, 0, Math.PI * 2); ctx.clip();
+    const mw = 20 * p.fighter.size, mh = 27 * p.fighter.size;
+    drawAvatar(lx - mw / 2, ly - mh / 2 + 2, mw, mh, p.fighter, p.hitstun > 0 ? "#fff2f2" : p.color, p.facing);
+    ctx.restore();
+
+    ctx.lineWidth = danger ? 4 : 3;
+    ctx.strokeStyle = danger ? "#ff4242" : p.color;
+    ctx.beginPath(); ctx.arc(lx, ly, rad, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(i === 0 ? "P1" : (p.isSandbag ? "BAG" : (p.isCPU ? "CPU" : "P2")), lx, ly - rad - 5);
+    ctx.restore();
+  }
+}
+
+function drawRadarMinimap() {
+  if (players.length < 2) return;
+  if (!players.some(p => isPlayerOffstage(p))) return;
+
+  const worldMinX = -BLAST_X, worldMaxX = VIEW_W + BLAST_X;
+  const worldMinY = TOP_BLAST_Y, worldMaxY = VIEW_H + BLAST_Y;
+  const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
+  const mapW = 164, mapH = Math.round(mapW * (worldH / worldW));
+  const mapX = Math.round((VIEW_W - mapW) / 2), mapY = 10;
+  const toMapX = wx => mapX + ((wx - worldMinX) / worldW) * mapW;
+  const toMapY = wy => mapY + ((wy - worldMinY) / worldH) * mapH;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8,10,24,.8)";
+  drawRoundRect(mapX - 4, mapY - 4, mapW + 8, mapH + 8, 6); ctx.fill();
+  ctx.strokeStyle = "rgba(255,85,85,.85)"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+  const camRX = toMapX(camX), camRY = toMapY(camY);
+  const camRW = (VIEW_W / worldW) * mapW, camRH = (VIEW_H / worldH) * mapH;
+  ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1;
+  ctx.strokeRect(camRX, camRY, camRW, camRH);
+
+  for (const pl of platforms) {
+    ctx.fillStyle = pl.main ? "#7ed957" : "#f0ab4c";
+    const px = toMapX(pl.x), py = toMapY(pl.y);
+    const pw = Math.max(2, (pl.w / worldW) * mapW), ph = Math.max(2, (pl.h / worldH) * mapH);
+    ctx.fillRect(px, py, pw, ph);
+  }
+
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i]; if (!p.alive) continue;
+    const px = Math.max(mapX + 3, Math.min(mapX + mapW - 3, toMapX(p.x + p.w / 2)));
+    const py = Math.max(mapY + 3, Math.min(mapY + mapH - 3, toMapY(p.y + p.h / 2)));
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.2; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHUDPanel(p, x, label) {
+  const hasLimit = !!p.fighter.limitBreak;
+  ctx.save();
+  ctx.fillStyle = "rgba(9,10,25,.68)";
+  drawRoundRect(x, 12, 225, hasLimit ? 88 : 76, 9); ctx.fill();
+  ctx.fillStyle = p.color; ctx.font = "bold 14px sans-serif";
+  let extraTag = p.wasRandom && !p.isSandbag ? " (RND)" : "";
+  if (p.fighter.name === "ソアラ") {
+    extraTag += ` [${SOARA_MAGICS[p.magicIndex % 3].name}]`;
+  }
+  ctx.fillText(label + " " + p.fighter.name + extraTag, x + 10, 32);
+
+  const shade = Math.max(70, 255 - p.damage * 1.25);
+  ctx.fillStyle = `rgb(255,${shade},${shade})`;
+  ctx.font = "bold 27px sans-serif";
+  ctx.fillText(p.damage.toFixed(0) + "%", x + 10, 62);
+
+  if (trainingMode) {
+    ctx.fillStyle = "#ffe38a";
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText("∞ STOCK", x + 130, 56);
+  } else {
+    for (let i = 0; i < 3; i++) {
+      ctx.globalAlpha = i < p.stocks ? 1 : .25;
+      ctx.fillStyle = i < p.stocks ? p.color : "#a9a9b8";
+      ctx.beginPath(); ctx.arc(x + 135 + i * 20, 51, 7, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(0,0,0,.48)"; ctx.fillRect(x + 10, 72, 200, 5);
+  ctx.fillStyle = p.shieldHP > 30 ? "#61e0c2" : "#ff6262";
+  ctx.fillRect(x + 10, 72, 200 * (p.shieldHP / 100), 5);
+
+  if (hasLimit) {
+    const lim = Math.min(100, p.limit || 0);
+    const full = lim >= 100;
+    ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(x + 50, 84, 160, 8);
+    ctx.fillStyle = full ? (Math.floor(Date.now() / 120) % 2 ? "#bfe6ff" : "#4fb3ff") : "#3a8be0";
+    ctx.fillRect(x + 50, 84, 160 * (lim / 100), 8);
+    ctx.fillStyle = full ? "#bfe6ff" : "#9ecbff";
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillText(full ? "LIMIT!" : "LIMIT", x + 10, 92);
+  }
+  ctx.restore();
+}
+
+function drawTrainingBanner() {
+  if (!trainingMode || players.length < 2) return;
+  const sb = players[1];
+  const modeNames = ["棒立ち", "常時ガード", "ジャンプ", "暴れ(弱)"];
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 12, 28, 0.78)";
+  drawRoundRect(VIEW_W / 2 - 220, VIEW_H - 36, 440, 28, 7);
+  ctx.fill();
+  ctx.fillStyle = "#ffe38a";
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    `【練習モード】 1:リセット  2:ダメージ+25%  3:行動切替[${modeNames[sb.sandbagBehavior]}]  Esc:戻る`,
+    VIEW_W / 2,
+    VIEW_H - 18
+  );
+  ctx.restore();
+}
+
+function drawHUD() {
+  if (!players.length) return;
+  drawHUDPanel(players[0], 18, "P1");
+  const p2Label = players[1].isSandbag ? "練習" : (players[1].isCPU ? `CPU Lv.${players[1].cpuLevel}` : "P2");
+  drawHUDPanel(players[1], VIEW_W - 243, p2Label);
+  drawRadarMinimap();
+  drawOffscreenLoupes();
+  drawTrainingBanner();
+}
+
+function getCameraTarget() {
+  const living = players.filter(p => p.alive);
+  if (living.length === 0) return { x: camX, y: camY };
+  let x = 0, y = 0;
+  for (const p of living) { x += p.x + p.w / 2; y += p.y + p.h / 2; }
+  x /= living.length; y /= living.length;
+  return {
+    x: Math.max(-BLAST_X + 35, Math.min(VIEW_W + BLAST_X - VIEW_W - 35, x - VIEW_W / 2)),
+    y: Math.max(-140, Math.min(VIEW_H - 200, y - VIEW_H / 2 - 15))
+  };
+}
+
+function drawBattle(up) {
+  drawArenaBackground();
+  if (players.length === 2) {
+    const t = getCameraTarget();
+    camX += (t.x - camX) * .12;
+    camY += (t.y - camY) * .12;
+  }
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  drawStage();
+  drawEffects(up);
+  drawProjectiles();
+  if (players.length === 2) {
+    players[0].draw();
+    players[1].draw();
+  }
+  ctx.restore();
+  drawHUD();
+}
+
+// ===== タイトルメニュー用ヘルパー =====
+function getTitleButtonRect(idx) {
+  const w = 480, h = 58, x = (VIEW_W - w) / 2;
+  const y = 210 + idx * 68;
+  return { x, y, w, h };
+}
+
+function applyTitleMode(i) {
+  if (i === 0) { vsCPU = false; trainingMode = false; }
+  else if (i === 1) { vsCPU = true; trainingMode = false; }
+  else { vsCPU = true; trainingMode = true; }
+}
+
+function drawTitleScreen() {
+  drawArenaBackground();
+  const t = Date.now() / 1000;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(5, 8, 24, 0.74)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  for (let i = 0; i < 46; i++) {
+    const sx = ((i * 173 + t * 22 + Math.sin(t * 0.5 + i) * 20) % (VIEW_W + 40)) - 20;
+    const sy = (i * 97 + Math.cos(t * 0.4 + i * 0.7) * 18) % 250;
+    const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 2 + i));
+    ctx.globalAlpha = tw * 0.6;
+    ctx.fillStyle = i % 5 === 0 ? "#ffd76a" : (i % 3 === 0 ? "#ffe38a" : "#a8c8ff");
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = "center";
+
+  ctx.save();
+  ctx.shadowColor = "#ffcd5a";
+  ctx.shadowBlur = 26;
+  ctx.fillStyle = "#ffe38a";
+  ctx.font = "bold 48px sans-serif";
+  ctx.fillText("大出費MoneyBrothersSP", VIEW_W / 2, 92);
+  ctx.restore();
+
+  ctx.fillStyle = "#e8ebff";
+  ctx.font = "bold 15px sans-serif";
+  ctx.fillText("大乱闘アクションゲーム", VIEW_W / 2, 118);
+
+  // 1P vs 2P 選択中のみキャラを表示
+  if (titleCursor === 0) {
+    const showcase = [0, 1, 6, 7, 8, 9, 4, 5];
+    for (let i = 0; i < showcase.length; i++) {
+      const f = FIGHTERS[showcase[i]];
+      if (!f) continue;
+      const bob = Math.sin(t * 2.4 + i * 0.7) * 4;
+      const facing = i < showcase.length / 2 ? 1 : -1;
+      drawAvatar(150 + i * 78, 138 + bob, 42, 58, f, f.color, facing);
+    }
+  }
+
+  const modes = [
+    { label: "1P vs 2P",   sub: "2人で対戦 （P1: WASD ／ P2: 矢印キー）", color: "#f6c85f" },
+    { label: "1P vs CPU",  sub: "CPUと対戦 （強さはキャラ選択画面のTabで切替）", color: "#74b9ff" },
+    { label: "練習モード", sub: "サンドバッグでコンボ・撃墜の練習", color: "#8de0a6" }
+  ];
+  for (let i = 0; i < 3; i++) {
+    const b = modes[i];
+    const r = getTitleButtonRect(i);
+    const active = titleCursor === i;
+
+    ctx.save();
+    if (active) {
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 26;
+    }
+    ctx.fillStyle = active ? b.color : "rgba(40, 48, 78, 0.9)";
+    drawRoundRect(r.x, r.y, r.w, r.h, 12);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = active ? "#ffffff" : "#556077";
+    ctx.lineWidth = active ? 3.5 : 1.5;
+    drawRoundRect(r.x, r.y, r.w, r.h, 12);
+    ctx.stroke();
+
+    if (active) {
+      const ax = r.x - 26 + Math.sin(t * 8) * 4;
+      ctx.fillStyle = "#ffe38a";
+      ctx.beginPath();
+      ctx.moveTo(ax, r.y + r.h / 2);
+      ctx.lineTo(ax + 14, r.y + r.h / 2 - 9);
+      ctx.lineTo(ax + 14, r.y + r.h / 2 + 9);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = active ? "#1a1a2e" : "#ffffff";
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillText(b.label, r.x + 26, r.y + 27);
+    ctx.fillStyle = active ? "rgba(26,26,46,0.78)" : "#b8bfd8";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(b.sub, r.x + 26, r.y + 47);
+  }
+  ctx.textAlign = "center";
+
+  const pulse = 0.5 + 0.5 * Math.abs(Math.sin(t * 3));
+  ctx.save();
+  ctx.globalAlpha = 0.55 + pulse * 0.45;
+  ctx.fillStyle = "#ffe38a";
+  ctx.font = "bold 17px sans-serif";
+  ctx.shadowColor = "#ffe38a";
+  ctx.shadowBlur = 12;
+  ctx.fillText("▲▼ で選択　／　Enter または F で決定", VIEW_W / 2, 448);
+  ctx.restore();
+
+  ctx.fillStyle = "#8a94b8";
+  ctx.font = "12px sans-serif";
+  ctx.fillText("マウスクリックでも選択可能", VIEW_W / 2, 472);
+
+  ctx.restore();
+}
+
+function drawCharacterCard(idx) {
+  const c = cardPosition(idx);
+  ctx.save();
+  ctx.fillStyle = "rgba(12,14,31,.78)";
+  drawRoundRect(c.x, c.y, c.w, c.h, 10); ctx.fill();
+  ctx.strokeStyle = "#555a7a"; ctx.lineWidth = 1.5;
+  drawRoundRect(c.x, c.y, c.w, c.h, 10); ctx.stroke();
+
+  if (selectedFighters[0] === idx) {
+    ctx.strokeStyle = "#ff6262"; ctx.lineWidth = 3;
+    drawRoundRect(c.x + 2, c.y + 2, c.w - 4, c.h - 4, 9); ctx.stroke();
+  }
+  if (!trainingMode && selectedFighters[1] === idx) {
+    ctx.strokeStyle = "#64a6ff"; ctx.lineWidth = 3;
+    drawRoundRect(c.x + 6, c.y + 6, c.w - 12, c.h - 12, 7); ctx.stroke();
+  }
+
+  let markers = "";
+  if (selectedFighters[0] === idx) markers += " P1";
+  if (!trainingMode && selectedFighters[1] === idx) markers += (vsCPU ? " CPU" : " P2");
+
+  if (idx === RANDOM_INDEX) {
+    ctx.fillStyle = "#ffe38a"; ctx.font = "bold 28px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("？", c.x + 32, c.y + 41);
+    ctx.textAlign = "left"; ctx.fillStyle = "#fff"; ctx.font = "bold 17px sans-serif";
+    ctx.fillText("ランダム", c.x + 62, c.y + 27);
+    ctx.fillStyle = "#d4d6e4"; ctx.font = "11px sans-serif";
+    ctx.fillText(FIGHTERS.length + "体からランダムに選出", c.x + 62, c.y + 46);
+    if (markers) {
+      ctx.fillStyle = "#ffe38a"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(markers.trim(), c.x + c.w - 12, c.y + 27);
+    }
+    ctx.restore(); return;
+  }
+
+  const f = FIGHTERS[idx];
+  drawAvatar(c.x + 10, c.y + 14, 30, 46, f, f.color, 1);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#fff"; ctx.font = "bold 14px sans-serif";
+  ctx.fillText(f.name, c.x + 50, c.y + 26);
+  ctx.fillStyle = f.color; ctx.font = "bold 10px sans-serif";
+  ctx.fillText(f.role, c.x + 50, c.y + 44);
+
+  ctx.fillStyle = "#d4d6e4"; ctx.font = "10px sans-serif";
+  const desc = f.description;
+  ctx.fillText(desc.slice(0, 13), c.x + 10, c.y + 76);
+  if (desc.length > 13) ctx.fillText(desc.slice(13, 26), c.x + 10, c.y + 90);
+
+  if (markers) {
+    ctx.fillStyle = "#ffe38a"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(markers.trim(), c.x + c.w - 10, c.y + 104);
+  }
+  ctx.restore();
+}
+
+function drawCharacterSelect() {
+  drawArenaBackground();
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(7,9,25,.66)";
+  drawRoundRect(15, 15, 870, 465, 14); ctx.fill();
+
+  ctx.fillStyle = "#ffe38a"; ctx.font = "bold 25px sans-serif";
+  ctx.fillText("キャラクターセレクト", 230, 46);
+
+  ctx.fillStyle = trainingMode ? "#2f8f5b" : (vsCPU ? "#3a7bd5" : "#44496b");
+  drawRoundRect(600, 24, 270, 38, 8); ctx.fill();
+  ctx.strokeStyle = "#9ecbff"; ctx.lineWidth = 1.5;
+  drawRoundRect(600, 24, 270, 38, 8); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "bold 13px sans-serif";
+  const modeText = trainingMode
+    ? "モード: 練習 サンドバッグ (Tabで切替)"
+    : (vsCPU ? `対戦相手: CPU Lv.${cpuLevel} (Tabで切替)` : "対戦相手: P2 人間 (Tabで切替)");
+  ctx.fillText(modeText, 735, 48);
+
+  const sel = trainingMode ? "P1 (練習するキャラ)" : (selectTurn === 0 ? "P1" : (vsCPU ? `CPU (Lv.${cpuLevel})` : "P2"));
+  ctx.fillStyle = selectTurn === 0 ? "#ff7777" : "#74b3ff";
+  ctx.font = "bold 16px sans-serif";
+  ctx.fillText(sel + " のファイターを選択", VIEW_W / 2, 80);
+
+  for (let i = 0; i <= RANDOM_INDEX; i++) drawCharacterCard(i);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#fff"; ctx.font = "13px sans-serif";
+  ctx.fillText(
+    selectTurn === 0
+      ? "P1: WASDで移動・Fで決定（カードクリックでも決定）"
+      : (vsCPU ? "CPUキャラ選択: WASD/矢印で移動・F/Enterで決定" : "P2: 矢印キーで移動・Enterで決定"),
+    VIEW_W / 2, 434
+  );
+  ctx.fillStyle = "#cdd1e2"; ctx.font = "12px sans-serif";
+  ctx.fillText("Escで戻る　／　Tabキーで「2人対戦 ⇔ CPU Lv.1〜3 ⇔ 練習モード」切替", VIEW_W / 2, 458);
+  ctx.restore();
+}
+
+function drawStageSelect() {
+  drawArenaBackground();
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(7,9,25,.68)";
+  drawRoundRect(15, 15, 870, 465, 14); ctx.fill();
+
+  ctx.fillStyle = "#ffe38a"; ctx.font = "bold 26px sans-serif";
+  ctx.fillText("ステージセレクト", VIEW_W / 2, 48);
+  ctx.fillStyle = "#d6deff"; ctx.font = "14px sans-serif";
+  ctx.fillText("戦うステージを選択してください（浮いている床は下入力ですり抜け可能）", VIEW_W / 2, 76);
+
+  for (let i = 0; i <= RANDOM_STAGE_INDEX; i++) {
+    const c = stageCardPosition(i);
+    const isSel = selectedStage === i;
+
+    ctx.save();
+    ctx.fillStyle = isSel ? "rgba(32,42,82,.92)" : "rgba(12,14,31,.78)";
+    drawRoundRect(c.x, c.y, c.w, c.h, 11); ctx.fill();
+    ctx.strokeStyle = isSel ? "#ffe38a" : "#555a7a";
+    ctx.lineWidth = isSel ? 3 : 1.5;
+    drawRoundRect(c.x, c.y, c.w, c.h, 11); ctx.stroke();
+
+    if (i === RANDOM_STAGE_INDEX) {
+      ctx.fillStyle = "#ffe38a"; ctx.font = "bold 22px sans-serif";
+      ctx.fillText("？ ランダムステージ", c.x + c.w / 2, c.y + 56);
+      ctx.fillStyle = "#cfd6e6"; ctx.font = "12px sans-serif";
+      ctx.fillText("全ステージからランダム選出", c.x + c.w / 2, c.y + 84);
+      ctx.restore();
+      continue;
+    }
+
+    const st = STAGES[i];
+    const px = c.x + 12, py = c.y + 14, pw = 92, ph = 66;
+    const g = ctx.createLinearGradient(px, py, px, py + ph);
+    g.addColorStop(0, st.skyTop); g.addColorStop(1, st.skyBot);
+    ctx.fillStyle = g;
+    drawRoundRect(px, py, pw, ph, 6); ctx.fill();
+
+    for (const pl of st.platforms) {
+      ctx.fillStyle = pl.main ? st.mainColor1 : st.platColor;
+      const rx = px + (pl.x / 900) * pw;
+      const ry = py + (pl.y / 500) * ph;
+      const rw = Math.max(4, (pl.w / 900) * pw);
+      const rh = pl.main ? 6 : 3;
+      ctx.fillRect(rx, ry, rw, rh);
+    }
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#fff"; ctx.font = "bold 15px sans-serif";
+    ctx.fillText(st.name, c.x + 114, c.y + 34);
+    ctx.fillStyle = "#cfd6e6"; ctx.font = "11px sans-serif";
+    ctx.fillText(st.desc.slice(0, 13), c.x + 114, c.y + 58);
+    ctx.fillText(st.desc.slice(13), c.x + 114, c.y + 74);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "#fff"; ctx.font = "13px sans-serif";
+  ctx.fillText("WASD / 矢印キーで選択、F / Enter（またはクリック）でバトル開始！", VIEW_W / 2, 438);
+  ctx.fillStyle = "#cdd1e2"; ctx.font = "12px sans-serif";
+  ctx.fillText("Escでキャラクター選択へ戻る", VIEW_W / 2, 460);
+  ctx.restore();
+}
+
+function drawResultsOverlay() {
+  ctx.save();
+  ctx.fillStyle = "rgba(5,7,18,.76)";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffe17a"; ctx.font = "bold 46px sans-serif";
+  ctx.fillText("GAME SET", VIEW_W / 2, VIEW_H / 2 - 48);
+
+  let win = "DRAW";
+  const p2Title = players[1]?.isCPU ? "CPU" : "P2";
+  if (players[0].alive && !players[1].alive) win = "P1 (" + players[0].fighter.name + ") WIN!";
+  if (players[1].alive && !players[0].alive) win = p2Title + " (" + players[1].fighter.name + ") WIN!";
+
+  ctx.fillStyle = "#fff"; ctx.font = "bold 30px sans-serif";
+  ctx.fillText(win, VIEW_W / 2, VIEW_H / 2 + 2);
+  ctx.fillStyle = "#e2e3ee"; ctx.font = "16px sans-serif";
+  ctx.fillText("R：同じ設定で再戦　／　F・Enter・クリック：キャラ選択へ", VIEW_W / 2, VIEW_H / 2 + 55);
+  ctx.restore();
+}
+
+function handleTrainingShortcuts() {
+  if (!trainingMode || players.length < 2) return false;
+  if (input.pressed["Escape"]) {
+    startCharacterSelect();
+    return true;
+  }
+  if (input.pressed["1"]) {
+    const sbMode = players[1].sandbagBehavior;
+    players[0].respawn();
+    players[1].respawn();
+    players[1].sandbagBehavior = sbMode;
+  }
+  if (input.pressed["2"]) {
+    players[1].damage = Math.min(999, players[1].damage + 25);
+  }
+  if (input.pressed["3"]) {
+    players[1].sandbagBehavior = (players[1].sandbagBehavior + 1) % 4;
+    players[1].shieldActive = false;
+  }
+  return false;
+}
+
+function gameLoop() {
+  if (screen === "fight") {
+    if (!handleTrainingShortcuts()) {
+      updateStagePlatforms();
+      players[0].update(input, players[1]);
+      const p2Input = (players[1].isCPU || players[1].isSandbag) ? createCPUInput(players[1], players[0]) : input;
+      players[1].update(p2Input, players[0]);
+      updateProjectiles(players);
+      if (!trainingMode && (!players[0].alive || !players[1].alive)) screen = "results";
+    }
+  } else {
+    updateMenus();
+  }
+
+  if (screen === "title") drawTitleScreen();
+  else if (screen === "select") drawCharacterSelect();
+  else if (screen === "stage") drawStageSelect();
+  else if (screen === "fight") drawBattle(true);
+  else if (screen === "results") { drawBattle(false); drawResultsOverlay(); }
+
+  input.pressed = Object.create(null);
+  mouseClick = null;
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ced5439ad87635',t:'MTc5MjQwMjk0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
