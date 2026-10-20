@@ -197,8 +197,31 @@
     if (DEMO) return;
     roll.classList.add("gold");
     banner.className = "";
-    banner.innerHTML = "★ ALL CLEAR ★<small>何かは案内所とくっつけた時に解禁…!</small>";
+    banner.innerHTML = "★ ALL CLEAR ★<small id=\"sr-secret-line\">全クリしたら <span id=\"sr-secret-mask\">？？？？？？？</span></small>";
     banner.style.display = "block";
+    (function revealSecret() {
+      var mask = document.getElementById("sr-secret-mask"), marks = 7, word = "cookie", typed = 0;
+      if (!mask) return;
+      setTimeout(function peel() {
+        if (marks > 0) {
+          marks--;
+          mask.textContent = "？".repeat(marks);
+          mask.style.display = "inline-block";
+          mask.style.transform = "scale(" + (1 + (7 - marks) * .04) + ")";
+          setTimeout(peel, 220);
+          return;
+        }
+        mask.textContent = "パスワード：";
+        mask.style.color = "#ffd76a";
+        mask.style.transform = "none";
+        setTimeout(function typeWord() {
+          if (typed < word.length) {
+            mask.textContent += word.charAt(typed++);
+            setTimeout(typeWord, 260);
+          }
+        }, 260);
+      }, 500);
+    })();
     try {
       var cu = (localStorage.getItem("gesen_sr_clear_url") || "").trim();
       if (cu && !document.getElementById("sr-perk")) {
@@ -222,7 +245,7 @@
       c: ["#3fe081", "#ffd76a", "#ff7a45", "#ffffff"][i % 4]
     });
     fxUntil = performance.now() + 3200;
-    setTimeout(function () { banner.style.display = "none"; }, 4200);
+    setTimeout(function () { banner.style.display = "none"; }, 9000);
   }
   function failOut() {
     failed = true; ended = true;
@@ -1254,7 +1277,7 @@
 
 
   function g15(i) {
-    var g = base(i), T = 15;
+    var g = base(i), T = 45;
     var px = 40, py = 110, txx = 40, tyy = 110, cx = 110, cy = 40, pCh = 0, hold = false, aimx = 75, aimy = 75;
     var shots = [], splats = [], pP = 0, cP = 0, cFire = 0, cNext = 1.2, st = 0, aiWait = false;
     var obs = [[62, 62, 26, 26], [22, 26, 24, 18], [104, 100, 24, 18]];
@@ -1846,5 +1869,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4db7d66eb05e35f',t:'MTc5MjUzNTY2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
