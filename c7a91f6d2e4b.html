@@ -16,14 +16,14 @@
   <iframe
     id="event"
     title="科学技術部のゲーム案内所"
-    src="https://knj48-iframetester.onrender.com/?url=https%3A%2F%2Fscience-club-event-private.ink3-tomo-0827.workers.dev%2Fa7f3c91e2b"
+    src="https://science-club-event-private.ink3-tomo-0827.workers.dev/a7f3c91e2b"
     allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write"
     allowfullscreen
   ></iframe>
   <script>
     (()=>{
       const frame=document.getElementById('event');
-      const base='https://knj48-iframetester.onrender.com/?url=https%3A%2F%2Fscience-club-event-private.ink3-tomo-0827.workers.dev%2Fa7f3c91e2b';
+      const base='https://science-club-event-private.ink3-tomo-0827.workers.dev/a7f3c91e2b';
       const windows=[
         [Date.UTC(2026,9,22,3,40),Date.UTC(2026,9,22,4,10)],
         [Date.UTC(2026,9,23,3,40),Date.UTC(2026,9,23,4,10)],
@@ -41,7 +41,7 @@
           last=current;
           const loading=document.getElementById('loading');
           if(loading)loading.style.display='grid';
-          frame.src=base+'&boundary='+now;
+          frame.src=base+'?boundary='+now;
         }
       },250);
     })();
