@@ -21,7 +21,30 @@
     allowfullscreen
   ></iframe>
   <script>
-    document.getElementById('event').addEventListener('load',()=>document.getElementById('loading')?.remove());
+    (()=>{
+      const frame=document.getElementById('event');
+      const base='https://science-club-event-private.ink3-tomo-0827.workers.dev/a7f3c91e2b';
+      const windows=[
+        [Date.UTC(2026,9,22,3,40),Date.UTC(2026,9,22,4,10)],
+        [Date.UTC(2026,9,23,3,40),Date.UTC(2026,9,23,4,10)],
+        [Date.UTC(2026,9,26,3,40),Date.UTC(2026,9,26,4,10)],
+        [Date.UTC(2026,9,27,3,40),Date.UTC(2026,9,27,4,10)],
+        [Date.UTC(2026,9,28,3,40),Date.UTC(2026,9,28,4,10)],
+        [Date.UTC(2026,9,29,3,40),Date.UTC(2026,9,29,4,10)]
+      ];
+      const state=n=>n<windows[0][0]||windows.some(w=>n>=w[0]&&n<w[1]);
+      let last=state(Date.now());
+      frame.addEventListener('load',()=>document.getElementById('loading')?.remove());
+      setInterval(()=>{
+        const now=Date.now(),current=state(now);
+        if(current!==last){
+          last=current;
+          const loading=document.getElementById('loading');
+          if(loading)loading.style.display='grid';
+          frame.src=base+'?boundary='+now;
+        }
+      },250);
+    })();
   </script>
 </body>
 </html>
