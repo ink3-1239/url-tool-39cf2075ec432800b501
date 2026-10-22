@@ -5,104 +5,100 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>賞状</title>
 <style>
-  :root{
-    --paper:#f7f1e1; --ink:#201a12; --gold:#b89334; --seal:#c0392b;
-  }
+  :root{ --paper:#f7f1e1; --ink:#201a12; --gold:#b89334; --seal:#c0392b; }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:#2b2419}
+  html,body{margin:0;height:100%;overflow:hidden;background:#16130d}
   body{font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN",serif;color:var(--ink);-webkit-text-size-adjust:100%}
-  #viewport{position:fixed;inset:0;overflow:hidden}
-  #scene{position:absolute;top:0;left:0;transform-origin:0 0}
-  #paper{position:relative;background:
-      radial-gradient(circle at 20% 10%,#fffaf0 0%,transparent 60%),
-      radial-gradient(circle at 80% 85%,#fff7e6 0%,transparent 55%),
+  #viewport{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center}
+  /* PC向け固定比率 16:9 */
+  #stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;
+         background:var(--paper);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #paper{position:absolute;inset:0;padding:30px 44px 92px;display:flex;flex-direction:row-reverse;align-items:flex-start;gap:22px;
+    background:
+      radial-gradient(circle at 18% 12%,#fffaf0 0%,transparent 60%),
+      radial-gradient(circle at 82% 88%,#fff7e6 0%,transparent 55%),
       var(--paper);
-    border:14px double var(--gold);
-    box-shadow:0 26px 60px rgba(0,0,0,.55);
-    padding:46px 54px 60px;
+    border:12px double var(--gold);
   }
-  #paper:before{content:"";position:absolute;inset:6px;border:1px solid #d9c89a;pointer-events:none}
-  .title{
-    writing-mode:vertical-rl;text-orientation:upright;
-    font-size:54px;font-weight:700;letter-spacing:.3em;color:var(--gold);
-    text-shadow:0 2px 0 #8c6f24;margin:0 0 10px auto;
-  }
-  #body{
-    writing-mode:vertical-rl;text-orientation:upright;
-    height:1180px;font-size:25px;line-height:2.05;letter-spacing:.06em;
-    display:block;white-space:pre-wrap;
-  }
-  .ch{display:inline-block}
+  #paper:before{content:"";position:absolute;inset:5px;border:1px solid #d9c89a;pointer-events:none}
+  .title{writing-mode:vertical-rl;text-orientation:upright;font-size:44px;font-weight:700;letter-spacing:.28em;
+    color:var(--gold);text-shadow:0 2px 0 #8c6f24;margin:0;flex:0 0 auto}
+  #body{writing-mode:vertical-rl;text-orientation:upright;height:512px;font-size:19px;line-height:1.95;
+    letter-spacing:.05em;display:block;white-space:pre-wrap;flex:0 0 auto}
+  .ch{display:inline-block;transition:opacity .16s,transform .16s}
+  .ch.gone{opacity:0;transform:scale(1.5)}
   .sp{display:inline-block;width:1em;height:1em}
-  #sign{
-    writing-mode:horizontal-tb;text-align:left;
-    font:700 40px/1.2 "Trebuchet MS",sans-serif;letter-spacing:.14em;
-    color:#1a1a1a;margin-top:26px;
-  }
-  #seal{
-    position:absolute;right:52px;bottom:58px;width:92px;height:92px;border-radius:10px;
-    border:5px solid var(--seal);color:var(--seal);
-    display:grid;place-items:center;font-size:27px;line-height:1.05;text-align:center;
-    transform:rotate(-7deg);opacity:.9;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:.1em;
-  }
-  #player{position:absolute;width:26px;height:30px;z-index:30;will-change:transform}
-  #player .body{position:absolute;inset:0;background:#2b6cb0;border:2px solid #16314d;border-radius:6px 6px 4px 4px}
-  #player .cap{position:absolute;left:-2px;right:-2px;top:-6px;height:9px;background:#c0392b;border:2px solid #7b2318;border-radius:5px}
-  #player .eye{position:absolute;left:15px;top:9px;width:5px;height:5px;background:#fff;border-radius:50%}
-  #player.left .eye{left:6px}
-  .conf{position:absolute;width:13px;height:13px;z-index:20;border-radius:2px;will-change:transform}
-  .puff{position:absolute;z-index:40;font-size:15px;font-weight:700;color:var(--gold);pointer-events:none}
-  #hud{
-    position:fixed;left:10px;top:10px;z-index:100;display:flex;gap:8px;align-items:center;
-    background:rgba(20,18,14,.74);color:#ffe9b0;border-radius:9px;padding:7px 11px;
-    font:700 13px/1 ui-monospace,monospace;letter-spacing:.08em;
-  }
-  #hud b{font-size:15px;color:#fff}
-  #help{
-    position:fixed;right:10px;top:10px;z-index:100;max-width:46vw;
-    background:rgba(20,18,14,.74);color:#efe6d2;border-radius:9px;padding:7px 11px;
-    font:500 11.5px/1.5 ui-monospace,monospace;
-  }
-  #pad{position:fixed;left:0;right:0;bottom:0;z-index:100;display:flex;justify-content:space-between;padding:12px;pointer-events:none}
-  #pad div{display:flex;gap:10px;pointer-events:auto}
-  #pad button{
-    width:62px;height:62px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
-    background:rgba(20,18,14,.52);color:#fff;font-size:22px;touch-action:none;
-  }
-  #pad button:active{background:rgba(20,18,14,.8)}
-  @media(hover:hover) and (pointer:fine){#pad{display:none}}
-  #clear{
-    position:fixed;inset:0;z-index:200;display:none;place-items:center;background:rgba(14,12,9,.78);
-    color:#ffe9b0;text-align:center;font:700 clamp(20px,5vw,34px)/1.6 serif;letter-spacing:.1em;padding:24px;
-  }
-  #clear.on{display:grid}
-  #clear small{display:block;margin-top:14px;font:500 13px/1.8 ui-monospace,monospace;color:#f0e6cc}
+  #sign{position:absolute;left:150px;bottom:124px;writing-mode:horizontal-tb;
+    font:700 34px/1.2 "Trebuchet MS",sans-serif;letter-spacing:.14em;color:#1a1a1a}
+  #seal{position:absolute;left:56px;bottom:112px;width:74px;height:74px;border-radius:10px;
+    border:5px solid var(--seal);color:var(--seal);display:grid;place-items:center;font-size:21px;line-height:1.05;
+    text-align:center;transform:rotate(-7deg);transform-origin:50% 50%;opacity:.9;
+    writing-mode:vertical-rl;text-orientation:upright;letter-spacing:.1em}
+  #hero{position:absolute;z-index:32;width:20px;height:24px;display:none}
+  #hero.on{display:block}
+  #hero .b{position:absolute;inset:0;background:#2b6cb0;border:2px solid #16314d;border-radius:5px}
+  #hero .c{position:absolute;left:-2px;right:-2px;top:-5px;height:8px;background:#c0392b;border:2px solid #7b2318;border-radius:4px}
+  #hero .e{position:absolute;left:11px;top:7px;width:4px;height:4px;background:#fff;border-radius:50%}
+  #hero.left .e{left:5px}
+  #ground{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:20;background:linear-gradient(#cdb98a,#a68d5a);border-top:3px solid #7d6736}
+  #paddle{position:absolute;z-index:30;height:13px;border-radius:7px;background:linear-gradient(#3a7fc1,#1d4f82);border:2px solid #16314d}
+  #ball{position:absolute;z-index:31;width:14px;height:14px;border-radius:50%;display:none;
+        background:radial-gradient(circle at 34% 30%,#fff,#d9a93a 60%,#8e6a18);box-shadow:0 0 10px rgba(216,168,52,.75)}
+  #ball.on{display:block}
+  .conf{position:absolute;z-index:25;width:11px;height:14px;border-radius:2px}
+  .puff{position:absolute;z-index:40;font:700 15px/1 ui-monospace,monospace;color:var(--gold);pointer-events:none}
+  #hud{position:absolute;left:14px;top:12px;z-index:60;display:flex;gap:16px;align-items:center;
+    background:rgba(20,18,14,.76);color:#ffe9b0;border-radius:9px;padding:8px 13px;
+    font:700 13px/1 ui-monospace,monospace;letter-spacing:.07em}
+  #hud b{color:#fff;font-size:15px}
+  #tip{position:absolute;right:14px;top:12px;z-index:60;background:rgba(20,18,14,.76);color:#efe6d2;
+    border-radius:9px;padding:8px 13px;font:500 12px/1.6 ui-monospace,monospace;max-width:420px}
+  .banner{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:80;text-align:center;
+    background:rgba(16,13,9,.84);border:2px solid var(--gold);border-radius:14px;padding:22px 34px;color:#ffe9b0;
+    font:700 24px/1.6 serif;letter-spacing:.12em;display:none}
+  .banner.on{display:block}
+  .banner small{display:block;margin-top:10px;font:500 13px/1.7 ui-monospace,monospace;color:#f0e6cc}
+  #thanks{position:absolute;inset:0;z-index:90;display:none;place-items:center;background:rgba(14,12,9,.85)}
+  #thanks.on{display:grid}
+  #thanks span{font:800 76px/1.2 "Trebuchet MS",sans-serif;letter-spacing:.05em;color:#ffe9b0;text-align:center;
+    text-shadow:0 5px 0 #8c6f24,0 0 30px rgba(255,220,140,.55)}
 </style>
 </head>
 <body>
 
 <div id="viewport">
-  <div id="scene">
+  <div id="stage">
     <div id="paper">
       <div class="title">賞　状</div>
       <div id="body"></div>
       <div id="sign">ink3</div>
       <div id="seal">科技部</div>
     </div>
+
+    <div id="ground"></div>
+    <div id="hero"><div class="b"></div><div class="c"></div><div class="e"></div></div>
+    <div id="paddle"></div>
+    <div id="ball"></div>
+
+    <div id="hud">
+      <span id="phaseLabel">PHASE 1 紙吹雪あつめ</span>
+      <span>紙吹雪 <b><span id="got">0</span>/10</b></span>
+      <span id="brickBox" hidden>のこり文字 <b id="left">0</b></span>
+      <span id="lifeBox" hidden>ボール <b id="life">3</b></span>
+    </div>
+    <div id="tip">←→ で走る　スペース／↑ でジャンプ　紙吹雪を10個あつめよう</div>
+
+    <div class="banner" id="bReady">PHASE 2 ブロック崩し<small>クリックかスペースでボールを発射<br>打ち返せずに落とすとボールが1つ減ります</small></div>
+    <div class="banner" id="bOver">GAME OVER<small>クリックかスペースでもう一度</small></div>
+    <div id="thanks"><span>Thank You For Playing</span></div>
   </div>
 </div>
-
-<div id="hud">紙吹雪 <b><span id="got">0</span>/<span id="all">0</span></b></div>
-<div id="help">←→ 移動　スペース/↑ ジャンプ<br>文字の上に乗れます</div>
-<div id="pad">
-  <div><button id="bl" aria-label="左">◀</button><button id="br" aria-label="右">▶</button></div>
-  <div><button id="bj" aria-label="ジャンプ">▲</button></div>
-</div>
-<div id="clear">全部あつめました！<small>おめでとうございます。放課後、部室で待ってます。</small></div>
 
 <script>
 (() => {
 'use strict';
+
+const SW = 1280, SH = 720;
 
 const TEXT = [
 "おめでとうございます！",
@@ -130,197 +126,300 @@ const frag = document.createDocumentFragment();
 TEXT.forEach((line, i) => {
   for (const c of line) {
     if (c === ' ' || c === '　') { const s = document.createElement('span'); s.className = 'sp'; frag.appendChild(s); continue; }
-    const s = document.createElement('span');
-    s.className = 'ch';
-    s.textContent = c;
-    frag.appendChild(s);
+    const s = document.createElement('span'); s.className = 'ch'; s.textContent = c; frag.appendChild(s);
   }
   if (i < TEXT.length - 1) frag.appendChild(document.createElement('br'));
 });
 bodyEl.appendChild(frag);
 
-const scene = document.getElementById('scene');
-const paper = document.getElementById('paper');
+const stage = document.getElementById('stage');
 const viewport = document.getElementById('viewport');
+const paddleEl = document.getElementById('paddle');
+const heroEl = document.getElementById('hero');
+const ballEl = document.getElementById('ball');
 const gotEl = document.getElementById('got');
-const allEl = document.getElementById('all');
-const clearEl = document.getElementById('clear');
+const leftEl = document.getElementById('left');
+const lifeEl = document.getElementById('life');
+const brickBox = document.getElementById('brickBox');
+const lifeBox = document.getElementById('lifeBox');
+const phaseLabel = document.getElementById('phaseLabel');
+const tip = document.getElementById('tip');
+const bReady = document.getElementById('bReady');
+const bOver = document.getElementById('bOver');
+const thanks = document.getElementById('thanks');
 
-let W = 0, H = 0, plats = [], confs = [], collected = 0;
-
-const player = document.createElement('div');
-player.id = 'player';
-player.innerHTML = '<div class="body"></div><div class="cap"></div><div class="eye"></div>';
-scene.appendChild(player);
-
-const P = { x: 60, y: 0, vx: 0, vy: 0, w: 26, h: 30, onGround: false, face: 1 };
-
-function buildWorld() {
-  const pr = paper.getBoundingClientRect();
-  const sr = scene.getBoundingClientRect();
-  W = pr.width; H = pr.height;
-
-  plats = [{ x: 0, y: H - 18, w: W, h: 18 }];
-
-  document.querySelectorAll('.ch').forEach(el => {
-    const r = el.getBoundingClientRect();
-    if (r.width < 6 || r.height < 6) return;
-    plats.push({
-      x: r.left - sr.left,
-      y: r.top - sr.top,
-      w: r.width,
-      h: Math.max(8, r.height * 0.5),
-      el
-    });
-  });
-
-  const sign = document.getElementById('sign').getBoundingClientRect();
-  plats.push({ x: sign.left - sr.left, y: sign.top - sr.top, w: sign.width, h: 10 });
-
-  confs.forEach(c => c.el.remove());
-  confs = [];
-  const colors = ['#e74c3c', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad', '#e67e22'];
-  const pool = plats.filter(p => p.el);
-  const step = Math.max(1, Math.floor(pool.length / 30));
-  for (let i = 0; i < pool.length; i += step) {
-    const p = pool[i];
-    const el = document.createElement('div');
-    el.className = 'conf';
-    el.style.background = colors[(i / step | 0) % colors.length];
-    const x = p.x + p.w / 2 - 6;
-    const y = p.y - 24;
-    el.style.transform = `translate(${x}px,${y}px) rotate(18deg)`;
-    scene.appendChild(el);
-    confs.push({ x, y, el, got: false, t: Math.random() * 6 });
-    if (confs.length >= 30) break;
-  }
-  allEl.textContent = confs.length;
-
-  P.x = Math.min(60, W - 40);
-  P.y = H - 60;
-  P.vx = P.vy = 0;
+let scale = 1;
+function fit() {
+  scale = Math.min(viewport.clientWidth / SW, viewport.clientHeight / SH);
+  const x = (viewport.clientWidth - SW * scale) / 2;
+  const y = (viewport.clientHeight - SH * scale) / 2;
+  stage.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
 }
+addEventListener('resize', fit);
+fit();
 
-const keys = Object.create(null);
-addEventListener('keydown', e => {
-  if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
-  keys[e.key] = true;
-});
-addEventListener('keyup', e => { keys[e.key] = false; });
+const HERO = { x: 120, y: SH - 34 - 24, w: 20, h: 24, vx: 0, vy: 0, onGround: false, face: 1 };
+const LEDGES = [
+  { x: 0, y: SH - 34, w: SW, h: 34 }
+];
+const PAD = { x: SW / 2 - 70, y: SH - 46, w: 140, h: 13, speed: 9 };
+const BALL = { x: 0, y: 0, vx: 0, vy: 0, r: 7, live: false };
+const SPEED = 6.4;
 
-function hold(id, key) {
-  const b = document.getElementById(id);
-  const on = e => { e.preventDefault(); keys[key] = true; };
-  const off = e => { e.preventDefault(); keys[key] = false; };
-  b.addEventListener('touchstart', on, { passive: false });
-  b.addEventListener('touchend', off, { passive: false });
-  b.addEventListener('touchcancel', off, { passive: false });
-  b.addEventListener('mousedown', on);
-  addEventListener('mouseup', off);
-}
-hold('bl', 'ArrowLeft');
-hold('br', 'ArrowRight');
-hold('bj', ' ');
+let phase = 1;          // 1: confetti, 2: ready, 3: breakout, 4: over, 5: clear
+let collected = 0, lives = 3;
+let blocks = [], confs = [], confTimer = 0, last = performance.now();
 
-function puff(x, y, text) {
-  const d = document.createElement('div');
-  d.className = 'puff';
-  d.textContent = text;
-  d.style.transform = `translate(${x}px,${y}px)`;
-  scene.appendChild(d);
-  let t = 0;
-  const id = setInterval(() => {
-    t += 1;
-    d.style.transform = `translate(${x}px,${y - t * 1.6}px)`;
-    d.style.opacity = String(1 - t / 26);
-    if (t > 26) { clearInterval(id); d.remove(); }
-  }, 16);
-}
+const COLORS = ['#e74c3c', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad', '#e67e22', '#16a085'];
 
-const GRAV = 0.62, MOVE = 0.72, MAXV = 5.1, FRICT = 0.82, JUMP = -11.6;
-let last = performance.now();
-
-function step(now) {
-  const dt = Math.min(2.4, (now - last) / 16.67);
-  last = now;
-
+function updateHero(dt) {
   const left = keys['ArrowLeft'] || keys['a'] || keys['A'];
   const right = keys['ArrowRight'] || keys['d'] || keys['D'];
   const jump = keys[' '] || keys['ArrowUp'] || keys['w'] || keys['W'];
 
-  if (left) { P.vx -= MOVE * dt; P.face = -1; }
-  if (right) { P.vx += MOVE * dt; P.face = 1; }
-  if (!left && !right) P.vx *= Math.pow(FRICT, dt);
-  P.vx = Math.max(-MAXV, Math.min(MAXV, P.vx));
+  if (left) { HERO.vx -= 0.8 * dt; HERO.face = -1; }
+  if (right) { HERO.vx += 0.8 * dt; HERO.face = 1; }
+  if (!left && !right) HERO.vx *= Math.pow(0.82, dt);
+  HERO.vx = Math.max(-5.6, Math.min(5.6, HERO.vx));
+  if (jump && HERO.onGround) { HERO.vy = -12.2; HERO.onGround = false; }
+  HERO.vy = Math.min(16, HERO.vy + 0.62 * dt);
 
-  if (jump && P.onGround) { P.vy = JUMP; P.onGround = false; }
-  P.vy = Math.min(16, P.vy + GRAV * dt);
+  HERO.x += HERO.vx * dt;
+  HERO.x = Math.max(8, Math.min(SW - HERO.w - 8, HERO.x));
 
-  P.x += P.vx * dt;
-  if (P.x < 0) { P.x = 0; P.vx = 0; }
-  if (P.x + P.w > W) { P.x = W - P.w; P.vx = 0; }
-
-  const prevBottom = P.y + P.h;
-  P.y += P.vy * dt;
-  const bottom = P.y + P.h;
-
-  P.onGround = false;
-  if (P.vy >= 0) {
-    for (const p of plats) {
-      if (P.x + P.w - 3 < p.x || P.x + 3 > p.x + p.w) continue;
-      if (prevBottom <= p.y + 2 && bottom >= p.y) {
-        P.y = p.y - P.h;
-        P.vy = 0;
-        P.onGround = true;
-        if (p.el) {
-          p.el.style.transition = 'transform .12s';
-          p.el.style.transform = 'translateY(2px)';
-          setTimeout(() => { p.el.style.transform = ''; }, 120);
-        }
-        break;
+  const prevBottom = HERO.y + HERO.h;
+  HERO.y += HERO.vy * dt;
+  const bottom = HERO.y + HERO.h;
+  HERO.onGround = false;
+  if (HERO.vy >= 0) {
+    for (const g of LEDGES) {
+      if (HERO.x + HERO.w - 3 < g.x || HERO.x + 3 > g.x + g.w) continue;
+      if (prevBottom <= g.y + 2 && bottom >= g.y) {
+        HERO.y = g.y - HERO.h; HERO.vy = 0; HERO.onGround = true; break;
       }
     }
   }
+  if (HERO.y > SH + 200) { HERO.x = 120; HERO.y = SH - 58; HERO.vx = HERO.vy = 0; }
+  heroEl.className = HERO.face < 0 ? 'on left' : 'on';
+  heroEl.style.transform = `translate(${HERO.x}px,${HERO.y}px)`;
+}
 
-  if (P.y > H + 300) { P.x = 60; P.y = H - 60; P.vx = P.vy = 0; }
+function buildBlocks() {
+  blocks = [];
+  const sr = stage.getBoundingClientRect();
+  document.querySelectorAll('.ch').forEach(el => {
+    el.classList.remove('gone');
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) return;
+    blocks.push({
+      el,
+      x: (r.left - sr.left) / scale,
+      y: (r.top - sr.top) / scale,
+      w: r.width / scale,
+      h: r.height / scale,
+      dead: false
+    });
+  });
+  leftEl.textContent = blocks.length;
+}
 
-  player.className = P.face < 0 ? 'left' : '';
-  player.style.transform = `translate(${P.x}px,${P.y}px)`;
+function aliveCount() { let n = 0; for (const b of blocks) if (!b.dead) n++; return n; }
 
-  for (const c of confs) {
-    if (c.got) continue;
-    c.t += 0.08 * dt;
-    c.el.style.transform = `translate(${c.x}px,${c.y + Math.sin(c.t) * 4}px) rotate(${Math.sin(c.t) * 40}deg)`;
-    if (P.x < c.x + 13 && P.x + P.w > c.x && P.y < c.y + 13 && P.y + P.h > c.y) {
-      c.got = true;
-      c.el.remove();
-      collected++;
-      gotEl.textContent = collected;
-      puff(c.x - 4, c.y - 6, '+1');
-      if (collected >= confs.length) clearEl.classList.add('on');
+function stickBall() {
+  BALL.live = false;
+  BALL.x = PAD.x + PAD.w / 2;
+  BALL.y = PAD.y - BALL.r - 2;
+  BALL.vx = 0; BALL.vy = 0;
+  ballEl.classList.add('on');
+}
+
+function launchBall() {
+  if (BALL.live) return;
+  BALL.live = true;
+  const dir = Math.random() < .5 ? -1 : 1;
+  BALL.vx = dir * SPEED * 0.55;
+  BALL.vy = -Math.sqrt(Math.max(1, SPEED * SPEED - BALL.vx * BALL.vx));
+}
+
+function toPhase2() {
+  phase = 2;
+  heroEl.classList.remove('on');
+  document.getElementById('ground').style.display = 'none';
+  phaseLabel.textContent = 'PHASE 2 ブロック崩し';
+  brickBox.hidden = false; lifeBox.hidden = false;
+  tip.textContent = '←→ キー／マウスでバー　クリックかスペースで発射';
+  buildBlocks();
+  stickBall();
+  bReady.classList.add('on');
+}
+
+function startBreakout() {
+  bReady.classList.remove('on');
+  phase = 3;
+  launchBall();
+}
+
+function loseBall() {
+  lives--;
+  lifeEl.textContent = Math.max(0, lives);
+  if (lives <= 0) { phase = 4; ballEl.classList.remove('on'); bOver.classList.add('on'); return; }
+  stickBall();
+}
+
+function restart() {
+  bOver.classList.remove('on');
+  lives = 3; lifeEl.textContent = '3';
+  buildBlocks();
+  stickBall();
+  phase = 3;
+  launchBall();
+}
+
+function clearAll() {
+  phase = 5;
+  ballEl.classList.remove('on');
+  thanks.classList.add('on');
+}
+
+const keys = Object.create(null);
+addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if (e.key === ' ') action();
+});
+addEventListener('keyup', e => { keys[e.key] = false; });
+
+let pointerX = null;
+viewport.addEventListener('pointermove', e => {
+  const sr = stage.getBoundingClientRect();
+  pointerX = (e.clientX - sr.left) / scale;
+});
+viewport.addEventListener('pointerdown', action);
+
+function action() {
+  if (phase === 2) startBreakout();
+  else if (phase === 3 && !BALL.live) launchBall();
+  else if (phase === 4) restart();
+}
+
+function puff(x, y, t) {
+  const d = document.createElement('div');
+  d.className = 'puff'; d.textContent = t;
+  d.style.transform = `translate(${x}px,${y}px)`;
+  stage.appendChild(d);
+  let k = 0;
+  const id = setInterval(() => {
+    k++;
+    d.style.transform = `translate(${x}px,${y - k * 1.7}px)`;
+    d.style.opacity = String(1 - k / 22);
+    if (k > 22) { clearInterval(id); d.remove(); }
+  }, 16);
+}
+
+function spawnConf() {
+  const el = document.createElement('div');
+  el.className = 'conf';
+  el.style.background = COLORS[(Math.random() * COLORS.length) | 0];
+  stage.appendChild(el);
+  confs.push({ el, x: 30 + Math.random() * (SW - 80), y: -20, vy: 1.6 + Math.random() * 1.4, sway: Math.random() * 6.28 });
+}
+
+function bounceBlocks() {
+  for (const b of blocks) {
+    if (b.dead) continue;
+    if (BALL.x + BALL.r < b.x || BALL.x - BALL.r > b.x + b.w) continue;
+    if (BALL.y + BALL.r < b.y || BALL.y - BALL.r > b.y + b.h) continue;
+    const overX = Math.min(BALL.x + BALL.r - b.x, b.x + b.w - (BALL.x - BALL.r));
+    const overY = Math.min(BALL.y + BALL.r - b.y, b.y + b.h - (BALL.y - BALL.r));
+    if (overX < overY) { BALL.vx = -BALL.vx; BALL.x += BALL.vx > 0 ? overX : -overX; }
+    else { BALL.vy = -BALL.vy; BALL.y += BALL.vy > 0 ? overY : -overY; }
+    b.dead = true;
+    b.el.classList.add('gone');
+    const n = aliveCount();
+    leftEl.textContent = n;
+    if (n === 0) clearAll();
+    return;
+  }
+}
+
+function loop(now) {
+  const dt = Math.min(2.4, (now - last) / 16.67);
+  last = now;
+
+  if (phase === 1) {
+    paddleEl.style.display = 'none';
+    heroEl.classList.add('on');
+    updateHero(dt);
+  } else {
+    paddleEl.style.display = 'block';
+    if (phase !== 5) {
+      if (keys['ArrowLeft'] || keys['a']) PAD.x -= PAD.speed * dt;
+      if (keys['ArrowRight'] || keys['d']) PAD.x += PAD.speed * dt;
+      if (pointerX !== null) PAD.x += ((pointerX - PAD.w / 2) - PAD.x) * Math.min(1, 0.3 * dt);
+      PAD.x = Math.max(8, Math.min(SW - PAD.w - 8, PAD.x));
+    }
+    paddleEl.style.width = PAD.w + 'px';
+    paddleEl.style.transform = `translate(${PAD.x}px,${PAD.y}px)`;
+  }
+
+  if (phase === 1) {
+    confTimer += dt;
+    if (confTimer > 22) { confTimer = 0; spawnConf(); }
+  }
+
+  for (let i = confs.length - 1; i >= 0; i--) {
+    const c = confs[i];
+    c.y += c.vy * dt; c.sway += 0.08 * dt;
+    const sx = c.x + Math.sin(c.sway) * 14;
+    c.el.style.transform = `translate(${sx}px,${c.y}px) rotate(${Math.sin(c.sway) * 70}deg)`;
+    const caught = phase === 1 &&
+      sx + 11 > HERO.x && sx < HERO.x + HERO.w &&
+      c.y + 14 > HERO.y && c.y < HERO.y + HERO.h;
+    if (caught) {
+      collected++; gotEl.textContent = collected;
+      puff(sx - 4, c.y - 10, '+1');
+      c.el.remove(); confs.splice(i, 1);
+      if (collected >= 10) { confs.forEach(x => x.el.remove()); confs = []; toPhase2(); }
+      continue;
+    }
+    if (c.y > SH - 40) { c.el.remove(); confs.splice(i, 1); }
+  }
+
+  if (phase === 2 || (phase === 3 && !BALL.live)) {
+    BALL.x = PAD.x + PAD.w / 2;
+    BALL.y = PAD.y - BALL.r - 2;
+  } else if (phase === 3) {
+    const steps = 2;
+    for (let s = 0; s < steps; s++) {
+      BALL.x += (BALL.vx * dt) / steps;
+      BALL.y += (BALL.vy * dt) / steps;
+
+      if (BALL.x - BALL.r < 8) { BALL.x = 8 + BALL.r; BALL.vx = Math.abs(BALL.vx); }
+      if (BALL.x + BALL.r > SW - 8) { BALL.x = SW - 8 - BALL.r; BALL.vx = -Math.abs(BALL.vx); }
+      if (BALL.y - BALL.r < 8) { BALL.y = 8 + BALL.r; BALL.vy = Math.abs(BALL.vy); }
+
+      if (BALL.vy > 0 && BALL.y + BALL.r >= PAD.y && BALL.y - BALL.r <= PAD.y + PAD.h &&
+          BALL.x >= PAD.x - 4 && BALL.x <= PAD.x + PAD.w + 4) {
+        BALL.y = PAD.y - BALL.r;
+        const hit = (BALL.x - (PAD.x + PAD.w / 2)) / (PAD.w / 2);
+        const ang = hit * 1.05;
+        const sp = Math.min(9, Math.hypot(BALL.vx, BALL.vy) + 0.04);
+        BALL.vx = Math.sin(ang) * sp;
+        BALL.vy = -Math.abs(Math.cos(ang) * sp);
+      }
+
+      bounceBlocks();
+
+      if (BALL.y - BALL.r > SH) { loseBall(); break; }
     }
   }
 
-  const vw = viewport.clientWidth, vh = viewport.clientHeight;
-  const scale = Math.min(1, vw / (W + 40));
-  let camY = P.y * scale - vh * 0.55;
-  const maxY = Math.max(0, H * scale - vh + 40);
-  camY = Math.max(0, Math.min(maxY, camY));
-  const offX = Math.max(0, (vw - W * scale) / 2);
-  scene.style.transform = `translate(${offX}px,${-camY}px) scale(${scale})`;
-
-  requestAnimationFrame(step);
+  ballEl.style.transform = `translate(${BALL.x - BALL.r}px,${BALL.y - BALL.r}px)`;
+  requestAnimationFrame(loop);
 }
 
-function boot() {
-  scene.style.transform = 'translate(0,0) scale(1)';
-  buildWorld();
-  requestAnimationFrame(step);
-}
-
+function boot() { fit(); requestAnimationFrame(loop); }
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(boot); else addEventListener('load', boot);
-let rt;
-addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { collected = 0; gotEl.textContent = '0'; clearEl.classList.remove('on'); buildWorld(); }, 220); });
 })();
 </script>
 </body>
