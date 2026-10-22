@@ -42,7 +42,7 @@
   #hero.left .e{left:5px}
   #ground{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:20;background:linear-gradient(#cdb98a,#a68d5a);border-top:3px solid #7d6736}
   #paddle{display:none;position:absolute;z-index:30;height:13px;border-radius:7px;background:linear-gradient(#3a7fc1,#1d4f82);border:2px solid #16314d}
-  #paddle.on{display:block}
+  #paddle.on{display:block!important}
   #ball{position:absolute;z-index:31;width:14px;height:14px;border-radius:50%;display:none;
         background:radial-gradient(circle at 34% 30%,#fff,#d9a93a 60%,#8e6a18);box-shadow:0 0 10px rgba(216,168,52,.75)}
   #ball.on{display:block}
@@ -168,6 +168,9 @@ function fit() {
   stage.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
 }
 addEventListener('resize', fit);
+addEventListener('orientationchange', fit);
+if (window.ResizeObserver) { try { new ResizeObserver(fit).observe(viewport); } catch (e) {} }
+[0, 60, 200, 600, 1500].forEach(t => setTimeout(fit, t));
 fit();
 
 const HERO = { x: 120, y: SH - 34 - 24, w: 20, h: 24, vx: 0, vy: 0, onGround: false, face: 1 };
@@ -361,7 +364,7 @@ function bounceBlocks() {
   }
 }
 
-function loop(now) {
+function frame(now) {
   const dt = Math.min(2.4, (now - last) / 16.67);
   last = now;
 
@@ -445,6 +448,20 @@ function loop(now) {
   if (!isFinite(PAD.x)) PAD.x = SW / 2 - PAD.w / 2;
   if (!isFinite(BALL.x) || !isFinite(BALL.y)) stickBall();
   ballEl.style.transform = `translate(${BALL.x - BALL.r}px,${BALL.y - BALL.r}px)`;
+
+  // 保険: 後半なのにバーが消えていたら必ず出し直す
+  if (phase >= 2 && phase <= 4) {
+    if (!paddleEl.classList.contains('on')) paddleEl.classList.add('on');
+    const cs = getComputedStyle(paddleEl);
+    if (cs.display === 'none' || paddleEl.offsetWidth < 10) {
+      paddleEl.style.display = 'block';
+      paddleEl.style.width = PAD.w + 'px';
+    }
+  }
+}
+
+function loop(now) {
+  try { frame(now); } catch (e) { /* 1フレームの失敗でゲームを止めない */ }
   requestAnimationFrame(loop);
 }
 
