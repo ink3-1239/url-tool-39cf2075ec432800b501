@@ -41,7 +41,8 @@
   #hero .e{position:absolute;left:11px;top:7px;width:4px;height:4px;background:#fff;border-radius:50%}
   #hero.left .e{left:5px}
   #ground{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:20;background:linear-gradient(#cdb98a,#a68d5a);border-top:3px solid #7d6736}
-  #paddle{position:absolute;z-index:30;height:13px;border-radius:7px;background:linear-gradient(#3a7fc1,#1d4f82);border:2px solid #16314d}
+  #paddle{display:none;position:absolute;z-index:30;height:13px;border-radius:7px;background:linear-gradient(#3a7fc1,#1d4f82);border:2px solid #16314d}
+  #paddle.on{display:block}
   #ball{position:absolute;z-index:31;width:14px;height:14px;border-radius:50%;display:none;
         background:radial-gradient(circle at 34% 30%,#fff,#d9a93a 60%,#8e6a18);box-shadow:0 0 10px rgba(216,168,52,.75)}
   #ball.on{display:block}
@@ -158,9 +159,12 @@ const startEl = document.getElementById('start');
 
 let scale = 1;
 function fit() {
-  scale = Math.min(viewport.clientWidth / SW, viewport.clientHeight / SH);
-  const x = (viewport.clientWidth - SW * scale) / 2;
-  const y = (viewport.clientHeight - SH * scale) / 2;
+  const vw = viewport.clientWidth || window.innerWidth || SW;
+  const vh = viewport.clientHeight || window.innerHeight || SH;
+  const sc = Math.min(vw / SW, vh / SH);
+  scale = (isFinite(sc) && sc > 0.05) ? sc : 1;
+  const x = Math.max(0, (vw - SW * scale) / 2);
+  const y = Math.max(0, (vh - SH * scale) / 2);
   stage.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
 }
 addEventListener('resize', fit);
@@ -228,6 +232,7 @@ function buildBlocks() {
       dead: false
     });
   });
+  if (blocks.length === 0) setTimeout(buildBlocks, 300);
   leftEl.textContent = blocks.length;
 }
 
@@ -251,6 +256,10 @@ function launchBall() {
 
 function toPhase2() {
   phase = 2;
+  PAD.x = SW / 2 - PAD.w / 2;
+  paddleEl.style.width = PAD.w + 'px';
+  paddleEl.style.transform = `translate(${PAD.x}px,${PAD.y}px)`;
+  paddleEl.classList.add('on');
   heroEl.classList.remove('on');
   document.getElementById('ground').style.display = 'none';
   phaseLabel.textContent = 'PHASE 2 ブロック崩し';
@@ -300,8 +309,8 @@ addEventListener('keyup', e => { keys[e.key] = false; });
 let pointerX = null, pointerActive = false;
 viewport.addEventListener('pointermove', e => {
   const sr = stage.getBoundingClientRect();
-  pointerX = (e.clientX - sr.left) / scale;
-  pointerActive = true;
+  const px = (e.clientX - sr.left) / (scale || 1);
+  if (isFinite(px)) { pointerX = px; pointerActive = true; }
 });
 viewport.addEventListener('pointerdown', action);
 
@@ -357,15 +366,15 @@ function loop(now) {
   last = now;
 
   if (phase === 0) {
-    paddleEl.style.display = 'none';
+    paddleEl.classList.remove('on');
     heroEl.classList.add('on');
     heroEl.style.transform = `translate(${HERO.x}px,${HERO.y}px)`;
   } else if (phase === 1) {
-    paddleEl.style.display = 'none';
+    paddleEl.classList.remove('on');
     heroEl.classList.add('on');
     updateHero(dt);
   } else {
-    paddleEl.style.display = 'block';
+    paddleEl.classList.add('on');
     if (phase !== 5) {
       const kl = keys['ArrowLeft'] || keys['a'] || keys['A'];
       const kr = keys['ArrowRight'] || keys['d'] || keys['D'];
@@ -433,6 +442,8 @@ function loop(now) {
     }
   }
 
+  if (!isFinite(PAD.x)) PAD.x = SW / 2 - PAD.w / 2;
+  if (!isFinite(BALL.x) || !isFinite(BALL.y)) stickBall();
   ballEl.style.transform = `translate(${BALL.x - BALL.r}px,${BALL.y - BALL.r}px)`;
   requestAnimationFrame(loop);
 }
