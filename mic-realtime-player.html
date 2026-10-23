@@ -94,7 +94,7 @@
     color: var(--text-muted);
   }
 
-  .status-pills {
+  .header-right {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -207,6 +207,7 @@
     gap: 9px;
     transition: all 0.16s ease;
     user-select: none;
+    text-decoration: none;
   }
 
   .btn:hover:not(:disabled) {
@@ -275,8 +276,8 @@
   }
 
   .btn-sm {
-    padding: 6px 12px;
-    font-size: 0.78rem;
+    padding: 6px 11px;
+    font-size: 0.77rem;
     border-radius: var(--radius-sm);
   }
 
@@ -292,7 +293,7 @@
   /* Visualizer & Level Meters */
   .visualizer-wrap {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 1fr 310px;
     gap: 14px;
     align-items: stretch;
   }
@@ -350,7 +351,7 @@
   .meter-label {
     display: flex;
     justify-content: space-between;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     color: var(--text-muted);
   }
 
@@ -761,7 +762,7 @@
       </div>
     </div>
 
-    <div class="status-pills">
+    <div class="header-right">
       <div class="pill" id="statusPill">
         <span class="dot"></span>
         <span id="statusText">停止中</span>
@@ -772,16 +773,19 @@
       <div class="pill" title="マイク入力からPC出力までの推定遅延時間">
         <span id="latencyText">遅延: -- ms</span>
       </div>
+      <button class="btn btn-sm" id="headerPopoutBtn" title="マイク権限が確実に動作する独立タブで開きます">↗ 別タブで開く</button>
+      <button class="btn btn-sm" id="downloadSelfBtn" title="自分のPCに単体HTMLとして保存（いつでもオフラインで起動可能）">💾 PCに保存</button>
     </div>
   </header>
 
   <!-- Permission / iframe helper banner -->
   <div class="banner" id="errorBanner">
-    <div id="errorMessage">マイクへのアクセスが許可されていないか、埋め込み画面の制限によりブロックされました。</div>
+    <div id="errorMessage">マイクへのアクセスが許可されていないか、埋め込みプレビュー枠の制限によりブロックされました。</div>
     <div class="banner-actions">
       <button class="btn btn-sm" id="openNewTabBtn" style="background:#2563eb;border-color:#60a5fa;color:#fff;">
         ↗ 新しいタブで開く（推奨）
       </button>
+      <button class="btn btn-sm" id="bannerDownloadBtn">💾 HTMLをPCに保存して開く</button>
       <button class="btn btn-sm" id="retryMicBtn">再試行</button>
     </div>
   </div>
@@ -800,7 +804,7 @@
         <span class="kbd">Space</span>
       </button>
 
-      <button class="btn btn-test" id="selfTestBtn" disabled title="エフェクト適用後の声を3秒間録音して確認します（録音中はスピーカー出力を自動ミュートできます）">
+      <button class="btn btn-test" id="selfTestBtn" disabled title="エフェクト適用後の声を3秒間録音して再生確認します（録音中はスピーカー出力を自動ミュートします）">
         <span id="selfTestLabel">🎧 3秒声チェック</span>
       </button>
     </div>
@@ -817,12 +821,12 @@
       <div class="meters-box">
         <div class="meter-row">
           <div class="meter-label">
-            <span>マイク入力レベル（黄線＝ノイズゲート境界）</span>
+            <span>マイク入力（黄線＝ノイズカット境界）</span>
             <span id="inDbText">-∞ dB</span>
           </div>
           <div class="meter-track">
             <div class="meter-fill" id="inMeterFill"></div>
-            <div class="gate-marker" id="gateMarker" style="left: 15%;"></div>
+            <div class="gate-marker" id="gateMarker" style="left: 30%;"></div>
           </div>
         </div>
 
@@ -864,7 +868,7 @@
         <select id="outputDeviceSelect">
           <option value="default">既定のスピーカー / ヘッドホン（システム音声）</option>
         </select>
-        <span class="field-hint" id="sinkSupportHint">※ 画面共有ツールが拾っているPCの再生デバイス（イヤホン・ヘッドホン推奨）を選択してください。</span>
+        <span class="field-hint">※ 画面共有ツールが拾っているPCの再生デバイス（イヤホン・ヘッドホン推奨）を選択してください。</span>
       </div>
 
       <div class="slider-control">
@@ -889,7 +893,7 @@
           <span class="slider-val" id="gateThresholdVal" data-reset="gateThresholdSlider">-52 dB</span>
         </div>
         <input type="range" id="gateThresholdSlider" min="-90" max="-15" step="1" value="-52">
-        <span class="field-hint">一番左（-90 dB）でオフ。無音時にメーターの緑バーが黄線より左に収まる位置に調整すると環境音が消えます。</span>
+        <span class="field-hint">一番左（OFF）で無効。無音時にメーターの緑バーが黄線より左に収まる位置に調整すると環境音が消えます。</span>
       </div>
 
       <div class="field-group">
@@ -1094,77 +1098,53 @@
   'use strict';
 
   // =========================================================================
-  // 1. Custom AudioWorklet Processor (Noise Gate + Low-Latency Pitch Shifter + FX)
+  // 1. Shared DSP Core (Works identically inside AudioWorklet OR file:// Fallback)
   // =========================================================================
-  const WORKLET_CODE = `
-    class VoiceStudioProcessor extends AudioWorkletProcessor {
-      static get parameterDescriptors() {
-        return [
-          { name: 'pitchSemitones', defaultValue: 0, minValue: -12, maxValue: 12, automationRate: 'k-rate' },
-          { name: 'gateThresholdDb', defaultValue: -52, minValue: -95, maxValue: 0, automationRate: 'k-rate' },
-          { name: 'robotAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-          { name: 'radioAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' }
-        ];
-      }
-
-      constructor() {
-        super();
+  const DSP_CORE_CODE = `
+    class VoiceDspCore {
+      constructor(sr) {
+        this.sr = sr;
         this.bufSize = 4096;
-        this.bufMask = this.bufSize - 1;
-        this.grainSize = 1536; // ~32ms at 48kHz: clean pitch shifting with low conversational latency
+        this.bufMask = 4095;
+        this.grainSize = 1536;
         this.circBuf = new Float32Array(this.bufSize);
         this.writeIdx = 0;
         this.phase = 0.0;
 
-        // Envelope & smooth gate state
         this.env = 0.0;
         this.gateGain = 1.0;
-        this.attackCoeff = Math.exp(-1.0 / (0.002 * sampleRate));
-        this.releaseCoeff = Math.exp(-1.0 / (0.085 * sampleRate));
-        this.gateSmooth = Math.exp(-1.0 / (0.005 * sampleRate));
+        this.gateIsOpen = true;
+        this.attackCoeff = Math.exp(-1.0 / (0.002 * sr));
+        this.releaseCoeff = Math.exp(-1.0 / (0.085 * sr));
+        this.gateSmooth = Math.exp(-1.0 / (0.005 * sr));
 
-        // Robot & Radio FX state
         this.robotPhase1 = 0.0;
         this.robotPhase2 = 0.0;
         this.holdCounter = 0;
         this.heldSample = 0.0;
-
-        this.reportCounter = 0;
       }
 
-      process(inputs, outputs, parameters) {
-        const input = inputs[0];
-        const output = outputs[0];
-        if (!output || output.length === 0) return true;
-
-        const inCh = (input && input.length > 0) ? input[0] : null;
-        const outCh0 = output[0];
+      processBlock(inCh, outCh0, outCh1, pitchSemi, gateDb, robotAmt, radioAmt) {
         const len = outCh0.length;
-
-        const pitchSemi = parameters.pitchSemitones[0];
-        const gateDb = parameters.gateThresholdDb[0];
-        const robotAmt = parameters.robotAmount[0];
-        const radioAmt = parameters.radioAmount[0];
-
         const gateActive = gateDb > -89.5;
         const threshOpen = Math.pow(10, gateDb / 20);
-        const threshClose = threshOpen * 0.72; // Hysteresis prevents chattering
+        const threshClose = threshOpen * 0.72;
 
         const usePitch = Math.abs(pitchSemi) >= 0.05;
         const pitchRatio = usePitch ? Math.pow(2.0, pitchSemi / 12.0) : 1.0;
         const phaseDelta = (1.0 - pitchRatio) / this.grainSize;
 
-        const robInc1 = (2.0 * Math.PI * 58.0) / sampleRate;
-        const robInc2 = (2.0 * Math.PI * 116.0) / sampleRate;
+        const robInc1 = (2.0 * Math.PI * 58.0) / this.sr;
+        const robInc2 = (2.0 * Math.PI * 116.0) / this.sr;
         const downsampleSteps = radioAmt > 0.01 ? Math.max(1, Math.round(1 + radioAmt * 5)) : 1;
         const drive = 1.0 + radioAmt * 7.5;
 
-        let gateIsOpen = this.gateGain > 0.5;
+        let gateIsOpen = this.gateIsOpen;
 
         for (let i = 0; i < len; i++) {
           let x = inCh ? inCh[i] : 0.0;
 
-          // 1. Noise Gate with smooth envelope
+          // 1. Smooth Hysteresis Noise Gate
           const absX = Math.abs(x);
           if (absX > this.env) {
             this.env = this.attackCoeff * this.env + (1.0 - this.attackCoeff) * absX;
@@ -1183,10 +1163,9 @@
           this.gateGain = this.gateSmooth * this.gateGain + (1.0 - this.gateSmooth) * targetGate;
           x *= this.gateGain;
 
-          // Write gated input to circular buffer even when bypassed so toggling pitch is seamless
           this.circBuf[this.writeIdx] = x;
 
-          // 2. Dual-Tap Equal-Power Crossfade Pitch Shifter
+          // 2. Equal-Power Dual-Tap Real-time Pitch Shifter
           let y = x;
           if (usePitch) {
             this.phase += phaseDelta;
@@ -1208,9 +1187,7 @@
             const f2 = r2 - r2i;
             const s2 = this.circBuf[r2i & this.bufMask] * (1.0 - f2) + this.circBuf[(r2i + 1) & this.bufMask] * f2;
 
-            const w1 = Math.sin(Math.PI * p1);
-            const w2 = Math.sin(Math.PI * p2);
-            y = s1 * w1 + s2 * w2;
+            y = s1 * Math.sin(Math.PI * p1) + s2 * Math.sin(Math.PI * p2);
           }
 
           this.writeIdx = (this.writeIdx + 1) & this.bufMask;
@@ -1222,8 +1199,7 @@
             this.robotPhase2 += robInc2;
             if (this.robotPhase2 > 2.0 * Math.PI) this.robotPhase2 -= 2.0 * Math.PI;
             const carrier = 0.72 * Math.sin(this.robotPhase1) + 0.28 * Math.sin(this.robotPhase2);
-            const modded = y * carrier * 1.45;
-            y = y * (1.0 - robotAmt) + modded * robotAmt;
+            y = y * (1.0 - robotAmt) + (y * carrier * 1.45) * robotAmt;
           }
 
           // 4. Radio / Walkie-Talkie Saturation & Lo-Fi Sample Hold
@@ -1239,22 +1215,60 @@
           outCh0[i] = y;
         }
 
-        // Copy processed mono voice cleanly to all output channels (Stereo left & right)
-        for (let ch = 1; ch < output.length; ch++) {
-          output[ch].set(outCh0);
-        }
+        if (outCh1) outCh1.set(outCh0);
+        this.gateIsOpen = gateIsOpen;
+        return { gateOpen: gateIsOpen, gateActive };
+      }
+    }
+  `;
 
-        this.reportCounter += len;
+  const WORKLET_CODE = `
+    ${DSP_CORE_CODE}
+    class VoiceStudioProcessor extends AudioWorkletProcessor {
+      static get parameterDescriptors() {
+        return [
+          { name: 'pitchSemitones', defaultValue: 0, minValue: -12, maxValue: 12, automationRate: 'k-rate' },
+          { name: 'gateThresholdDb', defaultValue: -52, minValue: -95, maxValue: 0, automationRate: 'k-rate' },
+          { name: 'robotAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+          { name: 'radioAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' }
+        ];
+      }
+      constructor() {
+        super();
+        this.dsp = new VoiceDspCore(sampleRate);
+        this.reportCounter = 0;
+      }
+      process(inputs, outputs, parameters) {
+        const input = inputs[0];
+        const output = outputs[0];
+        if (!output || output.length === 0) return true;
+        const inCh = (input && input.length > 0) ? input[0] : null;
+        const outCh0 = output[0];
+        const outCh1 = output.length > 1 ? output[1] : null;
+
+        const status = this.dsp.processBlock(
+          inCh,
+          outCh0,
+          outCh1,
+          parameters.pitchSemitones[0],
+          parameters.gateThresholdDb[0],
+          parameters.robotAmount[0],
+          parameters.radioAmount[0]
+        );
+
+        this.reportCounter += outCh0.length;
         if (this.reportCounter >= 2048) {
           this.reportCounter = 0;
-          this.port.postMessage({ gateOpen: gateIsOpen, gateActive });
+          this.port.postMessage(status);
         }
-
         return true;
       }
     }
     registerProcessor('voice-studio-processor', VoiceStudioProcessor);
   `;
+
+  // Instantiate DSP factory for main-thread fallback (e.g. local file:// origin)
+  const createFallbackDsp = new Function(`${DSP_CORE_CODE}; return (sr) => new VoiceDspCore(sr);`)();
 
   // =========================================================================
   // 2. Presets Definition
@@ -1276,14 +1290,22 @@
   // =========================================================================
   let audioCtx = null;
   let micStream = null;
-  let workletLoaded = false;
+  let workletAvailable = false;
+  let workletChecked = false;
+
+  const liveDspParams = {
+    pitchSemitones: 0,
+    gateThresholdDb: -52,
+    robotAmount: 0,
+    radioAmount: 0
+  };
 
   let nodes = {
     source: null,
     inputGain: null,
     inAnalyser: null,
     lowCutFilter: null,
-    voiceWorklet: null,
+    voiceProcessor: null,
     lowEq: null,
     midEq: null,
     highEq: null,
@@ -1304,7 +1326,7 @@
 
   let isRunning = false;
   let isMuted = false;
-  let talkMode = 'toggle'; // 'toggle' | 'ptt'
+  let talkMode = 'toggle';
   let spaceHeld = false;
   let isSelfTesting = false;
   let animFrameId = null;
@@ -1317,6 +1339,10 @@
     statusText: document.getElementById('statusText'),
     gateStatusText: document.getElementById('gateStatusText'),
     latencyText: document.getElementById('latencyText'),
+    headerPopoutBtn: document.getElementById('headerPopoutBtn'),
+    downloadSelfBtn: document.getElementById('downloadSelfBtn'),
+    bannerDownloadBtn: document.getElementById('bannerDownloadBtn'),
+
     errorBanner: document.getElementById('errorBanner'),
     errorMessage: document.getElementById('errorMessage'),
     openNewTabBtn: document.getElementById('openNewTabBtn'),
@@ -1342,7 +1368,6 @@
     refreshDevicesBtn: document.getElementById('refreshDevicesBtn'),
     inputDeviceSelect: document.getElementById('inputDeviceSelect'),
     outputDeviceSelect: document.getElementById('outputDeviceSelect'),
-    sinkSupportHint: document.getElementById('sinkSupportHint'),
     fallbackSinkAudio: document.getElementById('fallbackSinkAudio'),
 
     inputGainSlider: document.getElementById('inputGainSlider'),
@@ -1394,7 +1419,6 @@
         const t = i / length;
         const env = Math.pow(1 - t, decay);
         const white = Math.random() * 2 - 1;
-        // Gentle damping so reverb sounds warm & natural rather than harsh
         prev = prev * 0.42 + white * 0.58;
         channelData[i] = prev * env * 0.85;
       }
@@ -1463,7 +1487,6 @@
     if (!audioCtx || !nodes.outAnalyser) return;
     const sinkId = el.outputDeviceSelect.value;
 
-    // Disconnect previous final output connections safely
     try { nodes.outAnalyser.disconnect(); } catch (_) {}
     if (!el.fallbackSinkAudio.paused) {
       el.fallbackSinkAudio.pause();
@@ -1472,18 +1495,18 @@
 
     const targetSink = (sinkId === 'default') ? '' : sinkId;
 
-    // Method 1: Native low-latency AudioContext.setSinkId (Chrome 110+ / Edge)
+    // 1. Direct ultra-low-latency AudioContext.setSinkId (Chrome 110+ / Edge)
     if (typeof audioCtx.setSinkId === 'function') {
       try {
         await audioCtx.setSinkId(targetSink);
         nodes.outAnalyser.connect(audioCtx.destination);
         return;
       } catch (err) {
-        console.warn('AudioContext.setSinkId failed, falling back to audio element:', err);
+        console.warn('AudioContext.setSinkId fallback:', err);
       }
     }
 
-    // Method 2: HTMLAudioElement.setSinkId fallback when a non-default device is chosen
+    // 2. HTMLAudioElement.setSinkId fallback if specific device selected
     if (targetSink && typeof el.fallbackSinkAudio.setSinkId === 'function') {
       try {
         if (!nodes.streamDest) {
@@ -1495,11 +1518,11 @@
         await el.fallbackSinkAudio.play();
         return;
       } catch (err) {
-        console.warn('HTMLAudioElement.setSinkId failed, using default destination:', err);
+        console.warn('HTMLAudioElement.setSinkId fallback:', err);
       }
     }
 
-    // Method 3: Direct default system output
+    // 3. Default system output
     nodes.outAnalyser.connect(audioCtx.destination);
   }
 
@@ -1510,7 +1533,7 @@
     el.errorBanner.classList.remove('show');
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showError('お使いのブラウザ環境ではマイク取得APIが利用できません。新しいタブで開くか、Chrome / Edge で開いてください。');
+      showError('お使いの環境ではマイク取得APIが制限されています。「↗ 新しいタブで開く」または「💾 HTMLをPCに保存して開く」をお試しください。');
       return;
     }
 
@@ -1523,12 +1546,20 @@
         await audioCtx.resume();
       }
 
-      if (!workletLoaded) {
-        const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
-        await audioCtx.audioWorklet.addModule(blobUrl);
-        URL.revokeObjectURL(blobUrl);
-        workletLoaded = true;
+      if (!workletChecked) {
+        workletChecked = true;
+        if (audioCtx.audioWorklet && window.location.protocol !== 'file:') {
+          try {
+            const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+            const blobUrl = URL.createObjectURL(blob);
+            await audioCtx.audioWorklet.addModule(blobUrl);
+            URL.revokeObjectURL(blobUrl);
+            workletAvailable = true;
+          } catch (wErr) {
+            console.warn('AudioWorklet unavailable, using low-latency DSP fallback:', wErr);
+            workletAvailable = false;
+          }
+        }
       }
 
       const selectedMic = el.inputDeviceSelect.value;
@@ -1545,18 +1576,13 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
       micStream = stream;
 
-      // Refresh device labels now that permission is granted
       await updateDeviceLists();
 
       buildGraph(stream);
       await applyOutputDevice();
 
       isRunning = true;
-      if (talkMode === 'ptt') {
-        isMuted = !spaceHeld;
-      } else {
-        isMuted = false;
-      }
+      isMuted = (talkMode === 'ptt') ? !spaceHeld : false;
       updateAllParams();
       updateUIState();
       startVisualizerLoop();
@@ -1564,7 +1590,7 @@
       console.error('Microphone start error:', err);
       stopAudioEngine();
       if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
-        showError('マイクの権限が拒否されたか、プレビュー枠の制限でブロックされました。右の「↗ 新しいタブで開く」を押すとマイク許可ダイアログが表示されてすぐに使えます。');
+        showError('マイクの権限が拒否されたか、プレビュー枠の制限でブロックされました。「↗ 新しいタブで開く」を押すとマイク許可ダイアログが表示されてすぐに使えます。');
       } else if (err && err.name === 'OverconstrainedError') {
         el.inputDeviceSelect.value = 'default';
         showError('選択されたマイクが見つかりませんでした。「再試行」を押すと既定のマイクで開始します。');
@@ -1572,6 +1598,52 @@
         showError(`マイクの開始に失敗しました: ${err ? err.message : '不明なエラー'}`);
       }
     }
+  }
+
+  function updateGateUI({ gateOpen, gateActive }) {
+    if (!isRunning) return;
+    if (!gateActive) {
+      el.gateStatusText.textContent = 'GATE: オフ';
+    } else {
+      el.gateStatusText.textContent = gateOpen ? 'GATE: 通過中 🟢' : 'GATE: 雑音遮断中';
+    }
+  }
+
+  function createVoiceProcessorNode() {
+    if (workletAvailable) {
+      const node = new AudioWorkletNode(audioCtx, 'voice-studio-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2]
+      });
+      node.port.onmessage = (ev) => updateGateUI(ev.data);
+      return node;
+    }
+
+    // Fallback processor (512 frames = ~10.6ms at 48kHz) so even local file:// double-click works 100%
+    const spNode = audioCtx.createScriptProcessor(512, 1, 2);
+    const dsp = createFallbackDsp(audioCtx.sampleRate);
+    let counter = 0;
+    spNode.onaudioprocess = (ev) => {
+      const inCh = ev.inputBuffer.numberOfChannels > 0 ? ev.inputBuffer.getChannelData(0) : null;
+      const out0 = ev.outputBuffer.getChannelData(0);
+      const out1 = ev.outputBuffer.numberOfChannels > 1 ? ev.outputBuffer.getChannelData(1) : null;
+      const status = dsp.processBlock(
+        inCh,
+        out0,
+        out1,
+        liveDspParams.pitchSemitones,
+        liveDspParams.gateThresholdDb,
+        liveDspParams.robotAmount,
+        liveDspParams.radioAmount
+      );
+      counter += out0.length;
+      if (counter >= 2048) {
+        counter = 0;
+        updateGateUI(status);
+      }
+    };
+    return spNode;
   }
 
   function buildGraph(stream) {
@@ -1588,21 +1660,7 @@
     nodes.lowCutFilter.type = 'highpass';
     nodes.lowCutFilter.Q.value = 0.707;
 
-    nodes.voiceWorklet = new AudioWorkletNode(audioCtx, 'voice-studio-processor', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [2]
-    });
-
-    nodes.voiceWorklet.port.onmessage = (ev) => {
-      if (!isRunning) return;
-      const { gateOpen, gateActive } = ev.data;
-      if (!gateActive) {
-        el.gateStatusText.textContent = 'GATE: オフ';
-      } else {
-        el.gateStatusText.textContent = gateOpen ? 'GATE: 通過中 🟢' : 'GATE: 雑音遮断中';
-      }
-    };
+    nodes.voiceProcessor = createVoiceProcessorNode();
 
     nodes.lowEq = audioCtx.createBiquadFilter();
     nodes.lowEq.type = 'lowshelf';
@@ -1617,7 +1675,7 @@
     nodes.highEq.type = 'highshelf';
     nodes.highEq.frequency.value = 4200;
 
-    // Dry / Delay / Reverb parallel send buses
+    // Parallel FX buses
     nodes.dryGain = audioCtx.createGain();
     nodes.dryGain.gain.value = 1.0;
 
@@ -1634,7 +1692,6 @@
     nodes.convolver.buffer = createReverbImpulse(audioCtx);
     nodes.reverbWetGain = audioCtx.createGain();
 
-    // Limiter / Safety Compressor to prevent clipping when boosting or adding FX
     nodes.compressor = audioCtx.createDynamicsCompressor();
     nodes.compressor.threshold.value = -5;
     nodes.compressor.knee.value = 10;
@@ -1655,26 +1712,23 @@
       .connect(nodes.inputGain)
       .connect(nodes.inAnalyser)
       .connect(nodes.lowCutFilter)
-      .connect(nodes.voiceWorklet)
+      .connect(nodes.voiceProcessor)
       .connect(nodes.lowEq)
       .connect(nodes.midEq)
       .connect(nodes.highEq);
 
-    // Parallel FX routing into safety compressor
+    // Parallel sends into limiter
     nodes.highEq.connect(nodes.dryGain).connect(nodes.compressor);
 
-    // Echo loop
     nodes.highEq.connect(nodes.delayNode);
     nodes.delayNode.connect(nodes.delayFilter);
     nodes.delayFilter.connect(nodes.delayFeedback);
     nodes.delayFeedback.connect(nodes.delayNode);
     nodes.delayFilter.connect(nodes.echoWetGain).connect(nodes.compressor);
 
-    // Reverb send
     nodes.highEq.connect(nodes.convolver);
     nodes.convolver.connect(nodes.reverbWetGain).connect(nodes.compressor);
 
-    // Output & self-test tap (self-test records pre-speaker-mute signal so you can test silently!)
     nodes.compressor.connect(nodes.testDest);
     nodes.compressor
       .connect(nodes.masterGain)
@@ -1686,6 +1740,7 @@
     Object.keys(nodes).forEach((k) => {
       if (nodes[k]) {
         try { nodes[k].disconnect(); } catch (_) {}
+        if (nodes[k].onaudioprocess) nodes[k].onaudioprocess = null;
         nodes[k] = null;
       }
     });
@@ -1716,8 +1771,8 @@
     updateUIState();
   }
 
-  // Hot-swap mic stream when input device or hardware toggles change while running
   async function restartMicIfRunning() {
+    saveSettings();
     if (!isRunning) return;
     await startAudioEngine();
   }
@@ -1728,7 +1783,7 @@
   }
 
   // =========================================================================
-  // 8. Real-time Parameter Updates & Presets
+  // 8. Real-time Parameter Updates, Presets & Settings Persistence
   // =========================================================================
   function updateAllParams() {
     const inGain = Number(el.inputGainSlider.value) / 100;
@@ -1745,7 +1800,11 @@
     const robot = Number(el.robotSlider.value) / 100;
     const radio = Number(el.radioSlider.value) / 100;
 
-    // Labels
+    liveDspParams.pitchSemitones = pitch;
+    liveDspParams.gateThresholdDb = gateDb;
+    liveDspParams.robotAmount = robot;
+    liveDspParams.radioAmount = radio;
+
     el.inputGainVal.textContent = `${Math.round(inGain * 100)}%`;
     el.outputGainVal.textContent = `${Math.round(outGain * 100)}%`;
     el.gateThresholdVal.textContent = gateDb <= -90 ? 'OFF' : `${gateDb} dB`;
@@ -1758,10 +1817,11 @@
     el.robotVal.textContent = `${Math.round(robot * 100)}%`;
     el.radioVal.textContent = `${Math.round(radio * 100)}%`;
 
-    // Position gate threshold marker along meter (-75dB..0dB visual range)
     const gatePct = gateDb <= -90 ? 0 : Math.max(0, Math.min(100, ((gateDb + 75) / 75) * 100));
     el.gateMarker.style.left = `${gatePct}%`;
     el.gateMarker.style.opacity = gateDb <= -90 ? '0' : '1';
+
+    saveSettings();
 
     if (!audioCtx || !isRunning) return;
     const now = audioCtx.currentTime;
@@ -1776,11 +1836,11 @@
       nodes.lowCutFilter.frequency.setTargetAtTime(lowCutOn ? 85 : 18, now, 0.02);
     }
 
-    if (nodes.voiceWorklet) {
-      nodes.voiceWorklet.parameters.get('pitchSemitones').setValueAtTime(pitch, now);
-      nodes.voiceWorklet.parameters.get('gateThresholdDb').setValueAtTime(gateDb, now);
-      nodes.voiceWorklet.parameters.get('robotAmount').setValueAtTime(robot, now);
-      nodes.voiceWorklet.parameters.get('radioAmount').setValueAtTime(radio, now);
+    if (nodes.voiceProcessor && nodes.voiceProcessor.parameters) {
+      nodes.voiceProcessor.parameters.get('pitchSemitones').setValueAtTime(pitch, now);
+      nodes.voiceProcessor.parameters.get('gateThresholdDb').setValueAtTime(gateDb, now);
+      nodes.voiceProcessor.parameters.get('robotAmount').setValueAtTime(robot, now);
+      nodes.voiceProcessor.parameters.get('radioAmount').setValueAtTime(radio, now);
     }
 
     if (nodes.lowEq) nodes.lowEq.gain.setTargetAtTime(lowEq, now, 0.02);
@@ -1789,10 +1849,10 @@
     if (nodes.reverbWetGain) nodes.reverbWetGain.gain.setTargetAtTime(reverb * 1.15, now, 0.02);
     if (nodes.echoWetGain) nodes.echoWetGain.gain.setTargetAtTime(echo * 0.85, now, 0.02);
 
-    // Update latency readout
     const baseLat = (audioCtx.baseLatency || 0) + (audioCtx.outputLatency || 0);
+    const spLat = workletAvailable ? 0 : (512 / audioCtx.sampleRate);
     const pitchLat = Math.abs(pitch) >= 0.05 ? (768 / audioCtx.sampleRate) : 0;
-    const totalMs = Math.max(4, Math.round((baseLat + pitchLat) * 1000));
+    const totalMs = Math.max(4, Math.round((baseLat + spLat + pitchLat) * 1000));
     el.latencyText.textContent = `遅延: ~${totalMs} ms`;
   }
 
@@ -1814,6 +1874,50 @@
     });
     el.presetBadge.textContent = `プリセット: ${p.label}`;
     updateAllParams();
+  }
+
+  function saveSettings() {
+    try {
+      const data = {
+        inGain: el.inputGainSlider.value,
+        outGain: el.outputGainSlider.value,
+        gateDb: el.gateThresholdSlider.value,
+        echoCancel: el.echoCancelToggle.checked,
+        noiseSupp: el.noiseSuppressToggle.checked,
+        lowCut: el.lowCutToggle.checked,
+        pitch: el.pitchSlider.value,
+        lowEq: el.lowEqSlider.value,
+        midEq: el.midEqSlider.value,
+        highEq: el.highEqSlider.value,
+        reverb: el.reverbSlider.value,
+        echo: el.echoSlider.value,
+        robot: el.robotSlider.value,
+        radio: el.radioSlider.value
+      };
+      localStorage.setItem('voicebridge_settings_v1', JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem('voicebridge_settings_v1');
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.inGain !== undefined) el.inputGainSlider.value = d.inGain;
+      if (d.outGain !== undefined) el.outputGainSlider.value = d.outGain;
+      if (d.gateDb !== undefined) el.gateThresholdSlider.value = d.gateDb;
+      if (d.echoCancel !== undefined) el.echoCancelToggle.checked = d.echoCancel;
+      if (d.noiseSupp !== undefined) el.noiseSuppressToggle.checked = d.noiseSupp;
+      if (d.lowCut !== undefined) el.lowCutToggle.checked = d.lowCut;
+      if (d.pitch !== undefined) el.pitchSlider.value = d.pitch;
+      if (d.lowEq !== undefined) el.lowEqSlider.value = d.lowEq;
+      if (d.midEq !== undefined) el.midEqSlider.value = d.midEq;
+      if (d.highEq !== undefined) el.highEqSlider.value = d.highEq;
+      if (d.reverb !== undefined) el.reverbSlider.value = d.reverb;
+      if (d.echo !== undefined) el.echoSlider.value = d.echo;
+      if (d.robot !== undefined) el.robotSlider.value = d.robot;
+      if (d.radio !== undefined) el.radioSlider.value = d.radio;
+    } catch (_) {}
   }
 
   function updateUIState() {
@@ -1854,12 +1958,12 @@
   }
 
   // =========================================================================
-  // 9. 3-Second Voice Check (Silent Self-Monitor Preview)
+  // 9. 3-Second Voice Check & Single-File Self Download
   // =========================================================================
   async function runSelfVoiceCheck() {
     if (!isRunning || isSelfTesting || !nodes.testDest || typeof MediaRecorder === 'undefined') return;
     isSelfTesting = true;
-    updateAllParams(); // Temporarily mutes live output so user doesn't hear double voice while recording
+    updateAllParams();
     updateUIState();
     el.selfTestBtn.classList.add('recording');
 
@@ -1909,6 +2013,19 @@
     }, 1000);
   }
 
+  function downloadSelfHtml() {
+    const htmlSource = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'VoiceBridge-Studio.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   // =========================================================================
   // 10. Real-time Visualizer & dB Level Meters
   // =========================================================================
@@ -1949,7 +2066,6 @@
       el.inDbText.textContent = inDb <= -85 ? '-∞ dB' : `${inDb.toFixed(1)} dB`;
       el.outDbText.textContent = outDb <= -85 ? '-∞ dB' : `${outDb.toFixed(1)} dB`;
 
-      // Canvas HiDPI sizing
       const dpr = window.devicePixelRatio || 1;
       const rect = el.canvas.getBoundingClientRect();
       if (el.canvas.width !== Math.floor(rect.width * dpr) || el.canvas.height !== Math.floor(rect.height * dpr)) {
@@ -1961,7 +2077,6 @@
       const h = el.canvas.height;
       ctx2d.clearRect(0, 0, w, h);
 
-      // Subtle background frequency bars
       const bars = 48;
       const barWidth = w / bars;
       for (let i = 0; i < bars; i++) {
@@ -1971,7 +2086,6 @@
         ctx2d.fillRect(i * barWidth + 1, h - barH, Math.max(1, barWidth - 2), barH);
       }
 
-      // Smooth output waveform line
       ctx2d.lineWidth = 2 * dpr;
       ctx2d.strokeStyle = isMuted ? '#ef4444' : '#34d399';
       ctx2d.beginPath();
@@ -2019,10 +2133,21 @@
 
   el.selfTestBtn.addEventListener('click', runSelfVoiceCheck);
 
-  el.openNewTabBtn.addEventListener('click', () => {
-    window.open(window.location.href, '_blank', 'noopener');
-  });
+  const openStandaloneTab = () => {
+    // 元のファイルパス / URL をそのまま新タブで開く（file:// でも http/https でも同じ挙動）
+    // Blob URL を使わないことで、新タブ側の origin が null になり audioWorklet / getUserMedia が
+    // ブロックされる問題を回避します。
+    const w = window.open(window.location.href, '_blank', 'noopener');
+    if (!w) {
+      // ポップアップブロックされた場合はダウンロードフォールバック
+      downloadSelfHtml();
+    }
+  };
+  el.openNewTabBtn.addEventListener('click', openStandaloneTab);
+  el.headerPopoutBtn.addEventListener('click', openStandaloneTab);
 
+  el.downloadSelfBtn.addEventListener('click', downloadSelfHtml);
+  el.bannerDownloadBtn.addEventListener('click', downloadSelfHtml);
   el.retryMicBtn.addEventListener('click', startAudioEngine);
 
   el.refreshDevicesBtn.addEventListener('click', updateDeviceLists);
@@ -2033,7 +2158,6 @@
   el.noiseSuppressToggle.addEventListener('change', restartMicIfRunning);
   el.lowCutToggle.addEventListener('change', updateAllParams);
 
-  // Sliders live update
   const allSliders = [
     el.inputGainSlider, el.outputGainSlider, el.gateThresholdSlider,
     el.pitchSlider, el.lowEqSlider, el.midEqSlider, el.highEqSlider,
@@ -2041,7 +2165,6 @@
   ];
   allSliders.forEach(s => s.addEventListener('input', updateAllParams));
 
-  // Click value badge to reset individual slider to its default
   document.querySelectorAll('.slider-val[data-reset]').forEach(badge => {
     badge.title = 'クリックで初期値にリセット';
     badge.addEventListener('click', () => {
@@ -2053,7 +2176,6 @@
     });
   });
 
-  // Preset buttons
   el.presetsGrid.addEventListener('click', (e) => {
     const btn = e.target.closest('.preset-btn');
     if (btn && btn.dataset.preset) {
@@ -2063,7 +2185,6 @@
 
   el.resetFxBtn.addEventListener('click', () => applyPreset('normal'));
 
-  // Talk mode switching (Always-on vs Push-to-Talk)
   function setTalkMode(mode) {
     talkMode = mode;
     el.modeToggleBtn.classList.toggle('active', mode === 'toggle');
@@ -2077,7 +2198,6 @@
   el.modeToggleBtn.addEventListener('click', () => setTalkMode('toggle'));
   el.modePttBtn.addEventListener('click', () => setTalkMode('ptt'));
 
-  // Keyboard shortcuts: Space / M for mute toggle or Push-to-Talk
   window.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
@@ -2116,11 +2236,16 @@
     navigator.mediaDevices.addEventListener('devicechange', updateDeviceLists);
   }
 
-  // Initial setup
+  // Hide "Open in new tab" button when already running in a standalone local file
+  if (window.location.protocol === 'file:') {
+    el.headerPopoutBtn.style.display = 'none';
+  }
+
+  loadSettings();
   updateDeviceLists();
   updateAllParams();
   drawIdleCanvas();
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4efeccce9aed861',t:'MTc5Mjc0OTk0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
