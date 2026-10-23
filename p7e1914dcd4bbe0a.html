@@ -113,7 +113,7 @@
     ["14", "Dilemma", "ink3"],
     ["15", "ｍaru-pla", "まるくん"],
     ["16", "ノック＆ピンポン", "ink3"],
-    ["17", "大出費MoneyBrothersSP", "お金欲しい"]
+    ["17", "大出費MoneyBrothersSP", "okanehosii"]
   ];
   var HELP = [
     "迫るスライムをタップで撃つ(10体)。弾は6発まで、oreブロック(緑)を撃つと+3。弾0でタップor基地到達=やり直し",
@@ -196,6 +196,8 @@
   var parts = [], fxUntil = 0;
   function payoff() {
     allclear = true;
+    failed = false;
+    if (window.__srFailTimer) { clearTimeout(window.__srFailTimer); window.__srFailTimer = 0; }
     window.STAFF_ROLL_ALLCLEAR = true;
     if (DEMO) return;
     roll.classList.add("gold");
@@ -268,7 +270,7 @@
     banner.innerHTML = "TIME UP<small>最後まで流れ切った…4秒後に自動で再挑戦</small>";
     banner.style.display = "block";
     chalUpdate();
-    setTimeout(function () { location.reload(); }, 4000);
+    window.__srFailTimer = setTimeout(function () { if (!allclear) location.reload(); }, 4000);
   }
 
   function ctxOf(i) { return stations[i].querySelector("canvas").getContext("2d"); }
@@ -1552,10 +1554,17 @@
     var ifr = document.createElement("iframe");
     ifr.style.cssText = "width:100%;height:100%;border:0;display:block;";
     ifr.name = "sr_demo";
+    var demoHtml = SR_PRISTINE_HTML.replace(/<head([^>]*)>/i, '<head$1><script>window.__SR_DEMO=1;<\/script>');
+    var usedBlob = false;
     try {
-      ifr.srcdoc = SR_PRISTINE_HTML.replace(/<head([^>]*)>/i, '<head$1><script>window.__SR_DEMO=1;<\/script>');
-    } catch (e) {
-      ifr.src = location.pathname + "?sr_demo=1";
+      var bu = URL.createObjectURL(new Blob([demoHtml], { type: "text/html" }));
+      ifr.src = bu; usedBlob = true;
+      setTimeout(function () { try { URL.revokeObjectURL(bu); } catch (e0) {} }, 60000);
+    } catch (e) { usedBlob = false; }
+    if (!usedBlob) {
+      try { ifr.srcdoc = demoHtml; } catch (e1) {
+        try { var d = ifr.contentDocument || (ifr.contentWindow && ifr.contentWindow.document); d.open(); d.write(demoHtml); d.close(); } catch (e2) {}
+      }
     }
     demoFrame = ifr;
     try { ifr.focus(); } catch (e) {}
@@ -1863,8 +1872,9 @@
   roll.addEventListener("animationend", function () {
     if (plain) { ended = true; return; }
     if (DEMO) { ended = true; return; }
-    if (!allclear) failOut();
-    else ended = true;
+    if (allclear) { ended = true; return; }
+    if (clearedCount() >= games.length) { payoff(); return; }
+    failOut();
   });
 
   var last = performance.now();

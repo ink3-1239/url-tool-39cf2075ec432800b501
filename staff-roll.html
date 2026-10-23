@@ -94,7 +94,8 @@
 (function () {
   "use strict";
   var FLOW_SEC = 200, PREP_SEC = 0;
-  var DEMO = /[?&]sr_demo=1/.test(location.search);
+  var DEMO = /[?&]sr_demo=1/.test(location.search) || window.name === "sr_demo" || window.__SR_DEMO === 1;
+  var SR_PRISTINE_HTML = "<!DOCTYPE html>" + document.documentElement.outerHTML;
   var META = [
     ["1", "クラフト＆バスターズ", "ink3"],
     ["2", "フローズン・ダジャレ", "ink3"],
@@ -111,7 +112,8 @@
     ["13", "オセロ・アリーナ", "MO"],
     ["14", "Dilemma", "ink3"],
     ["15", "ｍaru-pla", "まるくん"],
-    ["16", "ノック＆ピンポン", "ink3"]
+    ["16", "ノック＆ピンポン", "ink3"],
+    ["17", "大出費MoneyBrothersSP", "okanehosii"]
   ];
   var HELP = [
     "迫るスライムをタップで撃つ(10体)。弾は6発まで、oreブロック(緑)を撃つと+3。弾0でタップor基地到達=やり直し",
@@ -130,7 +132,8 @@
   ,
     "チャージ1つを消費して1回攻撃。ガードは攻撃を完全防御。相手のチャージ中に3回当てればクリア",
     "インクを引きながらドラッグ移動。光るビーコンを1→5の順に通過し、青いクリーナーを避けてインクレールを完成させる",
-    "2レーンを流れる10音をタイミングよくタップ。約7秒、1音でも逃したら最初からやり直し"];
+    "2レーンを流れる10音をタイミングよくタップ。約7秒、1音でも逃したら最初からやり直し",
+    "出てくる¥コインをタップで5枚集める。赤い請求書をタップ、またはコインを取り逃すとやり直し"];
   var roll = document.getElementById("roll");
   var stage = document.getElementById("stage");
   var banner = document.getElementById("allclear");
@@ -193,6 +196,8 @@
   var parts = [], fxUntil = 0;
   function payoff() {
     allclear = true;
+    failed = false;
+    if (window.__srFailTimer) { clearTimeout(window.__srFailTimer); window.__srFailTimer = 0; }
     window.STAFF_ROLL_ALLCLEAR = true;
     if (DEMO) return;
     roll.classList.add("gold");
@@ -265,7 +270,7 @@
     banner.innerHTML = "TIME UP<small>最後まで流れ切った…4秒後に自動で再挑戦</small>";
     banner.style.display = "block";
     chalUpdate();
-    setTimeout(function () { location.reload(); }, 4000);
+    window.__srFailTimer = setTimeout(function () { if (!allclear) location.reload(); }, 4000);
   }
 
   function ctxOf(i) { return stations[i].querySelector("canvas").getContext("2d"); }
@@ -1411,7 +1416,58 @@
     return g;
   }
 
-  var MAKERS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16];
+
+  /* 17 money brothers sp: simple coin grab, tap the bill = reset */
+  function g17(i) {
+    var g = base(i), got = 0, NEED = 5, item = null, aiLock = null;
+    function spawn() {
+      var bad = got > 0 && drand() < .4;
+      item = { x: 24 + drand() * 102, y: 22 + drand() * 96, bad: bad, life: bad ? 1.1 : 1.6 };
+    }
+    function setup() { got = 0; item = null; aiLock = null; g.t = 0; g.aiT = 0; spawn(); }
+    g.reset = function () { setup(); };
+    g.label = function () { return "GET " + got + "/" + NEED; };
+    g.update = function (dt) {
+      if (g.cleared || !item) return;
+      item.life -= dt;
+      if (item.life <= 0) { if (!item.bad) { resetGame(i); return; } spawn(); aiLock = null; }
+    };
+    g.down = function (x, y) {
+      if (g.cleared || !item) return;
+      var hit = Math.abs(x - item.x) <= 20 && Math.abs(y - item.y) <= 20;
+      if (!hit) return;
+      if (item.bad) { resetGame(i); return; }
+      got++; g.flash = .45; stat(i, g.label());
+      if (got >= NEED) { clearGame(i); return; }
+      spawn(); aiLock = null;
+    };
+    g.draw = function (c) {
+      cls(c); c.fillStyle = "#101c14"; c.fillRect(0, 0, 150, 150);
+      c.strokeStyle = "#1f3a2a"; for (var k = 20; k < 150; k += 20) { c.beginPath(); c.moveTo(0, k); c.lineTo(150, k); c.stroke(); }
+      c.fillStyle = "#ffd76a"; c.font = "bold 9px sans-serif"; c.textAlign = "center";
+      c.fillText("GET " + got + "/" + NEED, 75, 13);
+      if (item) {
+        if (item.bad) {
+          c.fillStyle = "#e0564f"; c.fillRect(item.x - 18, item.y - 12, 36, 24);
+          c.strokeStyle = "#fff"; c.strokeRect(item.x - 18, item.y - 12, 36, 24);
+          c.fillStyle = "#fff"; c.font = "bold 10px sans-serif"; c.fillText("請求", item.x, item.y + 4);
+        } else {
+          c.fillStyle = "#ffcf3f"; c.beginPath(); c.arc(item.x, item.y, 15, 0, 7); c.fill();
+          c.strokeStyle = "#8a6a10"; c.stroke();
+          c.fillStyle = "#6b5208"; c.font = "bold 14px sans-serif"; c.fillText("¥", item.x, item.y + 5);
+        }
+      }
+      c.fillStyle = "#9fd7b4"; c.font = "8px sans-serif"; c.fillText("請求書/取り逃し = RESET", 75, 145); c.textAlign = "left";
+    };
+    g.ai = function (dt) {
+      if (g.cleared || !item) return;
+      if (item.bad) { aiLock = null; return; }
+      if (aiLock !== item) { aiLock = item; setTarget(g.i, item.x, item.y, function () { g.down(item.x, item.y); }, null); }
+    };
+    return g;
+  }
+
+  var MAKERS = [g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, g14, g15, g16, g17];
   MAKERS.forEach(function (f, i) {
     var g = f(i);
     g.ctx = ctxOf(i);
@@ -1497,7 +1553,19 @@
     ov.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#000;";
     var ifr = document.createElement("iframe");
     ifr.style.cssText = "width:100%;height:100%;border:0;display:block;";
-    ifr.src = location.pathname + "?sr_demo=1";
+    ifr.name = "sr_demo";
+    var demoHtml = SR_PRISTINE_HTML.replace(/<head([^>]*)>/i, '<head$1><script>window.__SR_DEMO=1;<\/script>');
+    var usedBlob = false;
+    try {
+      var bu = URL.createObjectURL(new Blob([demoHtml], { type: "text/html" }));
+      ifr.src = bu; usedBlob = true;
+      setTimeout(function () { try { URL.revokeObjectURL(bu); } catch (e0) {} }, 60000);
+    } catch (e) { usedBlob = false; }
+    if (!usedBlob) {
+      try { ifr.srcdoc = demoHtml; } catch (e1) {
+        try { var d = ifr.contentDocument || (ifr.contentWindow && ifr.contentWindow.document); d.open(); d.write(demoHtml); d.close(); } catch (e2) {}
+      }
+    }
     demoFrame = ifr;
     try { ifr.focus(); } catch (e) {}
     ifr.addEventListener("load", function () { try { ifr.contentWindow.focus(); } catch (e) {} });
@@ -1804,8 +1872,9 @@
   roll.addEventListener("animationend", function () {
     if (plain) { ended = true; return; }
     if (DEMO) { ended = true; return; }
-    if (!allclear) failOut();
-    else ended = true;
+    if (allclear) { ended = true; return; }
+    if (clearedCount() >= games.length) { payoff(); return; }
+    failOut();
   });
 
   var last = performance.now();
@@ -1850,6 +1919,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e119badf9ed4a7',t:'MTc5MjU5NDQ5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
