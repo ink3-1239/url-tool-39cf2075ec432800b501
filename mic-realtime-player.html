@@ -768,6 +768,10 @@
     display: none;
   }
   .url-viewer.expanded .panel-content { display: block; }
+  .url-viewer-actions {
+    display: flex;
+    gap: 8px;
+  }
   .url-header {
     display: flex;
     gap: 10px;
@@ -874,6 +878,49 @@
     font-size: 0.8rem;
     color: var(--text-dim);
     margin-top: 8px;
+  }
+
+  /* ========== URL Viewer Fullscreen ========== */
+  #urlIframeWrap:fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    z-index: 2147483647 !important;
+    background: #000;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  #urlIframeWrap:fullscreen iframe {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+  }
+  #urlIframeWrap:fullscreen .url-viewer-actions,
+  #urlIframeWrap:fullscreen #closeUrlBtn,
+  #urlIframeWrap:fullscreen .field-hint {
+    position: absolute !important;
+    top: 16px;
+    left: 16px;
+    z-index: 2147483648 !important;
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff !important;
+  }
+  #urlIframeWrap:fullscreen #closeUrlBtn {
+    left: auto !important;
+    right: 16px !important;
+    top: 16px !important;
+  }
+  #urlIframeWrap:fullscreen .field-hint {
+    position: static !important;
+    margin-top: 14px !important;
+    color: #aaa !important;
+    text-align: center;
+    max-width: 600px;
   }
 </style>
 </head>
@@ -983,7 +1030,9 @@
     <section class="panel url-viewer expanded" id="urlViewerPanel">
       <div class="collapse-bar" onclick="toggleUrlViewer()">
         <span>🌐 ブラウザビューア（裏でマイク出力を継続）</span>
-        <span id="urlViewerToggle">▲</span>
+        <div class="url-viewer-actions">
+          <button class="btn btn-sm" id="urlFullscreenBtn" title="ビューアを全画面表示">⛶ 全画面</button>
+        </div>
       </div>
       <div class="panel-content">
         <div class="url-header">
@@ -992,7 +1041,7 @@
         </div>
         <div class="url-iframe-wrap" id="urlIframeWrap">
           <button class="btn btn-sm" id="closeUrlBtn">✕ 閉じてVoiceBridgeに戻る</button>
-          <iframe id="urlIframe" src="about:blank" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"></iframe>
+          <iframe id="urlIframe" src="about:blank" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads" allowfullscreen></iframe>
         </div>
         <p class="field-hint" style="margin-top:10px;">※ マイク出力・エフェクトは裏で動作し続けます。一部サイトは埋め込み制限（X-Frame-Options）により表示できない場合があります。</p>
       </div>
@@ -1572,6 +1621,7 @@ let urlViewerActive = false;
     closeUrlBtn: document.getElementById('closeUrlBtn'),
     urlIframe: document.getElementById('urlIframe'),
     urlIframeWrap: document.getElementById('urlIframeWrap'),
+    urlFullscreenBtn: document.getElementById('urlFullscreenBtn'),
 
     /* Yukkuri Voice */
     yukkuriText: document.getElementById('yukkuriText'),
@@ -2527,6 +2577,34 @@ let urlViewerActive = false;
     el.closeUrlBtn.style.display = 'inline-block';
   });
 
+  /* URL Viewer 全画面制御 */
+  function toggleUrlFullscreen() {
+    if (!el.urlIframeWrap) return;
+    if (!document.fullscreenElement) {
+      el.urlIframeWrap.requestFullscreen().catch((err) => {
+        showError('全画面表示に失敗しました: ' + err.message);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  el.urlFullscreenBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // collapse-bar のクリックイベントをキャンセル
+    toggleUrlFullscreen();
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    const isFull = !!document.fullscreenElement;
+    if (isFull) {
+      el.urlFullscreenBtn.textContent = '⛶ 元に戻す';
+      el.urlFullscreenBtn.title = '全画面を解除';
+    } else {
+      el.urlFullscreenBtn.textContent = '⛶ 全画面';
+      el.urlFullscreenBtn.title = 'ビューアを全画面表示';
+    }
+  });
+
   el.closeUrlBtn.addEventListener('click', () => {
     el.urlIframe.src = 'about:blank';
     el.urlIframeWrap.style.display = 'none';
@@ -2671,5 +2749,5 @@ let urlViewerActive = false;
   });
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4f02ca6da1ec535',t:'MTc5Mjc1MjU1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
