@@ -880,6 +880,13 @@
     margin-top: 8px;
   }
 
+  /* ========== Tab Relay Panel ========== */
+  #relayPanel .toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
   /* ========== URL Viewer Fullscreen ========== */
   #urlIframeWrap:fullscreen {
     position: fixed !important;
@@ -1033,6 +1040,7 @@
         <div class="url-viewer-actions">
           <button class="btn btn-sm" id="urlFullscreenBtn" title="ビューアを全画面表示">⛶ 全画面</button>
         </div>
+        <span id="urlViewerToggle">▲</span>
       </div>
       <div class="panel-content">
         <div class="url-header">
@@ -1045,6 +1053,47 @@
         </div>
         <p class="field-hint" style="margin-top:10px;">※ マイク出力・エフェクトは裏で動作し続けます。一部サイトは埋め込み制限（X-Frame-Options）により表示できない場合があります。</p>
       </div>
+    </section>
+
+    <!-- タブ間音声中継 -->
+    <section class="panel" id="relayPanel">
+      <div class="panel-header">
+        <div class="panel-title">🔄 タブ間音声中継（別タブに音を飛ばす）</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">
+          <span>このタブの動作モード</span>
+        </label>
+        <div class="toggle-list">
+          <div class="toggle-item">
+            <div class="toggle-text">
+              <strong>送信元（このタブの音声を他のタブに届ける）</strong>
+              <span>マイク＋エフェクト適用後の音声をBroadcastChannelで中継します。http:// または https://  で開いているタブ間で動作します。</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="relaySourceToggle">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-item">
+            <div class="toggle-text">
+              <strong>受信側（他のタブから送られた音声を再生する）</strong>
+              <span>他のVoiceBridgeタブから送られた音声をこのタブのスピーカーから出力します。</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="relayReceiverToggle">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="slider-control">
+        <div class="slider-header">
+          <span class="slider-name">中継ステータス</span>
+          <span class="slider-val" id="relayStatusText">送受信: オフ</span>
+        </div>
+      </div>
+      <p class="field-hint">※ 同一オリジン（同じhttp://localhost:3000など）のタブ間でのみ動作します。file:// で開いている場合はタブ間中継は利用できません。</p>
     </section>
 
     <!-- Left Column: Devices, Volume & Noise Control -->
@@ -1576,7 +1625,15 @@ let recognition = null;
 let isTranscribing = false;
 let finalTranscript = '';
 let urlViewerActive = false;
-  let isSelfTesting = false;
+
+/* 新機能: タブ間音声中継（BroadcastChannel） */
+let relayChannel = null;
+let isRelaySource = false;
+let isRelayReceiver = false;
+let relayAudioQueue = [];
+let relayScriptNode = null;
+let relaySourceTabCount = 0;
+let isSelfTesting = false;
   let animFrameId = null;
 
   // =========================================================================
@@ -1635,6 +1692,11 @@ let urlViewerActive = false;
     transcribeClearBtn: document.getElementById('transcribeClearBtn'),
     transcribeExportBtn: document.getElementById('transcribeExportBtn'),
     transcribeOutput: document.getElementById('transcribeOutput'),
+
+    /* Tab Relay */
+    relaySourceToggle: document.getElementById('relaySourceToggle'),
+    relayReceiverToggle: document.getElementById('relayReceiverToggle'),
+    relayStatusText: document.getElementById('relayStatusText'),
 
     refreshDevicesBtn: document.getElementById('refreshDevicesBtn'),
     inputDeviceSelect: document.getElementById('inputDeviceSelect'),
@@ -2747,7 +2809,179 @@ let urlViewerActive = false;
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
+
+  /* =========================================================================
+     15. タブ間音声中継（BroadcastChannel）
+     ========================================================================= */
+  function initRelayChannel() {
+    if (!window.BroadcastChannel) {
+      el.relayStatusText.textContent = '送受信: このブラウザは非対応';
+      el.relaySourceToggle.disabled = true;
+      el.relayReceiverToggle.disabled = true;
+      return;
+    }
+    relayChannel = new BroadcastChannel('voicebridge_audio_relay');
+
+    relayChannel.onmessage = (ev) => {
+      if (!isRelayReceiver) return;
+      const data = ev.data;
+      if (!data || !data.channelData || !data.sampleRate) return;
+      // ステレオデータをキューに積む
+      relayAudioQueue.push({
+        left: new Float32Array(data.channelData[0]),
+        right: new Float32Array(data.channelData[1]),
+      });
+      // キューが大きくなりすぎたら古いものを捨てる（遅延抑制）
+      if (relayAudioQueue.length > 8) relayAudioQueue.shift();
+    };
+
+    relayChannel.onmessageerror = (ev) => {
+      console.warn('Relay message error:', ev);
+    };
+  }
+
+  function updateRelayUI() {
+    let s = '';
+    if (isRelaySource && isRelayReceiver) s = '送受信中（両方）';
+    else if (isRelaySource) s = '送信中（このタブが送信元）';
+    else if (isRelayReceiver) s = '受信中（他のタブの音声を再生）';
+    else s = '送受信: オフ';
+    el.relayStatusText.textContent = s;
+  }
+
+  function createRelayTapNode() {
+    // コンプレッサー後の最終出力をタップしてBroadcastChannelに送信
+    const tap = audioCtx.createScriptProcessor(128, 2, 2);
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0; // 出力は無音に（タップのみ）
+    tap.connect(gain).connect(audioCtx.destination);
+
+    tap.onaudioprocess = (ev) => {
+      if (!isRelaySource || !relayChannel) return;
+      const left = ev.inputBuffer.getChannelData(0);
+      const right = ev.inputBuffer.getChannelData(1);
+      // Float32Arrayをコピーして送信（BroadcastChannelはstructured cloneでコピーされる）
+      relayChannel.postMessage({
+        type: 'audio',
+        channelData: [new Float32Array(left), new Float32Array(right)],
+        sampleRate: audioCtx.sampleRate,
+        timestamp: performance.now(),
+      });
+    };
+    return tap;
+  }
+
+  function createRelayReceiverNode() {
+    // キューから音声を取り出して再生
+    const node = audioCtx.createScriptProcessor(512, 0, 2);
+    node.onaudioprocess = (ev) => {
+      const outL = ev.outputBuffer.getChannelData(0);
+      const outR = ev.outputBuffer.getChannelData(1);
+      const len = outL.length;
+
+      for (let i = 0; i < len; i++) {
+        if (relayAudioQueue.length === 0) {
+          outL[i] = 0;
+          outR[i] = 0;
+          continue;
+        }
+        const frame = relayAudioQueue[0];
+        const idx = i % frame.left.length;
+        outL[i] = frame.left[idx];
+        outR[i] = frame.right[idx];
+
+        // 1フレーム分消費したらキューからポップ（簡易的な再生位置管理）
+        // 実際にはサンプル単位で消費すべきだが、ここではブロック単位で近似
+        if (idx === frame.left.length - 1) {
+          relayAudioQueue.shift();
+        }
+      }
+    };
+    node.connect(audioCtx.destination);
+    return node;
+  }
+
+  function startRelaySource() {
+    if (!audioCtx || isRelaySource) return;
+    isRelaySource = true;
+    // buildGraphの後にrelayTapを追加
+    if (nodes.compressor) {
+      nodes.relayTap = createRelayTapNode();
+      nodes.compressor.connect(nodes.relayTap);
+    }
+    updateRelayUI();
+    saveSettings();
+  }
+
+  function stopRelaySource() {
+    isRelaySource = false;
+    if (nodes.relayTap) {
+      try { nodes.relayTap.disconnect(); } catch (_) {}
+      nodes.relayTap = null;
+    }
+    updateRelayUI();
+    saveSettings();
+  }
+
+  function startRelayReceiver() {
+    if (!audioCtx || isRelayReceiver) return;
+    isRelayReceiver = true;
+    relayScriptNode = createRelayReceiverNode();
+    updateRelayUI();
+    saveSettings();
+  }
+
+  function stopRelayReceiver() {
+    isRelayReceiver = false;
+    relayAudioQueue = [];
+    if (relayScriptNode) {
+      try { relayScriptNode.disconnect(); } catch (_) {}
+      relayScriptNode = null;
+    }
+    updateRelayUI();
+    saveSettings();
+  }
+
+  el.relaySourceToggle.addEventListener('change', () => {
+    const on = el.relaySourceToggle.checked;
+    if (on && !isRelayReceiver) {
+      // 送信元のみ有効
+      if (isRunning && audioCtx) startRelaySource();
+    } else if (!on) {
+      stopRelaySource();
+    }
+  });
+
+  el.relayReceiverToggle.addEventListener('change', () => {
+    const on = el.relayReceiverToggle.checked;
+    if (on && !isRelaySource) {
+      if (isRunning && audioCtx) startRelayReceiver();
+    } else if (!on) {
+      stopRelayReceiver();
+    }
+  });
+
+  // startAudioEngine / stopAudioEngine への統合
+  const _startAudioEngine = startAudioEngine;
+  const _stopAudioEngine = stopAudioEngine;
+  window.__vb_startAudioEngine = _startAudioEngine;
+  window.__vb_stopAudioEngine = _stopAudioEngine;
+
+  // 上書きしてリレー制御を統合
+  startAudioEngine = async function () {
+    await _startAudioEngine();
+    if (el.relaySourceToggle.checked && audioCtx) startRelaySource();
+    if (el.relayReceiverToggle.checked && audioCtx) startRelayReceiver();
+  };
+
+  stopAudioEngine = function () {
+    stopRelaySource();
+    stopRelayReceiver();
+    _stopAudioEngine();
+  };
+
+  initRelayChannel();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4f02ca6da1ec535',t:'MTc5Mjc1MjU1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4f045f3ab0562d5',t:'MTc5Mjc1MzU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
