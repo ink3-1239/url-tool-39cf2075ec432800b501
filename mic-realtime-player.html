@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceBridge Studio — リアルタイム・マイク音声出力＆ボイスエフェクト</title>
+<style>
+  :root {
+    --bg-base: #0b0e14;
+    --bg-panel: #131823;
+    --bg-card: #1a2130;
+    --bg-input: #0f131c;
+    --border: #283248;
+    --border-active: #4f8cff;
+    --text-main: #edf2f7;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-glow: rgba(59, 130, 246, 0.32);
+    --live: #10b981;
+    --live-glow: rgba(16, 185, 129, 0.32);
+    --danger: #ef4444;
+    --danger-glow: rgba(239, 68, 68, 0.32);
+    --warn: #f59e0b;
+    --purple: #8b5cf6;
+    --radius-lg: 16px;
+    --radius-md: 11px;
+    --radius-sm: 8px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    background: radial-gradient(circle at 15% 0%, #162038 0%, var(--bg-base) 52%);
+    color: var(--text-main);
+    min-height: 100vh;
+    line-height: 1.5;
+    padding: 20px 16px 48px;
+  }
+
+  .container {
+    max-width: 1140px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px var(--accent-glow);
+    flex-shrink: 0;
+  }
+
+  .brand h1 {
+    font-size: 1.18rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .brand p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .status-pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .pill .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  .pill.is-live {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.45);
+    color: #34d399;
+  }
+
+  .pill.is-live .dot {
+    background: var(--live);
+    box-shadow: 0 0 8px var(--live);
+    animation: pulse 1.6s infinite;
+  }
+
+  .pill.is-muted {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #f87171;
+  }
+
+  .pill.is-muted .dot {
+    background: var(--danger);
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.65; }
+  }
+
+  /* Alert / Permission helper banner */
+  .banner {
+    display: none;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    color: #fecaca;
+    font-size: 0.88rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .banner.show {
+    display: flex;
+  }
+
+  .banner-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Hero Control & Visualizer Bar */
+  .hero-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .main-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    transition: all 0.16s ease;
+    user-select: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #232c40;
+    border-color: #3b4968;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-start {
+    flex: 1 1 250px;
+    font-size: 1.04rem;
+    padding: 15px 24px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    border-color: #60a5fa;
+    color: #fff;
+    box-shadow: 0 6px 20px var(--accent-glow);
+  }
+
+  .btn-start:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    border-color: #93c5fd;
+  }
+
+  .btn-start.active {
+    background: linear-gradient(135deg, #059669, #10b981);
+    border-color: #6ee7b7;
+    box-shadow: 0 6px 22px var(--live-glow);
+  }
+
+  .btn-mute {
+    flex: 1 1 190px;
+    font-size: 0.98rem;
+  }
+
+  .btn-mute.muted {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--danger);
+    color: #fca5a5;
+    box-shadow: 0 4px 16px var(--danger-glow);
+  }
+
+  .btn-test {
+    flex: 0 1 auto;
+    background: rgba(139, 92, 246, 0.14);
+    border-color: rgba(139, 92, 246, 0.45);
+    color: #ddd6fe;
+  }
+
+  .btn-test:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.26);
+    border-color: #a78bfa;
+  }
+
+  .btn-test.recording {
+    background: rgba(245, 158, 11, 0.24);
+    border-color: var(--warn);
+    color: #fde68a;
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .kbd {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* Visualizer & Level Meters */
+  .visualizer-wrap {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  @media (max-width: 820px) {
+    .visualizer-wrap {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .canvas-box {
+    position: relative;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    height: 112px;
+    overflow: hidden;
+  }
+
+  .canvas-box canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .canvas-overlay {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .meters-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .meter-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .meter-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .meter-track {
+    position: relative;
+    height: 12px;
+    background: #182030;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid #232d42;
+  }
+
+  .meter-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #10b981 0%, #34d399 65%, #f59e0b 86%, #ef4444 100%);
+    transition: width 0.04s linear;
+  }
+
+  .gate-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #fbbf24;
+    box-shadow: 0 0 6px #fbbf24;
+    pointer-events: none;
+  }
+
+  /* Two-Column Workspace Grid */
+  .workspace-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.18fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .workspace-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  /* Form controls */
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .field-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.88rem;
+    outline: none;
+    cursor: pointer;
+  }
+
+  select:focus {
+    border-color: var(--border-active);
+  }
+
+  /* Sliders */
+  .slider-control {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.83rem;
+  }
+
+  .slider-name {
+    color: var(--text-main);
+    font-weight: 500;
+  }
+
+  .slider-val {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    color: #93c5fd;
+    background: var(--bg-input);
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #232d42;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #60a5fa;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+
+  /* Toggles */
+  .toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .toggle-text strong {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .toggle-text span {
+    display: block;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+  }
+
+  .switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .switch-slider {
+    position: absolute;
+    inset: 0;
+    background: #2b354b;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .switch-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+
+  .switch input:checked + .switch-slider {
+    background: var(--accent);
+  }
+
+  .switch input:checked + .switch-slider::before {
+    transform: translateX(20px);
+  }
+
+  /* Mode Switch Tabs */
+  .mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    background: var(--bg-input);
+    padding: 5px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+
+  .mode-tab {
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.81rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .mode-tab.active {
+    background: var(--bg-card);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Presets Grid */
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  @media (max-width: 520px) {
+    .presets-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .preset-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 8px;
+    color: var(--text-main);
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    transition: all 0.15s ease;
+  }
+
+  .preset-btn:hover {
+    border-color: #4b5d82;
+    background: #222b3e;
+  }
+
+  .preset-btn.active {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+
+  .preset-emoji {
+    font-size: 1.25rem;
+  }
+
+  .preset-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .preset-sub {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+
+  .fx-sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 18px;
+  }
+
+  @media (max-width: 560px) {
+    .fx-sliders-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .fx-span-full {
+    grid-column: 1 / -1;
+  }
+
+  /* Guide Card */
+  .guide-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+  }
+
+  .guide-card summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .guide-card summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .guide-steps {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 820px) {
+    .guide-steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .step-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-size: 0.83rem;
+    color: var(--text-muted);
+  }
+
+  .step-box strong {
+    display: block;
+    color: var(--text-main);
+    font-size: 0.88rem;
+    margin-bottom: 5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>
+      </div>
+      <div>
+        <h1>VoiceBridge Studio</h1>
+        <p>マイク音声をリアルタイムでPC音声へ出力（画面＆システム音声共有対応）</p>
+      </div>
+    </div>
+
+    <div class="status-pills">
+      <div class="pill" id="statusPill">
+        <span class="dot"></span>
+        <span id="statusText">停止中</span>
+      </div>
+      <div class="pill" id="gatePill" title="ノイズゲートの状態">
+        <span id="gateStatusText">GATE: 待機</span>
+      </div>
+      <div class="pill" title="マイク入力からPC出力までの推定遅延時間">
+        <span id="latencyText">遅延: -- ms</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Permission / iframe helper banner -->
+  <div class="banner" id="errorBanner">
+    <div id="errorMessage">マイクへのアクセスが許可されていないか、埋め込み画面の制限によりブロックされました。</div>
+    <div class="banner-actions">
+      <button class="btn btn-sm" id="openNewTabBtn" style="background:#2563eb;border-color:#60a5fa;color:#fff;">
+        ↗ 新しいタブで開く（推奨）
+      </button>
+      <button class="btn btn-sm" id="retryMicBtn">再試行</button>
+    </div>
+  </div>
+
+  <!-- Main Control & Visualizer -->
+  <section class="hero-panel">
+    <div class="main-controls">
+      <button class="btn btn-start" id="toggleStreamBtn">
+        <span id="toggleStreamIcon">▶</span>
+        <span id="toggleStreamLabel">マイク出力を開始する</span>
+      </button>
+
+      <button class="btn btn-mute" id="muteBtn" disabled>
+        <span id="muteIcon">🔊</span>
+        <span id="muteLabel">出力オン</span>
+        <span class="kbd">Space</span>
+      </button>
+
+      <button class="btn btn-test" id="selfTestBtn" disabled title="エフェクト適用後の声を3秒間録音して確認します（録音中はスピーカー出力を自動ミュートできます）">
+        <span id="selfTestLabel">🎧 3秒声チェック</span>
+      </button>
+    </div>
+
+    <div class="visualizer-wrap">
+      <div class="canvas-box">
+        <div class="canvas-overlay">
+          <span id="vizModeLabel">リアルタイム出力波形 / スペクトラム</span>
+          <span id="presetBadge">プリセット: 🎙️ ノーマル</span>
+        </div>
+        <canvas id="visualizerCanvas"></canvas>
+      </div>
+
+      <div class="meters-box">
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>マイク入力レベル（黄線＝ノイズゲート境界）</span>
+            <span id="inDbText">-∞ dB</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill" id="inMeterFill"></div>
+            <div class="gate-marker" id="gateMarker" style="left: 15%;"></div>
+          </div>
+        </div>
+
+        <div class="meter-row">
+          <div class="meter-label">
+            <span>PC出力レベル（共有に乗る音量）</span>
+            <span id="outDbText">-∞ dB</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill" id="outMeterFill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Workspace Two-Column Grid -->
+  <div class="workspace-grid">
+    <!-- Left Column: Devices, Volume & Noise Control -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🎛️ 入出力デバイス ＆ ノイズ対策</div>
+        <button class="btn btn-sm" id="refreshDevicesBtn" title="接続されているマイク・スピーカーを再取得">🔄 デバイス更新</button>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="inputDeviceSelect">
+          <span>🎤 使用するマイク（入力）</span>
+        </label>
+        <select id="inputDeviceSelect">
+          <option value="default">既定のマイク（開始時に一覧を取得します）</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="outputDeviceSelect">
+          <span>🔈 出力先デバイス（PC音声の流し先）</span>
+        </label>
+        <select id="outputDeviceSelect">
+          <option value="default">既定のスピーカー / ヘッドホン（システム音声）</option>
+        </select>
+        <span class="field-hint" id="sinkSupportHint">※ 画面共有ツールが拾っているPCの再生デバイス（イヤホン・ヘッドホン推奨）を選択してください。</span>
+      </div>
+
+      <div class="slider-control">
+        <div class="slider-header">
+          <span class="slider-name">マイク入力ブースト（声の大きさ）</span>
+          <span class="slider-val" id="inputGainVal" data-reset="inputGainSlider">100%</span>
+        </div>
+        <input type="range" id="inputGainSlider" min="0" max="300" step="1" value="100">
+      </div>
+
+      <div class="slider-control">
+        <div class="slider-header">
+          <span class="slider-name">PC出力マスター音量</span>
+          <span class="slider-val" id="outputGainVal" data-reset="outputGainSlider">100%</span>
+        </div>
+        <input type="range" id="outputGainSlider" min="0" max="150" step="1" value="100">
+      </div>
+
+      <div class="slider-control">
+        <div class="slider-header">
+          <span class="slider-name">ノイズゲート（喋っていない時の雑音カット）</span>
+          <span class="slider-val" id="gateThresholdVal" data-reset="gateThresholdSlider">-52 dB</span>
+        </div>
+        <input type="range" id="gateThresholdSlider" min="-90" max="-15" step="1" value="-52">
+        <span class="field-hint">一番左（-90 dB）でオフ。無音時にメーターの緑バーが黄線より左に収まる位置に調整すると環境音が消えます。</span>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">発言モード切替</span>
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="toggle" id="modeToggleBtn">常時出力（Spaceでミュート）</button>
+          <button class="mode-tab" data-mode="ptt" id="modePttBtn">Push-to-Talk（Space長押し中のみ）</button>
+        </div>
+      </div>
+
+      <div class="toggle-list">
+        <div class="toggle-item">
+          <div class="toggle-text">
+            <strong>エコーキャンセリング（ハウリング防止）</strong>
+            <span>スピーカーから音を出す時はON必須。イヤホン着用時はOFFにすると高音質になります</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="echoCancelToggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <div class="toggle-text">
+            <strong>ブラウザノイズ抑制</strong>
+            <span>キーボード打鍵音やPCファン音を自動で低減します</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="noiseSuppressToggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <div class="toggle-text">
+            <strong>ローカットフィルター（85Hz以下カット）</strong>
+            <span>エアコンの低い唸り音やマイクの吹かれ音（ボフッ）を除去</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="lowCutToggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Voice Changer & Audio FX Studio -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">✨ ボイスチェンジャー ＆ エフェクト</div>
+        <button class="btn btn-sm" id="resetFxBtn">エフェクトをリセット</button>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">ワンクリック・ボイスプリセット</span>
+        <div class="presets-grid" id="presetsGrid">
+          <button class="preset-btn active" data-preset="normal">
+            <span class="preset-emoji">🎙️</span>
+            <span class="preset-label">ノーマル</span>
+            <span class="preset-sub">素の声・無加工</span>
+          </button>
+          <button class="preset-btn" data-preset="clear">
+            <span class="preset-emoji">💎</span>
+            <span class="preset-label">クリア配信</span>
+            <span class="preset-sub">聞き取りやすさUP</span>
+          </button>
+          <button class="preset-btn" data-preset="high">
+            <span class="preset-emoji">🌸</span>
+            <span class="preset-label">ハイトーン</span>
+            <span class="preset-sub">高め・明るい声</span>
+          </button>
+          <button class="preset-btn" data-preset="deep">
+            <span class="preset-emoji">🔥</span>
+            <span class="preset-label">ディープ低音</span>
+            <span class="preset-sub">落ち着いた低い声</span>
+          </button>
+          <button class="preset-btn" data-preset="mascot">
+            <span class="preset-emoji">🐿️</span>
+            <span class="preset-label">マスコット</span>
+            <span class="preset-sub">アニメ風ハイピッチ</span>
+          </button>
+          <button class="preset-btn" data-preset="monster">
+            <span class="preset-emoji">👹</span>
+            <span class="preset-label">ダークボス</span>
+            <span class="preset-sub">重低音＋残響</span>
+          </button>
+          <button class="preset-btn" data-preset="robot">
+            <span class="preset-emoji">🤖</span>
+            <span class="preset-label">ロボット</span>
+            <span class="preset-sub">サイボーグ音声</span>
+          </button>
+          <button class="preset-btn" data-preset="radio">
+            <span class="preset-emoji">📻</span>
+            <span class="preset-label">無線・ラジオ</span>
+            <span class="preset-sub">トランシーバー風</span>
+          </button>
+          <button class="preset-btn" data-preset="hall">
+            <span class="preset-emoji">🎤</span>
+            <span class="preset-label">エコーホール</span>
+            <span class="preset-sub">カラオケ・大聖堂</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="fx-sliders-grid">
+        <div class="slider-control fx-span-full">
+          <div class="slider-header">
+            <span class="slider-name">🎵 声の高さ（ピッチシフト）</span>
+            <span class="slider-val" id="pitchVal" data-reset="pitchSlider">0.0 半音</span>
+          </div>
+          <input type="range" id="pitchSlider" min="-12" max="12" step="0.5" value="0">
+          <span class="field-hint">※ 数値バッジをクリックすると初期値（0.0）に戻ります。0.0の時はピッチ処理遅延ゼロで動作します。</span>
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">低音ブースト (Low EQ)</span>
+            <span class="slider-val" id="lowEqVal" data-reset="lowEqSlider">0 dB</span>
+          </div>
+          <input type="range" id="lowEqSlider" min="-12" max="12" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">声の輪郭・厚み (Mid EQ)</span>
+            <span class="slider-val" id="midEqVal" data-reset="midEqSlider">0 dB</span>
+          </div>
+          <input type="range" id="midEqSlider" min="-12" max="12" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">クリアさ・抜け感 (High EQ)</span>
+            <span class="slider-val" id="highEqVal" data-reset="highEqSlider">0 dB</span>
+          </div>
+          <input type="range" id="highEqSlider" min="-12" max="12" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">リバーブ（部屋の響き）</span>
+            <span class="slider-val" id="reverbVal" data-reset="reverbSlider">0%</span>
+          </div>
+          <input type="range" id="reverbSlider" min="0" max="100" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">エコー（やまびこ）</span>
+            <span class="slider-val" id="echoVal" data-reset="echoSlider">0%</span>
+          </div>
+          <input type="range" id="echoSlider" min="0" max="80" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">ロボット変調</span>
+            <span class="slider-val" id="robotVal" data-reset="robotSlider">0%</span>
+          </div>
+          <input type="range" id="robotSlider" min="0" max="100" step="1" value="0">
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span class="slider-name">無線・ローファイ感</span>
+            <span class="slider-val" id="radioVal" data-reset="radioSlider">0%</span>
+          </div>
+          <input type="range" id="radioSlider" min="0" max="100" step="1" value="0">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Step-by-Step Guide for Screen & Audio Sharing -->
+  <details class="guide-card" open>
+    <summary>
+      <span>💡 画面＆システム音声共有ツールで声をきれいに流すコツ（クリックで開閉）</span>
+      <span style="color:var(--text-dim);font-size:0.8rem;">▼</span>
+    </summary>
+    <div class="guide-steps">
+      <div class="step-box">
+        <strong>① イヤホン・ヘッドホンの使用がおすすめ</strong>
+        このツールはマイクの音をそのままPCの再生音（システム音声）として出力します。イヤホンを使うと自分の声がマイクに再び入る「ハウリング」を完全に防げ、エコーキャンセリングをOFFにして最高音質で流せます。
+      </div>
+      <div class="step-box">
+        <strong>② 画面共有ソフトの「PC音声共有」をONに</strong>
+        お使いの画面共有ツール側で「システムの音声を共有（PC音声を含める）」をONにします。このページから流れるあなたの声が、ゲーム音や動画音と一緒にそのまま相手へ届きます。
+      </div>
+      <div class="step-box">
+        <strong>③ 共有ソフト自体のマイクはOFF（二重音声防止）</strong>
+        もし共有ツール側にもマイク通話機能がある場合、共有ツール側のマイクはミュートにしておくと「元の声」と「PC音声経由の声」が二重に重なるのを防げます。
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- Fallback audio element for browsers without AudioContext.setSinkId -->
+<audio id="fallbackSinkAudio" autoplay playsinline style="display:none;"></audio>
+
+<script>
+(() => {
+  'use strict';
+
+  // =========================================================================
+  // 1. Custom AudioWorklet Processor (Noise Gate + Low-Latency Pitch Shifter + FX)
+  // =========================================================================
+  const WORKLET_CODE = `
+    class VoiceStudioProcessor extends AudioWorkletProcessor {
+      static get parameterDescriptors() {
+        return [
+          { name: 'pitchSemitones', defaultValue: 0, minValue: -12, maxValue: 12, automationRate: 'k-rate' },
+          { name: 'gateThresholdDb', defaultValue: -52, minValue: -95, maxValue: 0, automationRate: 'k-rate' },
+          { name: 'robotAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+          { name: 'radioAmount', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' }
+        ];
+      }
+
+      constructor() {
+        super();
+        this.bufSize = 4096;
+        this.bufMask = this.bufSize - 1;
+        this.grainSize = 1536; // ~32ms at 48kHz: clean pitch shifting with low conversational latency
+        this.circBuf = new Float32Array(this.bufSize);
+        this.writeIdx = 0;
+        this.phase = 0.0;
+
+        // Envelope & smooth gate state
+        this.env = 0.0;
+        this.gateGain = 1.0;
+        this.attackCoeff = Math.exp(-1.0 / (0.002 * sampleRate));
+        this.releaseCoeff = Math.exp(-1.0 / (0.085 * sampleRate));
+        this.gateSmooth = Math.exp(-1.0 / (0.005 * sampleRate));
+
+        // Robot & Radio FX state
+        this.robotPhase1 = 0.0;
+        this.robotPhase2 = 0.0;
+        this.holdCounter = 0;
+        this.heldSample = 0.0;
+
+        this.reportCounter = 0;
+      }
+
+      process(inputs, outputs, parameters) {
+        const input = inputs[0];
+        const output = outputs[0];
+        if (!output || output.length === 0) return true;
+
+        const inCh = (input && input.length > 0) ? input[0] : null;
+        const outCh0 = output[0];
+        const len = outCh0.length;
+
+        const pitchSemi = parameters.pitchSemitones[0];
+        const gateDb = parameters.gateThresholdDb[0];
+        const robotAmt = parameters.robotAmount[0];
+        const radioAmt = parameters.radioAmount[0];
+
+        const gateActive = gateDb > -89.5;
+        const threshOpen = Math.pow(10, gateDb / 20);
+        const threshClose = threshOpen * 0.72; // Hysteresis prevents chattering
+
+        const usePitch = Math.abs(pitchSemi) >= 0.05;
+        const pitchRatio = usePitch ? Math.pow(2.0, pitchSemi / 12.0) : 1.0;
+        const phaseDelta = (1.0 - pitchRatio) / this.grainSize;
+
+        const robInc1 = (2.0 * Math.PI * 58.0) / sampleRate;
+        const robInc2 = (2.0 * Math.PI * 116.0) / sampleRate;
+        const downsampleSteps = radioAmt > 0.01 ? Math.max(1, Math.round(1 + radioAmt * 5)) : 1;
+        const drive = 1.0 + radioAmt * 7.5;
+
+        let gateIsOpen = this.gateGain > 0.5;
+
+        for (let i = 0; i < len; i++) {
+          let x = inCh ? inCh[i] : 0.0;
+
+          // 1. Noise Gate with smooth envelope
+          const absX = Math.abs(x);
+          if (absX > this.env) {
+            this.env = this.attackCoeff * this.env + (1.0 - this.attackCoeff) * absX;
+          } else {
+            this.env = this.releaseCoeff * this.env + (1.0 - this.releaseCoeff) * absX;
+          }
+
+          if (gateActive) {
+            if (!gateIsOpen && this.env >= threshOpen) gateIsOpen = true;
+            else if (gateIsOpen && this.env < threshClose) gateIsOpen = false;
+          } else {
+            gateIsOpen = true;
+          }
+
+          const targetGate = gateIsOpen ? 1.0 : 0.0;
+          this.gateGain = this.gateSmooth * this.gateGain + (1.0 - this.gateSmooth) * targetGate;
+          x *= this.gateGain;
+
+          // Write gated input to circular buffer even when bypassed so toggling pitch is seamless
+          this.circBuf[this.writeIdx] = x;
+
+          // 2. Dual-Tap Equal-Power Crossfade Pitch Shifter
+          let y = x;
+          if (usePitch) {
+            this.phase += phaseDelta;
+            this.phase -= Math.floor(this.phase);
+
+            const p1 = this.phase;
+            const p2 = p1 >= 0.5 ? p1 - 0.5 : p1 + 0.5;
+
+            const d1 = p1 * this.grainSize + 1.0;
+            const d2 = p2 * this.grainSize + 1.0;
+
+            const r1 = this.writeIdx - d1;
+            const r1i = Math.floor(r1);
+            const f1 = r1 - r1i;
+            const s1 = this.circBuf[r1i & this.bufMask] * (1.0 - f1) + this.circBuf[(r1i + 1) & this.bufMask] * f1;
+
+            const r2 = this.writeIdx - d2;
+            const r2i = Math.floor(r2);
+            const f2 = r2 - r2i;
+            const s2 = this.circBuf[r2i & this.bufMask] * (1.0 - f2) + this.circBuf[(r2i + 1) & this.bufMask] * f2;
+
+            const w1 = Math.sin(Math.PI * p1);
+            const w2 = Math.sin(Math.PI * p2);
+            y = s1 * w1 + s2 * w2;
+          }
+
+          this.writeIdx = (this.writeIdx + 1) & this.bufMask;
+
+          // 3. Robot / Sci-Fi Ring Modulator
+          if (robotAmt > 0.005) {
+            this.robotPhase1 += robInc1;
+            if (this.robotPhase1 > 2.0 * Math.PI) this.robotPhase1 -= 2.0 * Math.PI;
+            this.robotPhase2 += robInc2;
+            if (this.robotPhase2 > 2.0 * Math.PI) this.robotPhase2 -= 2.0 * Math.PI;
+            const carrier = 0.72 * Math.sin(this.robotPhase1) + 0.28 * Math.sin(this.robotPhase2);
+            const modded = y * carrier * 1.45;
+            y = y * (1.0 - robotAmt) + modded * robotAmt;
+          }
+
+          // 4. Radio / Walkie-Talkie Saturation & Lo-Fi Sample Hold
+          if (radioAmt > 0.005) {
+            this.holdCounter++;
+            if (this.holdCounter >= downsampleSteps) {
+              this.holdCounter = 0;
+              this.heldSample = Math.tanh(y * drive) / Math.tanh(drive);
+            }
+            y = y * (1.0 - radioAmt) + this.heldSample * radioAmt;
+          }
+
+          outCh0[i] = y;
+        }
+
+        // Copy processed mono voice cleanly to all output channels (Stereo left & right)
+        for (let ch = 1; ch < output.length; ch++) {
+          output[ch].set(outCh0);
+        }
+
+        this.reportCounter += len;
+        if (this.reportCounter >= 2048) {
+          this.reportCounter = 0;
+          this.port.postMessage({ gateOpen: gateIsOpen, gateActive });
+        }
+
+        return true;
+      }
+    }
+    registerProcessor('voice-studio-processor', VoiceStudioProcessor);
+  `;
+
+  // =========================================================================
+  // 2. Presets Definition
+  // =========================================================================
+  const PRESETS = {
+    normal:  { label: '🎙️ ノーマル',     pitch: 0,    low: 0,   mid: 0,  high: 0,  reverb: 0,  echo: 0,  robot: 0,  radio: 0 },
+    clear:   { label: '💎 クリア配信',   pitch: 0,    low: -2,  mid: 3,  high: 5,  reverb: 6,  echo: 0,  robot: 0,  radio: 0 },
+    high:    { label: '🌸 ハイトーン',   pitch: 4.0,  low: -4,  mid: 2,  high: 5,  reverb: 10, echo: 0,  robot: 0,  radio: 0 },
+    deep:    { label: '🔥 ディープ低音', pitch: -3.5, low: 5,   mid: 2,  high: 1,  reverb: 8,  echo: 0,  robot: 0,  radio: 0 },
+    mascot:  { label: '🐿️ マスコット',   pitch: 7.5,  low: -6,  mid: 3,  high: 4,  reverb: 5,  echo: 0,  robot: 0,  radio: 0 },
+    monster: { label: '👹 ダークボス',   pitch: -8.0, low: 8,   mid: -2, high: -3, reverb: 38, echo: 16, robot: 12, radio: 0 },
+    robot:   { label: '🤖 ロボット',     pitch: -1.0, low: -2,  mid: 5,  high: 3,  reverb: 14, echo: 8,  robot: 85, radio: 15 },
+    radio:   { label: '📻 無線・ラジオ', pitch: 0,    low: -12, mid: 10, high: -6, reverb: 0,  echo: 0,  robot: 0,  radio: 75 },
+    hall:    { label: '🎤 エコーホール', pitch: 0,    low: 1,   mid: 2,  high: 4,  reverb: 62, echo: 36, robot: 0,  radio: 0 }
+  };
+
+  // =========================================================================
+  // 3. State & Audio Nodes
+  // =========================================================================
+  let audioCtx = null;
+  let micStream = null;
+  let workletLoaded = false;
+
+  let nodes = {
+    source: null,
+    inputGain: null,
+    inAnalyser: null,
+    lowCutFilter: null,
+    voiceWorklet: null,
+    lowEq: null,
+    midEq: null,
+    highEq: null,
+    dryGain: null,
+    delayNode: null,
+    delayFeedback: null,
+    delayFilter: null,
+    echoWetGain: null,
+    convolver: null,
+    reverbWetGain: null,
+    compressor: null,
+    masterGain: null,
+    muteGate: null,
+    outAnalyser: null,
+    streamDest: null,
+    testDest: null
+  };
+
+  let isRunning = false;
+  let isMuted = false;
+  let talkMode = 'toggle'; // 'toggle' | 'ptt'
+  let spaceHeld = false;
+  let isSelfTesting = false;
+  let animFrameId = null;
+
+  // =========================================================================
+  // 4. DOM References
+  // =========================================================================
+  const el = {
+    statusPill: document.getElementById('statusPill'),
+    statusText: document.getElementById('statusText'),
+    gateStatusText: document.getElementById('gateStatusText'),
+    latencyText: document.getElementById('latencyText'),
+    errorBanner: document.getElementById('errorBanner'),
+    errorMessage: document.getElementById('errorMessage'),
+    openNewTabBtn: document.getElementById('openNewTabBtn'),
+    retryMicBtn: document.getElementById('retryMicBtn'),
+
+    toggleStreamBtn: document.getElementById('toggleStreamBtn'),
+    toggleStreamIcon: document.getElementById('toggleStreamIcon'),
+    toggleStreamLabel: document.getElementById('toggleStreamLabel'),
+    muteBtn: document.getElementById('muteBtn'),
+    muteIcon: document.getElementById('muteIcon'),
+    muteLabel: document.getElementById('muteLabel'),
+    selfTestBtn: document.getElementById('selfTestBtn'),
+    selfTestLabel: document.getElementById('selfTestLabel'),
+
+    canvas: document.getElementById('visualizerCanvas'),
+    presetBadge: document.getElementById('presetBadge'),
+    inDbText: document.getElementById('inDbText'),
+    outDbText: document.getElementById('outDbText'),
+    inMeterFill: document.getElementById('inMeterFill'),
+    outMeterFill: document.getElementById('outMeterFill'),
+    gateMarker: document.getElementById('gateMarker'),
+
+    refreshDevicesBtn: document.getElementById('refreshDevicesBtn'),
+    inputDeviceSelect: document.getElementById('inputDeviceSelect'),
+    outputDeviceSelect: document.getElementById('outputDeviceSelect'),
+    sinkSupportHint: document.getElementById('sinkSupportHint'),
+    fallbackSinkAudio: document.getElementById('fallbackSinkAudio'),
+
+    inputGainSlider: document.getElementById('inputGainSlider'),
+    inputGainVal: document.getElementById('inputGainVal'),
+    outputGainSlider: document.getElementById('outputGainSlider'),
+    outputGainVal: document.getElementById('outputGainVal'),
+    gateThresholdSlider: document.getElementById('gateThresholdSlider'),
+    gateThresholdVal: document.getElementById('gateThresholdVal'),
+
+    modeToggleBtn: document.getElementById('modeToggleBtn'),
+    modePttBtn: document.getElementById('modePttBtn'),
+
+    echoCancelToggle: document.getElementById('echoCancelToggle'),
+    noiseSuppressToggle: document.getElementById('noiseSuppressToggle'),
+    lowCutToggle: document.getElementById('lowCutToggle'),
+
+    presetsGrid: document.getElementById('presetsGrid'),
+    resetFxBtn: document.getElementById('resetFxBtn'),
+
+    pitchSlider: document.getElementById('pitchSlider'),
+    pitchVal: document.getElementById('pitchVal'),
+    lowEqSlider: document.getElementById('lowEqSlider'),
+    lowEqVal: document.getElementById('lowEqVal'),
+    midEqSlider: document.getElementById('midEqSlider'),
+    midEqVal: document.getElementById('midEqVal'),
+    highEqSlider: document.getElementById('highEqSlider'),
+    highEqVal: document.getElementById('highEqVal'),
+    reverbSlider: document.getElementById('reverbSlider'),
+    reverbVal: document.getElementById('reverbVal'),
+    echoSlider: document.getElementById('echoSlider'),
+    echoVal: document.getElementById('echoVal'),
+    robotSlider: document.getElementById('robotSlider'),
+    robotVal: document.getElementById('robotVal'),
+    radioSlider: document.getElementById('radioSlider'),
+    radioVal: document.getElementById('radioVal')
+  };
+
+  // =========================================================================
+  // 5. Synthetic Stereo Reverb Impulse Response Generator
+  // =========================================================================
+  function createReverbImpulse(ctx, durationSec = 2.1, decay = 2.6) {
+    const rate = ctx.sampleRate;
+    const length = Math.floor(rate * durationSec);
+    const impulse = ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const channelData = impulse.getChannelData(ch);
+      let prev = 0;
+      for (let i = 0; i < length; i++) {
+        const t = i / length;
+        const env = Math.pow(1 - t, decay);
+        const white = Math.random() * 2 - 1;
+        // Gentle damping so reverb sounds warm & natural rather than harsh
+        prev = prev * 0.42 + white * 0.58;
+        channelData[i] = prev * env * 0.85;
+      }
+    }
+    return impulse;
+  }
+
+  // =========================================================================
+  // 6. Device Enumeration & Output Sink Routing
+  // =========================================================================
+  async function updateDeviceLists() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const prevIn = el.inputDeviceSelect.value;
+      const prevOut = el.outputDeviceSelect.value;
+
+      el.inputDeviceSelect.innerHTML = '';
+      el.outputDeviceSelect.innerHTML = '';
+
+      let micCount = 0;
+      let spkCount = 0;
+
+      devices.forEach((d) => {
+        if (d.kind === 'audioinput') {
+          micCount++;
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `マイク ${micCount}`;
+          el.inputDeviceSelect.appendChild(opt);
+        } else if (d.kind === 'audiooutput') {
+          spkCount++;
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `スピーカー / 出力 ${spkCount}`;
+          el.outputDeviceSelect.appendChild(opt);
+        }
+      });
+
+      if (micCount === 0) {
+        const opt = document.createElement('option');
+        opt.value = 'default';
+        opt.textContent = '既定のマイク';
+        el.inputDeviceSelect.appendChild(opt);
+      }
+
+      if (spkCount === 0) {
+        const opt = document.createElement('option');
+        opt.value = 'default';
+        opt.textContent = '既定のシステム出力（OS設定に従う）';
+        el.outputDeviceSelect.appendChild(opt);
+      }
+
+      if ([...el.inputDeviceSelect.options].some(o => o.value === prevIn)) {
+        el.inputDeviceSelect.value = prevIn;
+      }
+      if ([...el.outputDeviceSelect.options].some(o => o.value === prevOut)) {
+        el.outputDeviceSelect.value = prevOut;
+      }
+    } catch (err) {
+      console.warn('Device enumeration warning:', err);
+    }
+  }
+
+  async function applyOutputDevice() {
+    if (!audioCtx || !nodes.outAnalyser) return;
+    const sinkId = el.outputDeviceSelect.value;
+
+    // Disconnect previous final output connections safely
+    try { nodes.outAnalyser.disconnect(); } catch (_) {}
+    if (!el.fallbackSinkAudio.paused) {
+      el.fallbackSinkAudio.pause();
+      el.fallbackSinkAudio.srcObject = null;
+    }
+
+    const targetSink = (sinkId === 'default') ? '' : sinkId;
+
+    // Method 1: Native low-latency AudioContext.setSinkId (Chrome 110+ / Edge)
+    if (typeof audioCtx.setSinkId === 'function') {
+      try {
+        await audioCtx.setSinkId(targetSink);
+        nodes.outAnalyser.connect(audioCtx.destination);
+        return;
+      } catch (err) {
+        console.warn('AudioContext.setSinkId failed, falling back to audio element:', err);
+      }
+    }
+
+    // Method 2: HTMLAudioElement.setSinkId fallback when a non-default device is chosen
+    if (targetSink && typeof el.fallbackSinkAudio.setSinkId === 'function') {
+      try {
+        if (!nodes.streamDest) {
+          nodes.streamDest = audioCtx.createMediaStreamDestination();
+        }
+        nodes.outAnalyser.connect(nodes.streamDest);
+        el.fallbackSinkAudio.srcObject = nodes.streamDest.stream;
+        await el.fallbackSinkAudio.setSinkId(targetSink);
+        await el.fallbackSinkAudio.play();
+        return;
+      } catch (err) {
+        console.warn('HTMLAudioElement.setSinkId failed, using default destination:', err);
+      }
+    }
+
+    // Method 3: Direct default system output
+    nodes.outAnalyser.connect(audioCtx.destination);
+  }
+
+  // =========================================================================
+  // 7. Build & Start Real-time Audio Pipeline
+  // =========================================================================
+  async function startAudioEngine() {
+    el.errorBanner.classList.remove('show');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('お使いのブラウザ環境ではマイク取得APIが利用できません。新しいタブで開くか、Chrome / Edge で開いてください。');
+      return;
+    }
+
+    try {
+      if (!audioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioCtx({ latencyHint: 'interactive' });
+      }
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      if (!workletLoaded) {
+        const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        await audioCtx.audioWorklet.addModule(blobUrl);
+        URL.revokeObjectURL(blobUrl);
+        workletLoaded = true;
+      }
+
+      const selectedMic = el.inputDeviceSelect.value;
+      const audioConstraints = {
+        echoCancellation: el.echoCancelToggle.checked,
+        noiseSuppression: el.noiseSuppressToggle.checked,
+        autoGainControl: false,
+        latency: 0
+      };
+      if (selectedMic && selectedMic !== 'default') {
+        audioConstraints.deviceId = { exact: selectedMic };
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+      micStream = stream;
+
+      // Refresh device labels now that permission is granted
+      await updateDeviceLists();
+
+      buildGraph(stream);
+      await applyOutputDevice();
+
+      isRunning = true;
+      if (talkMode === 'ptt') {
+        isMuted = !spaceHeld;
+      } else {
+        isMuted = false;
+      }
+      updateAllParams();
+      updateUIState();
+      startVisualizerLoop();
+    } catch (err) {
+      console.error('Microphone start error:', err);
+      stopAudioEngine();
+      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+        showError('マイクの権限が拒否されたか、プレビュー枠の制限でブロックされました。右の「↗ 新しいタブで開く」を押すとマイク許可ダイアログが表示されてすぐに使えます。');
+      } else if (err && err.name === 'OverconstrainedError') {
+        el.inputDeviceSelect.value = 'default';
+        showError('選択されたマイクが見つかりませんでした。「再試行」を押すと既定のマイクで開始します。');
+      } else {
+        showError(`マイクの開始に失敗しました: ${err ? err.message : '不明なエラー'}`);
+      }
+    }
+  }
+
+  function buildGraph(stream) {
+    cleanupGraphNodes();
+
+    nodes.source = audioCtx.createMediaStreamSource(stream);
+
+    nodes.inputGain = audioCtx.createGain();
+    nodes.inAnalyser = audioCtx.createAnalyser();
+    nodes.inAnalyser.fftSize = 1024;
+    nodes.inAnalyser.smoothingTimeConstant = 0.65;
+
+    nodes.lowCutFilter = audioCtx.createBiquadFilter();
+    nodes.lowCutFilter.type = 'highpass';
+    nodes.lowCutFilter.Q.value = 0.707;
+
+    nodes.voiceWorklet = new AudioWorkletNode(audioCtx, 'voice-studio-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2]
+    });
+
+    nodes.voiceWorklet.port.onmessage = (ev) => {
+      if (!isRunning) return;
+      const { gateOpen, gateActive } = ev.data;
+      if (!gateActive) {
+        el.gateStatusText.textContent = 'GATE: オフ';
+      } else {
+        el.gateStatusText.textContent = gateOpen ? 'GATE: 通過中 🟢' : 'GATE: 雑音遮断中';
+      }
+    };
+
+    nodes.lowEq = audioCtx.createBiquadFilter();
+    nodes.lowEq.type = 'lowshelf';
+    nodes.lowEq.frequency.value = 180;
+
+    nodes.midEq = audioCtx.createBiquadFilter();
+    nodes.midEq.type = 'peaking';
+    nodes.midEq.frequency.value = 1450;
+    nodes.midEq.Q.value = 0.9;
+
+    nodes.highEq = audioCtx.createBiquadFilter();
+    nodes.highEq.type = 'highshelf';
+    nodes.highEq.frequency.value = 4200;
+
+    // Dry / Delay / Reverb parallel send buses
+    nodes.dryGain = audioCtx.createGain();
+    nodes.dryGain.gain.value = 1.0;
+
+    nodes.delayNode = audioCtx.createDelay(1.0);
+    nodes.delayNode.delayTime.value = 0.21;
+    nodes.delayFeedback = audioCtx.createGain();
+    nodes.delayFeedback.gain.value = 0.36;
+    nodes.delayFilter = audioCtx.createBiquadFilter();
+    nodes.delayFilter.type = 'lowpass';
+    nodes.delayFilter.frequency.value = 2600;
+    nodes.echoWetGain = audioCtx.createGain();
+
+    nodes.convolver = audioCtx.createConvolver();
+    nodes.convolver.buffer = createReverbImpulse(audioCtx);
+    nodes.reverbWetGain = audioCtx.createGain();
+
+    // Limiter / Safety Compressor to prevent clipping when boosting or adding FX
+    nodes.compressor = audioCtx.createDynamicsCompressor();
+    nodes.compressor.threshold.value = -5;
+    nodes.compressor.knee.value = 10;
+    nodes.compressor.ratio.value = 8;
+    nodes.compressor.attack.value = 0.003;
+    nodes.compressor.release.value = 0.14;
+
+    nodes.testDest = audioCtx.createMediaStreamDestination();
+    nodes.masterGain = audioCtx.createGain();
+    nodes.muteGate = audioCtx.createGain();
+
+    nodes.outAnalyser = audioCtx.createAnalyser();
+    nodes.outAnalyser.fftSize = 1024;
+    nodes.outAnalyser.smoothingTimeConstant = 0.72;
+
+    // Connect main serial chain
+    nodes.source
+      .connect(nodes.inputGain)
+      .connect(nodes.inAnalyser)
+      .connect(nodes.lowCutFilter)
+      .connect(nodes.voiceWorklet)
+      .connect(nodes.lowEq)
+      .connect(nodes.midEq)
+      .connect(nodes.highEq);
+
+    // Parallel FX routing into safety compressor
+    nodes.highEq.connect(nodes.dryGain).connect(nodes.compressor);
+
+    // Echo loop
+    nodes.highEq.connect(nodes.delayNode);
+    nodes.delayNode.connect(nodes.delayFilter);
+    nodes.delayFilter.connect(nodes.delayFeedback);
+    nodes.delayFeedback.connect(nodes.delayNode);
+    nodes.delayFilter.connect(nodes.echoWetGain).connect(nodes.compressor);
+
+    // Reverb send
+    nodes.highEq.connect(nodes.convolver);
+    nodes.convolver.connect(nodes.reverbWetGain).connect(nodes.compressor);
+
+    // Output & self-test tap (self-test records pre-speaker-mute signal so you can test silently!)
+    nodes.compressor.connect(nodes.testDest);
+    nodes.compressor
+      .connect(nodes.masterGain)
+      .connect(nodes.muteGate)
+      .connect(nodes.outAnalyser);
+  }
+
+  function cleanupGraphNodes() {
+    Object.keys(nodes).forEach((k) => {
+      if (nodes[k]) {
+        try { nodes[k].disconnect(); } catch (_) {}
+        nodes[k] = null;
+      }
+    });
+  }
+
+  function stopAudioEngine() {
+    isRunning = false;
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+    cleanupGraphNodes();
+    if (!el.fallbackSinkAudio.paused) {
+      el.fallbackSinkAudio.pause();
+      el.fallbackSinkAudio.srcObject = null;
+    }
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+    el.inMeterFill.style.width = '0%';
+    el.outMeterFill.style.width = '0%';
+    el.inDbText.textContent = '-∞ dB';
+    el.outDbText.textContent = '-∞ dB';
+    el.gateStatusText.textContent = 'GATE: 待機';
+    el.latencyText.textContent = '遅延: -- ms';
+    drawIdleCanvas();
+    updateUIState();
+  }
+
+  // Hot-swap mic stream when input device or hardware toggles change while running
+  async function restartMicIfRunning() {
+    if (!isRunning) return;
+    await startAudioEngine();
+  }
+
+  function showError(msg) {
+    el.errorMessage.textContent = msg;
+    el.errorBanner.classList.add('show');
+  }
+
+  // =========================================================================
+  // 8. Real-time Parameter Updates & Presets
+  // =========================================================================
+  function updateAllParams() {
+    const inGain = Number(el.inputGainSlider.value) / 100;
+    const outGain = Number(el.outputGainSlider.value) / 100;
+    const gateDb = Number(el.gateThresholdSlider.value);
+    const lowCutOn = el.lowCutToggle.checked;
+
+    const pitch = Number(el.pitchSlider.value);
+    const lowEq = Number(el.lowEqSlider.value);
+    const midEq = Number(el.midEqSlider.value);
+    const highEq = Number(el.highEqSlider.value);
+    const reverb = Number(el.reverbSlider.value) / 100;
+    const echo = Number(el.echoSlider.value) / 100;
+    const robot = Number(el.robotSlider.value) / 100;
+    const radio = Number(el.radioSlider.value) / 100;
+
+    // Labels
+    el.inputGainVal.textContent = `${Math.round(inGain * 100)}%`;
+    el.outputGainVal.textContent = `${Math.round(outGain * 100)}%`;
+    el.gateThresholdVal.textContent = gateDb <= -90 ? 'OFF' : `${gateDb} dB`;
+    el.pitchVal.textContent = `${pitch > 0 ? '+' : ''}${pitch.toFixed(1)} 半音`;
+    el.lowEqVal.textContent = `${lowEq > 0 ? '+' : ''}${lowEq} dB`;
+    el.midEqVal.textContent = `${midEq > 0 ? '+' : ''}${midEq} dB`;
+    el.highEqVal.textContent = `${highEq > 0 ? '+' : ''}${highEq} dB`;
+    el.reverbVal.textContent = `${Math.round(reverb * 100)}%`;
+    el.echoVal.textContent = `${Math.round(echo * 100)}%`;
+    el.robotVal.textContent = `${Math.round(robot * 100)}%`;
+    el.radioVal.textContent = `${Math.round(radio * 100)}%`;
+
+    // Position gate threshold marker along meter (-75dB..0dB visual range)
+    const gatePct = gateDb <= -90 ? 0 : Math.max(0, Math.min(100, ((gateDb + 75) / 75) * 100));
+    el.gateMarker.style.left = `${gatePct}%`;
+    el.gateMarker.style.opacity = gateDb <= -90 ? '0' : '1';
+
+    if (!audioCtx || !isRunning) return;
+    const now = audioCtx.currentTime;
+
+    if (nodes.inputGain) nodes.inputGain.gain.setTargetAtTime(inGain, now, 0.015);
+    if (nodes.masterGain) nodes.masterGain.gain.setTargetAtTime(outGain, now, 0.015);
+    if (nodes.muteGate) {
+      const targetMute = (isMuted || isSelfTesting) ? 0.0 : 1.0;
+      nodes.muteGate.gain.setTargetAtTime(targetMute, now, 0.012);
+    }
+    if (nodes.lowCutFilter) {
+      nodes.lowCutFilter.frequency.setTargetAtTime(lowCutOn ? 85 : 18, now, 0.02);
+    }
+
+    if (nodes.voiceWorklet) {
+      nodes.voiceWorklet.parameters.get('pitchSemitones').setValueAtTime(pitch, now);
+      nodes.voiceWorklet.parameters.get('gateThresholdDb').setValueAtTime(gateDb, now);
+      nodes.voiceWorklet.parameters.get('robotAmount').setValueAtTime(robot, now);
+      nodes.voiceWorklet.parameters.get('radioAmount').setValueAtTime(radio, now);
+    }
+
+    if (nodes.lowEq) nodes.lowEq.gain.setTargetAtTime(lowEq, now, 0.02);
+    if (nodes.midEq) nodes.midEq.gain.setTargetAtTime(midEq, now, 0.02);
+    if (nodes.highEq) nodes.highEq.gain.setTargetAtTime(highEq, now, 0.02);
+    if (nodes.reverbWetGain) nodes.reverbWetGain.gain.setTargetAtTime(reverb * 1.15, now, 0.02);
+    if (nodes.echoWetGain) nodes.echoWetGain.gain.setTargetAtTime(echo * 0.85, now, 0.02);
+
+    // Update latency readout
+    const baseLat = (audioCtx.baseLatency || 0) + (audioCtx.outputLatency || 0);
+    const pitchLat = Math.abs(pitch) >= 0.05 ? (768 / audioCtx.sampleRate) : 0;
+    const totalMs = Math.max(4, Math.round((baseLat + pitchLat) * 1000));
+    el.latencyText.textContent = `遅延: ~${totalMs} ms`;
+  }
+
+  function applyPreset(key) {
+    const p = PRESETS[key];
+    if (!p) return;
+
+    el.pitchSlider.value = p.pitch;
+    el.lowEqSlider.value = p.low;
+    el.midEqSlider.value = p.mid;
+    el.highEqSlider.value = p.high;
+    el.reverbSlider.value = p.reverb;
+    el.echoSlider.value = p.echo;
+    el.robotSlider.value = p.robot;
+    el.radioSlider.value = p.radio;
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === key);
+    });
+    el.presetBadge.textContent = `プリセット: ${p.label}`;
+    updateAllParams();
+  }
+
+  function updateUIState() {
+    if (!isRunning) {
+      el.toggleStreamBtn.classList.remove('active');
+      el.toggleStreamIcon.textContent = '▶';
+      el.toggleStreamLabel.textContent = 'マイク出力を開始する';
+
+      el.muteBtn.disabled = true;
+      el.muteBtn.classList.remove('muted');
+      el.selfTestBtn.disabled = true;
+
+      el.statusPill.className = 'pill';
+      el.statusText.textContent = '停止中';
+      return;
+    }
+
+    el.toggleStreamBtn.classList.add('active');
+    el.toggleStreamIcon.textContent = '■';
+    el.toggleStreamLabel.textContent = 'マイク出力を停止する';
+
+    el.muteBtn.disabled = false;
+    el.selfTestBtn.disabled = isSelfTesting;
+
+    if (isMuted) {
+      el.muteBtn.classList.add('muted');
+      el.muteIcon.textContent = '🔇';
+      el.muteLabel.textContent = talkMode === 'ptt' ? '待機中（Space長押しで発言）' : 'ミュート中（解除）';
+      el.statusPill.className = 'pill is-muted';
+      el.statusText.textContent = talkMode === 'ptt' ? 'PTT待機中' : 'ミュート中';
+    } else {
+      el.muteBtn.classList.remove('muted');
+      el.muteIcon.textContent = '🔊';
+      el.muteLabel.textContent = talkMode === 'ptt' ? '発言中！(PTT ON)' : '出力オン（ミュートする）';
+      el.statusPill.className = 'pill is-live';
+      el.statusText.textContent = 'PC音声へ出力中 (LIVE)';
+    }
+  }
+
+  // =========================================================================
+  // 9. 3-Second Voice Check (Silent Self-Monitor Preview)
+  // =========================================================================
+  async function runSelfVoiceCheck() {
+    if (!isRunning || isSelfTesting || !nodes.testDest || typeof MediaRecorder === 'undefined') return;
+    isSelfTesting = true;
+    updateAllParams(); // Temporarily mutes live output so user doesn't hear double voice while recording
+    updateUIState();
+    el.selfTestBtn.classList.add('recording');
+
+    const chunks = [];
+    const recorder = new MediaRecorder(nodes.testDest.stream);
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+    recorder.onstop = async () => {
+      el.selfTestLabel.textContent = '▶️ 録音を再生中...';
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+      const previewAudio = new Audio(url);
+      const sinkId = el.outputDeviceSelect.value;
+      if (sinkId && sinkId !== 'default' && typeof previewAudio.setSinkId === 'function') {
+        try { await previewAudio.setSinkId(sinkId); } catch (_) {}
+      }
+      previewAudio.onended = () => {
+        URL.revokeObjectURL(url);
+        isSelfTesting = false;
+        el.selfTestBtn.classList.remove('recording');
+        el.selfTestLabel.textContent = '🎧 3秒声チェック';
+        updateAllParams();
+        updateUIState();
+      };
+      try {
+        await previewAudio.play();
+      } catch (_) {
+        isSelfTesting = false;
+        el.selfTestBtn.classList.remove('recording');
+        el.selfTestLabel.textContent = '🎧 3秒声チェック';
+        updateAllParams();
+        updateUIState();
+      }
+    };
+
+    recorder.start();
+    let remain = 3;
+    el.selfTestLabel.textContent = `🔴 録音中 (${remain}秒)... 喋ってください`;
+    const timer = setInterval(() => {
+      remain--;
+      if (remain > 0) {
+        el.selfTestLabel.textContent = `🔴 録音中 (${remain}秒)... 喋ってください`;
+      } else {
+        clearInterval(timer);
+        if (recorder.state !== 'inactive') recorder.stop();
+      }
+    }, 1000);
+  }
+
+  // =========================================================================
+  // 10. Real-time Visualizer & dB Level Meters
+  // =========================================================================
+  function calcRmsDb(timeData) {
+    let sum = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      const v = (timeData[i] - 128) / 128;
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / timeData.length);
+    if (rms < 0.00001) return -96;
+    return 20 * Math.log10(rms);
+  }
+
+  function startVisualizerLoop() {
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    const ctx2d = el.canvas.getContext('2d');
+    const inBuf = new Uint8Array(nodes.inAnalyser.fftSize);
+    const outTimeBuf = new Uint8Array(nodes.outAnalyser.fftSize);
+    const outFreqBuf = new Uint8Array(nodes.outAnalyser.frequencyBinCount);
+
+    const render = () => {
+      if (!isRunning || !nodes.inAnalyser || !nodes.outAnalyser) return;
+      animFrameId = requestAnimationFrame(render);
+
+      nodes.inAnalyser.getByteTimeDomainData(inBuf);
+      nodes.outAnalyser.getByteTimeDomainData(outTimeBuf);
+      nodes.outAnalyser.getByteFrequencyData(outFreqBuf);
+
+      const inDb = calcRmsDb(inBuf);
+      const outDb = calcRmsDb(outTimeBuf);
+
+      const inPct = Math.max(0, Math.min(100, ((inDb + 75) / 75) * 100));
+      const outPct = Math.max(0, Math.min(100, ((outDb + 75) / 75) * 100));
+
+      el.inMeterFill.style.width = `${inPct}%`;
+      el.outMeterFill.style.width = `${outPct}%`;
+      el.inDbText.textContent = inDb <= -85 ? '-∞ dB' : `${inDb.toFixed(1)} dB`;
+      el.outDbText.textContent = outDb <= -85 ? '-∞ dB' : `${outDb.toFixed(1)} dB`;
+
+      // Canvas HiDPI sizing
+      const dpr = window.devicePixelRatio || 1;
+      const rect = el.canvas.getBoundingClientRect();
+      if (el.canvas.width !== Math.floor(rect.width * dpr) || el.canvas.height !== Math.floor(rect.height * dpr)) {
+        el.canvas.width = Math.floor(rect.width * dpr);
+        el.canvas.height = Math.floor(rect.height * dpr);
+      }
+
+      const w = el.canvas.width;
+      const h = el.canvas.height;
+      ctx2d.clearRect(0, 0, w, h);
+
+      // Subtle background frequency bars
+      const bars = 48;
+      const barWidth = w / bars;
+      for (let i = 0; i < bars; i++) {
+        const val = outFreqBuf[Math.floor(i * 3.2)] / 255;
+        const barH = val * h * 0.72;
+        ctx2d.fillStyle = isMuted ? 'rgba(239, 68, 68, 0.16)' : 'rgba(59, 130, 246, 0.22)';
+        ctx2d.fillRect(i * barWidth + 1, h - barH, Math.max(1, barWidth - 2), barH);
+      }
+
+      // Smooth output waveform line
+      ctx2d.lineWidth = 2 * dpr;
+      ctx2d.strokeStyle = isMuted ? '#ef4444' : '#34d399';
+      ctx2d.beginPath();
+      const slice = w / outTimeBuf.length;
+      for (let i = 0; i < outTimeBuf.length; i++) {
+        const y = (outTimeBuf[i] / 255) * h;
+        if (i === 0) ctx2d.moveTo(0, y);
+        else ctx2d.lineTo(i * slice, y);
+      }
+      ctx2d.stroke();
+    };
+
+    render();
+  }
+
+  function drawIdleCanvas() {
+    const ctx2d = el.canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = el.canvas.getBoundingClientRect();
+    el.canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    el.canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    ctx2d.clearRect(0, 0, el.canvas.width, el.canvas.height);
+    ctx2d.strokeStyle = '#283248';
+    ctx2d.lineWidth = 1.5 * dpr;
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, el.canvas.height / 2);
+    ctx2d.lineTo(el.canvas.width, el.canvas.height / 2);
+    ctx2d.stroke();
+  }
+
+  // =========================================================================
+  // 11. Event Listeners & Keyboard Shortcuts
+  // =========================================================================
+  el.toggleStreamBtn.addEventListener('click', () => {
+    if (isRunning) stopAudioEngine();
+    else startAudioEngine();
+  });
+
+  el.muteBtn.addEventListener('click', () => {
+    if (!isRunning) return;
+    isMuted = !isMuted;
+    updateAllParams();
+    updateUIState();
+  });
+
+  el.selfTestBtn.addEventListener('click', runSelfVoiceCheck);
+
+  el.openNewTabBtn.addEventListener('click', () => {
+    window.open(window.location.href, '_blank', 'noopener');
+  });
+
+  el.retryMicBtn.addEventListener('click', startAudioEngine);
+
+  el.refreshDevicesBtn.addEventListener('click', updateDeviceLists);
+  el.inputDeviceSelect.addEventListener('change', restartMicIfRunning);
+  el.outputDeviceSelect.addEventListener('change', applyOutputDevice);
+
+  el.echoCancelToggle.addEventListener('change', restartMicIfRunning);
+  el.noiseSuppressToggle.addEventListener('change', restartMicIfRunning);
+  el.lowCutToggle.addEventListener('change', updateAllParams);
+
+  // Sliders live update
+  const allSliders = [
+    el.inputGainSlider, el.outputGainSlider, el.gateThresholdSlider,
+    el.pitchSlider, el.lowEqSlider, el.midEqSlider, el.highEqSlider,
+    el.reverbSlider, el.echoSlider, el.robotSlider, el.radioSlider
+  ];
+  allSliders.forEach(s => s.addEventListener('input', updateAllParams));
+
+  // Click value badge to reset individual slider to its default
+  document.querySelectorAll('.slider-val[data-reset]').forEach(badge => {
+    badge.title = 'クリックで初期値にリセット';
+    badge.addEventListener('click', () => {
+      const target = document.getElementById(badge.dataset.reset);
+      if (target) {
+        target.value = target.defaultValue;
+        updateAllParams();
+      }
+    });
+  });
+
+  // Preset buttons
+  el.presetsGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preset-btn');
+    if (btn && btn.dataset.preset) {
+      applyPreset(btn.dataset.preset);
+    }
+  });
+
+  el.resetFxBtn.addEventListener('click', () => applyPreset('normal'));
+
+  // Talk mode switching (Always-on vs Push-to-Talk)
+  function setTalkMode(mode) {
+    talkMode = mode;
+    el.modeToggleBtn.classList.toggle('active', mode === 'toggle');
+    el.modePttBtn.classList.toggle('active', mode === 'ptt');
+    if (isRunning) {
+      isMuted = (mode === 'ptt') ? !spaceHeld : false;
+      updateAllParams();
+      updateUIState();
+    }
+  }
+  el.modeToggleBtn.addEventListener('click', () => setTalkMode('toggle'));
+  el.modePttBtn.addEventListener('click', () => setTalkMode('ptt'));
+
+  // Keyboard shortcuts: Space / M for mute toggle or Push-to-Talk
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+
+    if (e.code === 'Space') {
+      if (!isRunning) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      spaceHeld = true;
+      if (talkMode === 'ptt') {
+        isMuted = false;
+      } else {
+        isMuted = !isMuted;
+      }
+      updateAllParams();
+      updateUIState();
+    } else if (e.code === 'KeyM' && !e.repeat && isRunning && talkMode === 'toggle') {
+      isMuted = !isMuted;
+      updateAllParams();
+      updateUIState();
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      spaceHeld = false;
+      if (isRunning && talkMode === 'ptt') {
+        isMuted = true;
+        updateAllParams();
+        updateUIState();
+      }
+    }
+  });
+
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', updateDeviceLists);
+  }
+
+  // Initial setup
+  updateDeviceLists();
+  updateAllParams();
+  drawIdleCanvas();
+})();
+</script>
+</body>
+</html>
