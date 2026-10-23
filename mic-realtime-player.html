@@ -979,6 +979,25 @@
 
   <!-- Main Workspace Two-Column Grid -->
   <div class="workspace-grid">
+    <!-- URL Viewer - Top Panel (Background Mic Mode) -->
+    <section class="panel url-viewer expanded" id="urlViewerPanel">
+      <div class="collapse-bar" onclick="toggleUrlViewer()">
+        <span>🌐 ブラウザビューア（裏でマイク出力を継続）</span>
+        <span id="urlViewerToggle">▲</span>
+      </div>
+      <div class="panel-content">
+        <div class="url-header">
+          <input type="url" id="urlInput" placeholder="https://example.com を入力して開く" autocomplete="off">
+          <button class="btn btn-sm" id="openUrlBtn">開く</button>
+        </div>
+        <div class="url-iframe-wrap" id="urlIframeWrap">
+          <button class="btn btn-sm" id="closeUrlBtn">✕ 閉じてVoiceBridgeに戻る</button>
+          <iframe id="urlIframe" src="about:blank" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"></iframe>
+        </div>
+        <p class="field-hint" style="margin-top:10px;">※ マイク出力・エフェクトは裏で動作し続けます。一部サイトは埋め込み制限（X-Frame-Options）により表示できない場合があります。</p>
+      </div>
+    </section>
+
     <!-- Left Column: Devices, Volume & Noise Control -->
     <section class="panel">
       <div class="panel-header">
@@ -1129,6 +1148,11 @@
             <span class="preset-label">エコーホール</span>
             <span class="preset-sub">カラオケ・大聖堂</span>
           </button>
+          <button class="preset-btn" data-preset="yukkuri">
+            <span class="preset-emoji">🎀</span>
+            <span class="preset-label">ゆっくりボイス</span>
+            <span class="preset-sub">東方風・合成音声調</span>
+          </button>
         </div>
       </div>
 
@@ -1200,25 +1224,6 @@
       </div>
     </section>
   </div>
-
-  <!-- URL Viewer - Background Mic Mode -->
-  <section class="panel url-viewer collapsed" id="urlViewerPanel">
-    <div class="collapse-bar" onclick="toggleUrlViewer()">
-      <span>🌐 ブラウザビューア（裏でマイク出力を継続）</span>
-      <span id="urlViewerToggle">▼</span>
-    </div>
-    <div class="panel-content">
-      <div class="url-header">
-        <input type="url" id="urlInput" placeholder="https://example.com を入力して開く" autocomplete="off">
-        <button class="btn btn-sm" id="openUrlBtn">開く</button>
-      </div>
-      <div class="url-iframe-wrap" id="urlIframeWrap">
-        <button class="btn btn-sm" id="closeUrlBtn">✕ 閉じてVoiceBridgeに戻る</button>
-        <iframe id="urlIframe" src="about:blank" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
-      </div>
-      <p class="field-hint" style="margin-top:10px;">※ マイク出力・エフェクトは裏で動作し続けます。一部サイトは埋め込み制限（X-Frame-Options）により表示できない場合があります。</p>
-    </div>
-  </section>
 
   <!-- ゆっくりボイス 読み上げ -->
   <section class="panel yukkuri-panel" id="yukkuriPanel">
@@ -1468,7 +1473,8 @@
     monster: { label: '👹 ダークボス',   pitch: -8.0, low: 8,   mid: -2, high: -3, reverb: 38, echo: 16, robot: 12, radio: 0 },
     robot:   { label: '🤖 ロボット',     pitch: -1.0, low: -2,  mid: 5,  high: 3,  reverb: 14, echo: 8,  robot: 85, radio: 15 },
     radio:   { label: '📻 無線・ラジオ', pitch: 0,    low: -12, mid: 10, high: -6, reverb: 0,  echo: 0,  robot: 0,  radio: 75 },
-    hall:    { label: '🎤 エコーホール', pitch: 0,    low: 1,   mid: 2,  high: 4,  reverb: 62, echo: 36, robot: 0,  radio: 0 }
+    hall:    { label: '🎤 エコーホール', pitch: 0,    low: 1,   mid: 2,  high: 4,  reverb: 62, echo: 36, robot: 0,  radio: 0 },
+    yukkuri: { label: '🎀 ゆっくりボイス', pitch: 7.0,  low: -4,  mid: 4,  high: 6,  reverb: 10, echo: 0,  robot: 30, radio: 20 }
   };
 
   // =========================================================================
@@ -2481,14 +2487,44 @@ let urlViewerActive = false;
     const url = el.urlInput.value.trim();
     if (!url) return;
     const finalUrl = url.match(/^https?:\/\//i) ? url : 'https://' + url;
+
+    // iframeの読み込み状態を監視
+    let loadTimeout;
+    const onLoad = () => {
+      clearTimeout(loadTimeout);
+      el.urlIframeWrap.style.display = 'block';
+      el.urlViewerActive = true;
+      el.urlInput.disabled = true;
+      el.openUrlBtn.disabled = true;
+      el.closeUrlBtn.style.display = 'inline-block';
+      // ビューアを展開
+      if (el.urlViewerPanel.classList.contains('collapsed')) toggleUrlViewer();
+    };
+    const onError = () => {
+      clearTimeout(loadTimeout);
+      el.urlIframeWrap.style.display = 'block';
+      el.urlIframe.style.display = 'none';
+      showError('サイトの読み込みに失敗しました。埋め込み制限（X-Frame-Options / CSP）があるサイトは表示できない場合があります。別のURLをお試しください。');
+    };
+
+    el.urlIframe.removeEventListener('load', onLoad);
+    el.urlIframe.removeEventListener('error', onError);
+    el.urlIframe.addEventListener('load', onLoad, { once: true });
+    el.urlIframe.addEventListener('error', onError, { once: true });
+
+    el.urlIframe.style.display = 'block';
     el.urlIframe.src = finalUrl;
-    el.urlIframeWrap.style.display = 'block';
-    el.urlViewerActive = true;
+
+    // 10秒でタイムアウト
+    loadTimeout = setTimeout(() => {
+      if (el.urlIframe.src === finalUrl && el.urlIframe.contentWindow === null) {
+        onError();
+      }
+    }, 10000);
+
     el.urlInput.disabled = true;
     el.openUrlBtn.disabled = true;
     el.closeUrlBtn.style.display = 'inline-block';
-    // ビューアを展開
-    if (el.urlViewerPanel.classList.contains('collapsed')) toggleUrlViewer();
   });
 
   el.closeUrlBtn.addEventListener('click', () => {
@@ -2635,5 +2671,5 @@ let urlViewerActive = false;
   });
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4f00056f82496be',t:'MTc5Mjc1MDc0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
