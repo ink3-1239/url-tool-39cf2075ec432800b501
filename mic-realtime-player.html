@@ -741,6 +741,140 @@
     font-size: 0.88rem;
     margin-bottom: 5px;
   }
+
+  /* ========== URL Viewer Panel (Background Mic) ========== */
+  .url-viewer {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .url-viewer .collapse-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .url-viewer .panel-content {
+    padding: 16px;
+    display: none;
+  }
+  .url-viewer.expanded .panel-content { display: block; }
+  .url-header {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .url-header input[type="url"] {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  .url-iframe-wrap {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: #000;
+    height: 420px;
+    width: 100%;
+    border: 1px solid var(--border);
+  }
+  .url-iframe-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* ========== Yukkuri Voice Panel ========== */
+  .yukkuri-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .yukkuri-textarea {
+    width: 100%;
+    min-height: 110px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    margin-bottom: 12px;
+    resize: vertical;
+  }
+  .yukkuri-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .yukkuri-select {
+    flex: 1;
+    min-width: 160px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+
+  /* ========== Transcription Panel ========== */
+  .transcribe-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .transcribe-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .transcribe-output {
+    width: 100%;
+    min-height: 200px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    resize: vertical;
+    readonly: none;
+  }
+  .transcribe-hint {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
 </style>
 </head>
 <body>
@@ -1067,6 +1201,58 @@
     </section>
   </div>
 
+  <!-- URL Viewer - Background Mic Mode -->
+  <section class="panel url-viewer collapsed" id="urlViewerPanel">
+    <div class="collapse-bar" onclick="toggleUrlViewer()">
+      <span>🌐 ブラウザビューア（裏でマイク出力を継続）</span>
+      <span id="urlViewerToggle">▼</span>
+    </div>
+    <div class="panel-content">
+      <div class="url-header">
+        <input type="url" id="urlInput" placeholder="https://example.com を入力して開く" autocomplete="off">
+        <button class="btn btn-sm" id="openUrlBtn">開く</button>
+      </div>
+      <div class="url-iframe-wrap" id="urlIframeWrap">
+        <button class="btn btn-sm" id="closeUrlBtn">✕ 閉じてVoiceBridgeに戻る</button>
+        <iframe id="urlIframe" src="about:blank" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+      </div>
+      <p class="field-hint" style="margin-top:10px;">※ マイク出力・エフェクトは裏で動作し続けます。一部サイトは埋め込み制限（X-Frame-Options）により表示できない場合があります。</p>
+    </div>
+  </section>
+
+  <!-- ゆっくりボイス 読み上げ -->
+  <section class="panel yukkuri-panel" id="yukkuriPanel">
+    <div class="panel-header">
+      <div class="panel-title">🗣️ ゆっくりボイス読み上げ</div>
+    </div>
+    <div class="field-group">
+      <textarea id="yukkuriText" class="yukkuri-textarea" placeholder="読み上げたいテキストを入力してください…"></textarea>
+    </div>
+    <div class="yukkuri-controls">
+      <select id="yukkuriVoiceSelect" class="yukkuri-select"></select>
+      <button class="btn btn-start" id="yukkuriSpeakBtn">読み上げ開始</button>
+      <button class="btn btn-danger" id="yukkuriStopBtn">停止</button>
+    </div>
+    <p class="field-hint">※ ブラウザ標準の日本語音声合成を使用しています。本格的なゆっくりボイス（AquesTalk等）は別途専用ソフトが必要です。</p>
+  </section>
+
+  <!-- 文字起こしモード -->
+  <section class="panel transcribe-panel" id="transcribePanel">
+    <div class="panel-header">
+      <div class="panel-title">📝 文字起こしモード</div>
+    </div>
+    <div class="field-group">
+      <div class="transcribe-actions">
+        <button class="btn btn-start" id="transcribeBtn">🎙️ 文字起こし開始</button>
+        <button class="btn btn-danger" id="transcribeStopBtn" disabled>停止</button>
+        <button class="btn btn-sm" id="transcribeClearBtn">クリア</button>
+        <button class="btn btn-sm" id="transcribeExportBtn">TXT保存</button>
+      </div>
+      <textarea id="transcribeOutput" class="transcribe-output" readonly placeholder="ここに認識されたテキストが表示されます…"></textarea>
+    </div>
+    <p class="transcribe-hint">※ Chrome / Edge の Web Speech API を使用します。マイク出力中でも併用可能です。</p>
+  </section>
+
   <!-- Step-by-Step Guide for Screen & Audio Sharing -->
   <details class="guide-card" open>
     <summary>
@@ -1324,10 +1510,17 @@
     testDest: null
   };
 
-  let isRunning = false;
-  let isMuted = false;
-  let talkMode = 'toggle';
-  let spaceHeld = false;
+let isRunning = false;
+let isMuted = false;
+let talkMode = 'toggle';
+let spaceHeld = false;
+
+/* 新機能: 状態変数 */
+let yukkuriUtterance = null;
+let recognition = null;
+let isTranscribing = false;
+let finalTranscript = '';
+let urlViewerActive = false;
   let isSelfTesting = false;
   let animFrameId = null;
 
@@ -1364,6 +1557,28 @@
     inMeterFill: document.getElementById('inMeterFill'),
     outMeterFill: document.getElementById('outMeterFill'),
     gateMarker: document.getElementById('gateMarker'),
+
+    /* URL Viewer */
+    urlViewerPanel: document.getElementById('urlViewerPanel'),
+    urlViewerToggle: document.getElementById('urlViewerToggle'),
+    urlInput: document.getElementById('urlInput'),
+    openUrlBtn: document.getElementById('openUrlBtn'),
+    closeUrlBtn: document.getElementById('closeUrlBtn'),
+    urlIframe: document.getElementById('urlIframe'),
+    urlIframeWrap: document.getElementById('urlIframeWrap'),
+
+    /* Yukkuri Voice */
+    yukkuriText: document.getElementById('yukkuriText'),
+    yukkuriVoiceSelect: document.getElementById('yukkuriVoiceSelect'),
+    yukkuriSpeakBtn: document.getElementById('yukkuriSpeakBtn'),
+    yukkuriStopBtn: document.getElementById('yukkuriStopBtn'),
+
+    /* Transcription */
+    transcribeBtn: document.getElementById('transcribeBtn'),
+    transcribeStopBtn: document.getElementById('transcribeStopBtn'),
+    transcribeClearBtn: document.getElementById('transcribeClearBtn'),
+    transcribeExportBtn: document.getElementById('transcribeExportBtn'),
+    transcribeOutput: document.getElementById('transcribeOutput'),
 
     refreshDevicesBtn: document.getElementById('refreshDevicesBtn'),
     inputDeviceSelect: document.getElementById('inputDeviceSelect'),
@@ -2245,7 +2460,180 @@
   updateDeviceLists();
   updateAllParams();
   drawIdleCanvas();
+
+  /* =========================================================================
+     12. URL Viewer - 同じタブでサイトを開きつつマイク出力を継続
+     ========================================================================= */
+  function toggleUrlViewer() {
+    const isCollapsed = el.urlViewerPanel.classList.contains('collapsed');
+    if (isCollapsed) {
+      el.urlViewerPanel.classList.remove('collapsed');
+      el.urlViewerPanel.classList.add('expanded');
+      el.urlViewerToggle.textContent = '▲';
+    } else {
+      el.urlViewerPanel.classList.remove('expanded');
+      el.urlViewerPanel.classList.add('collapsed');
+      el.urlViewerToggle.textContent = '▼';
+    }
+  }
+
+  el.openUrlBtn.addEventListener('click', async () => {
+    const url = el.urlInput.value.trim();
+    if (!url) return;
+    const finalUrl = url.match(/^https?:\/\//i) ? url : 'https://' + url;
+    el.urlIframe.src = finalUrl;
+    el.urlIframeWrap.style.display = 'block';
+    el.urlViewerActive = true;
+    el.urlInput.disabled = true;
+    el.openUrlBtn.disabled = true;
+    el.closeUrlBtn.style.display = 'inline-block';
+    // ビューアを展開
+    if (el.urlViewerPanel.classList.contains('collapsed')) toggleUrlViewer();
+  });
+
+  el.closeUrlBtn.addEventListener('click', () => {
+    el.urlIframe.src = 'about:blank';
+    el.urlIframeWrap.style.display = 'none';
+    el.urlViewerActive = false;
+    el.urlInput.disabled = false;
+    el.openUrlBtn.disabled = false;
+    el.closeUrlBtn.style.display = 'none';
+    el.urlViewerPanel.classList.remove('expanded');
+    el.urlViewerPanel.classList.add('collapsed');
+    el.urlViewerToggle.textContent = '▼';
+  });
+
+  /* =========================================================================
+     13. ゆっくりボイス 読み上げ（Web Speech API）
+     ========================================================================= */
+  function populateYukkuriVoices() {
+    const voices = speechSynthesis.getVoices();
+    el.yukkuriVoiceSelect.innerHTML = '';
+    const jpVoices = voices.filter(v => v.lang.startsWith('ja'));
+    const target = jpVoices.length > 0 ? jpVoices : voices;
+    target.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = v.name + ' (' + v.lang + ')';
+      opt.dataset.voiceIndex = i;
+      el.yukkuriVoiceSelect.appendChild(opt);
+    });
+    if (target.length > 0) el.yukkuriVoiceSelect.selectedIndex = 0;
+  }
+
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = populateYukkuriVoices;
+  }
+  populateYukkuriVoices();
+
+  el.yukkuriSpeakBtn.addEventListener('click', () => {
+    const text = el.yukkuriText.value.trim();
+    if (!text) return;
+    if (yukkuriUtterance) speechSynthesis.cancel();
+    yukkuriUtterance = new SpeechSynthesisUtterance(text);
+    const idx = parseInt(el.yukkuriVoiceSelect.value, 10) || 0;
+    const voices = speechSynthesis.getVoices();
+    if (voices[idx]) yukkuriUtterance.voice = voices[idx];
+    yukkuriUtterance.rate = 1.0;
+    yukkuriUtterance.pitch = 1.0;
+    yukkuriUtterance.onend = () => { yukkuriUtterance = null; };
+    speechSynthesis.speak(yukkuriUtterance);
+  });
+
+  el.yukkuriStopBtn.addEventListener('click', () => {
+    speechSynthesis.cancel();
+    yukkuriUtterance = null;
+  });
+
+  /* =========================================================================
+     14. 文字起こしモード（Web Speech API / SpeechRecognition）
+     ========================================================================= */
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) final += transcript + '\n';
+        else interim += transcript;
+      }
+      if (final) {
+        finalTranscript += final;
+        el.transcribeOutput.value = finalTranscript + interim;
+        el.transcribeOutput.scrollTop = el.transcribeOutput.scrollHeight;
+      } else {
+        el.transcribeOutput.value = finalTranscript + interim;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('文字起こしエラー:', event.error);
+      if (event.error === 'not-allowed') {
+        showError('マイクの権限が拒否されました。文字起こしを開始できません。');
+      }
+      stopTranscriptionUI();
+    };
+
+    recognition.onend = () => {
+      if (isTranscribing) stopTranscriptionUI();
+    };
+  }
+
+  function startTranscription() {
+    if (!SpeechRecognition) {
+      showError('このブラウザでは文字起こしAPI（SpeechRecognition）が利用できません。');
+      return;
+    }
+    finalTranscript = '';
+    el.transcribeOutput.value = '';
+    try {
+      recognition.start();
+      isTranscribing = true;
+      el.transcribeBtn.disabled = true;
+      el.transcribeStopBtn.disabled = false;
+      el.transcribeBtn.textContent = '🎙️ 文字起こし中…';
+    } catch (e) {
+      showError('文字起こしの開始に失敗しました: ' + e.message);
+    }
+  }
+
+  function stopTranscriptionUI() {
+    isTranscribing = false;
+    el.transcribeBtn.disabled = false;
+    el.transcribeStopBtn.disabled = true;
+    el.transcribeBtn.textContent = '🎙️ 文字起こし開始';
+  }
+
+  el.transcribeBtn.addEventListener('click', startTranscription);
+  el.transcribeStopBtn.addEventListener('click', () => {
+    if (recognition) recognition.stop();
+    stopTranscriptionUI();
+  });
+  el.transcribeClearBtn.addEventListener('click', () => {
+    finalTranscript = '';
+    el.transcribeOutput.value = '';
+  });
+  el.transcribeExportBtn.addEventListener('click', () => {
+    const text = el.transcribeOutput.value.trim();
+    if (!text) return;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'voicebridge_transcript_' + new Date().toISOString().slice(0,16).replace(/[:-]/g,'') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4efeccce9aed861',t:'MTc5Mjc0OTk0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4f00056f82496be',t:'MTc5Mjc1MDc0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
