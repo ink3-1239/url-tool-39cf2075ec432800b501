@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>こっそりテロップ — Rendercaster 視聴者専用テキスト</title>
+<style>
+:root{
+  --bg:#0e1014; --panel:#191c23; --panel2:#20242d; --line:#333846;
+  --txt:#eef0f5; --muted:#98a0b3; --accent:#6f8cff; --accent2:#16834b;
+  --danger:#d0483f; --warn:#c8901c; --radius:12px;
+  --k:1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;font-size:15px;line-height:1.55}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:8px;padding:9px 13px;transition:.14s}
+button:hover{filter:brightness(1.22)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select,textarea{background:#11141a;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+textarea{resize:vertical;min-height:78px;line-height:1.5}
+input[type=color]{padding:3px;height:38px;cursor:pointer}
+input[type=range]{padding:0;height:26px;accent-color:var(--accent);background:transparent;border:0}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+a{color:#9db4ff}
+.hide{display:none !important}
+
+/* ============ 共通レイアウト ============ */
+.wrap{max-width:1320px;margin:0 auto;padding:18px 20px 60px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header.top h1{font-size:20px;margin:0;letter-spacing:.02em}
+.badge{font-size:11px;color:#07120b;background:#37d17a;border-radius:99px;padding:2px 9px;font-weight:700}
+.badge.off{background:#4a5060;color:#d6d9e2}
+.sub{color:var(--muted);font-size:12.5px}
+.grid{display:grid;grid-template-columns:minmax(380px,460px) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;margin-bottom:14px}
+section.card h2{font-size:14px;margin:0 0 12px;letter-spacing:.04em;color:#cfd6e6;display:flex;align-items:center;gap:8px}
+section.card h2 .num{font-size:10px;background:#2c3240;color:#aeb8cc;width:19px;height:19px;display:grid;place-items:center;border-radius:6px}
+label.f{display:block;margin:11px 0;font-size:12.5px;color:#c3cadb}
+label.f > span.lbl{display:block;margin-bottom:5px;color:#aab3c6}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.row > *{min-width:0}
+.grow{flex:1}
+.mini{font-size:11px;color:var(--muted)}
+.hr{height:1px;background:var(--line);margin:15px 0}
+.swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.sw{width:24px;height:24px;border-radius:6px;border:1px solid #555c6d;padding:0}
+.sw:hover{outline:2px solid var(--accent);outline-offset:1px}
+.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#c3cadb;margin:8px 0;cursor:pointer;user-select:none}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{padding:6px 10px;font-size:12px}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#08102b;font-weight:700}
+.posgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:170px}
+.posgrid button{padding:7px 0;font-size:11px;color:var(--muted)}
+.posgrid button:hover{color:#fff}
+.layerchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.layerchips button{padding:6px 11px;font-size:12px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layerchips button.on{border-color:var(--accent);background:#25305a;color:#fff}
+.layerchips button.muted{opacity:.45}
+.note{background:#22283a;border-left:3px solid var(--accent);padding:10px 12px;border-radius:0 8px 8px 0;font-size:12.5px;color:#c6cee0;margin:10px 0}
+.note.warn{background:#2e2718;border-left-color:var(--warn);color:#e8d9b7}
+.note b{color:#fff}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#08102b;font-weight:700}
+.btn-green{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:700}
+.btn-red{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700}
+.btn-sm{padding:6px 10px;font-size:12px}
+
+/* ============ プレビュー ============ */
+.stagewrap{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;border:1px solid #3a4050}
+.stage{position:absolute;inset:0;overflow:hidden;background:
+  radial-gradient(1200px 500px at 15% 5%,#2b3f6b 0%,transparent 60%),
+  radial-gradient(900px 600px at 85% 95%,#5a2f52 0%,transparent 60%),
+  linear-gradient(160deg,#101a2e,#171322 55%,#0d1a1c);
+}
+.stage::before{content:"";position:absolute;inset:0;opacity:.16;background-image:linear-gradient(#7fa6ff33 1px,transparent 1px),linear-gradient(90deg,#7fa6ff33 1px,transparent 1px);background-size:48px 48px}
+.stage .stagelabel{position:absolute;left:12px;top:10px;font-size:11px;color:#ffffff80;background:#0008;padding:3px 8px;border-radius:5px;z-index:3}
+.stage .mockvideo{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);font-size:13px;color:#ffffff55;letter-spacing:.12em}
+.stage.hidden-text .ov-layers{display:none}
+.stage.hidden-text .maskhint{display:grid}
+.maskhint{display:none;position:absolute;inset:0;place-items:center;color:#ffffffaa;font-size:13px;z-index:3}
+
+/* ============ オーバーレイ描画（配信者プレビュー / 視聴者 / ブックマークレット共通） ============ */
+.ov-layers{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+.ov-item{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:pre-wrap;word-break:break-word;
+  line-height:1.25;text-align:center;font-weight:400;will-change:transform,opacity;max-width:96%}
+.ov-item.draggable{pointer-events:auto;cursor:grab}
+.ov-item.draggable:hover{outline:1px dashed #ffffff88;outline-offset:4px}
+.ov-item.dragging{cursor:grabbing;outline:2px solid var(--accent)}
+.ov-item.sel{outline:2px solid var(--accent);outline-offset:4px}
+.ov-anim-blink{animation:ovBlink 1.1s steps(1,end) infinite}
+.ov-anim-pulse{animation:ovPulse 1.6s ease-in-out infinite}
+.ov-anim-fade{animation:ovFade .55s ease-out both}
+.ov-anim-slide{animation:ovSlide .55s cubic-bezier(.2,.9,.25,1) both}
+.ov-anim-marquee{animation:ovMarquee var(--mqdur,14s) linear infinite;max-width:none;width:max-content;left:0;transform:translateY(-50%)}
+@keyframes ovBlink{0%,49%{opacity:1}50%,100%{opacity:.05}}
+@keyframes ovPulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes ovFade{from{opacity:0}to{opacity:1}}
+@keyframes ovSlide{from{opacity:0;transform:translate(-50%,-50%) translateX(-70px)}to{opacity:1;transform:translate(-50%,-50%) translateX(0)}}
+@keyframes ovMarquee{from{transform:translate(100%,-50%)}to{transform:translate(-120%,-50%)}}
+
+/* ============ 視聴者モード ============ */
+body.viewer{background:#000;overflow:hidden}
+#viewer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+#screen{position:relative;background:#000;box-shadow:0 0 60px #0008;overflow:hidden}
+#remoteVideo{display:block;width:100%;height:100%;background:#000}
+#screen .ov-layers{z-index:5}
+#waiting{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#cfd6e6;padding:24px;z-index:4}
+#waiting .big{font-size:18px;margin-bottom:8px}
+#waiting .spin{width:28px;height:28px;border:3px solid #ffffff30;border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 16px}
+@keyframes sp{to{transform:rotate(360deg)}}
+#vbar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:9px 14px;
+  background:linear-gradient(transparent,#000c 35%);z-index:20;opacity:.12;transition:opacity .25s;flex-wrap:wrap}
+#viewer:hover #vbar,#vbar:focus-within{opacity:1}
+#vbar .st{font-size:12px;color:#c9d1e2;margin-right:auto}
+.vbtn{background:#000a;border:1px solid #ffffff40;backdrop-filter:blur(6px)}
+#vsetup{position:fixed;inset:0;background:#0e1014ee;display:grid;place-items:center;z-index:30;padding:20px}
+#vsetup .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;max-width:420px;width:100%}
+#vsetup h2{margin:0 0 6px;font-size:18px}
+.toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:#000d;border:1px solid #ffffff30;color:#fff;padding:9px 16px;border-radius:99px;font-size:12.5px;z-index:50;pointer-events:none}
+</style>
+</head>
+<body>
+
+<!-- ==================== 配信者用コントロール画面 ==================== -->
+<div id="control" class="wrap">
+  <header class="top">
+    <h1>🙈 こっそりテロップ</h1>
+    <span id="syncBadge" class="badge off">同期: 未接続</span>
+    <div class="sub">Rendercaster（rendercaster.onrender.com）用 ／ 視聴者にだけ見える文字</div>
+  </header>
+
+  <div class="note">
+    <b>仕組み：</b>文字は配信者の画面には描かれず、<b>視聴者のブラウザが受信した映像の上に重ねて表示</b>します。
+    そのため画面共有した配信者自身の画面・送信プレビューには一切映りません。<br>
+    <span class="mini">※ このコントロール画面を「画面全体」で共有すると設定画面ごと映ります。共有対象をゲーム/ウィンドウ単位にするか、この画面をスマホ・別PCで開いてください。</span>
+  </div>
+
+  <div class="grid">
+    <!-- 左：設定 -->
+    <div>
+      <section class="card">
+        <h2><span class="num">1</span> 接続先</h2>
+        <label class="f"><span class="lbl">ルームID（配信者在住のルーム名）</span>
+          <input id="roomId" list="roomSuggest" placeholder="例: 雑談とテストプレイ">
+        </label>
+        <datalist id="roomSuggest"></datalist>
+        <div class="mini" id="roomListHint" style="margin-top:-4px">配信中のルームを取得中…</div>
+        <label class="f"><span class="lbl">チャンネルID（配信者と視聴者を紐付ける合言葉）</span>
+          <div class="row">
+            <input id="channelId" class="grow" placeholder="例: ink3-a1b2">
+            <button id="reroll" class="btn-sm" title="ランダム生成">🎲</button>
+          </div>
+        </label>
+        <div class="mini">同じチャンネルIDの視聴者にだけ文字が届きます。他人に推測されにくい文字列にしてください。</div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">2</span> テキスト</h2>
+        <div class="layerchips" id="layerChips"></div>
+        <div class="row" style="margin-bottom:6px">
+          <button id="addLayer" class="btn-sm">＋ 追加</button>
+          <button id="dupLayer" class="btn-sm">⧉ 複製</button>
+          <button id="delLayer" class="btn-sm">🗑 削除</button>
+          <label class="chk" style="margin:0 0 0 auto"><input type="checkbox" id="layerVisible" checked> 表示</label>
+        </div>
+        <label class="f"><span class="lbl">内容（改行可）</span>
+          <textarea id="fText" placeholder="視聴者だけに見えるメッセージ"></textarea>
+        </label>
+        <div class="mini" id="charCount"></div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">3</span> 位置</h2>
+        <div class="row" style="align-items:flex-start;gap:16px">
+          <div>
+            <div class="mini" style="margin-bottom:5px">プリセット</div>
+            <div class="posgrid" id="posGrid"></div>
+          </div>
+          <div class="grow" style="min-width:150px">
+            <label class="f" style="margin-top:0"><span class="lbl">X（横）: <b id="xVal">50</b>%</span>
+              <input type="range" id="fX" min="0" max="100" step="0.5" value="50"></label>
+            <label class="f"><span class="lbl">Y（縦）: <b id="yVal">18</b>%</span>
+              <input type="range" id="fY" min="0" max="100" step="0.5" value="18"></label>
+            <div class="mini">右のプレビューを<b>ドラッグ</b>しても移動できます。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">4</span> 大きさ ・ 色</h2>
+        <label class="f"><span class="lbl">文字サイズ: <b id="sizeVal">64</b> px <span class="mini">（縦1080px換算／解像度に自動追従）</span></span>
+          <input type="range" id="fSize" min="12" max="220" step="1" value="64"></label>
+        <div class="row">
+          <div class="grow">
+            <label class="f" style="margin-bottom:4px"><span class="lbl">文字色</span>
+              <input type="color" id="fColor" value="#ffe14d"></label>
+          </div>
+          <div class="grow">
+            <label class="f" style="margin-bottom:4px"><span class="lbl">不透明度 <b id="opVal">100</b>%</span>
+              <input type="range" id="fOpacity" min="0" max="100" value="100"></label>
+          </div>
+        </div>
+        <div class="swatches" id="colorSwatches"></div>
+        <div class="hr"></div>
+        <div class="row">
+          <div class="grow">
+            <label class="f" style="margin-bottom:4px"><span class="lbl">縁取り色</span>
+              <input type="color" id="fOutlineColor" value="#000000"></label>
+          </div>
+          <div class="grow">
+            <label class="f" style="margin-bottom:4px"><span class="lbl">縁の太さ <b id="olVal">5</b>px</span>
+              <input type="range" id="fOutline" min="0" max="20" value="5"></label>
+          </div>
+        </div>
+        <label class="chk"><input type="checkbox" id="fShadow" checked> 影をつける（読みやすさUP）</label>
+        <label class="chk"><input type="checkbox" id="fBg"> 背景プレートをつける</label>
+        <div class="row" id="bgOpts" style="margin-top:4px">
+          <div class="grow"><input type="color" id="fBgColor" value="#000000"></div>
+          <div class="grow"><input type="range" id="fBgOpacity" min="0" max="100" value="55"></div>
+          <span class="mini" id="bgOpVal">55%</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">5</span> 書式 ・ 動き</h2>
+        <div class="row">
+          <div class="grow">
+            <label class="f" style="margin:0"><span class="lbl">フォント</span>
+              <select id="fFont">
+                <option value="gothic">ゴシック（太め）</option>
+                <option value="mincho">明朝</option>
+                <option value="round">丸ゴシック</option>
+                <option value="mono">等幅</option>
+                <option value="impact">インパクト英字</option>
+              </select></label>
+          </div>
+          <div class="grow">
+            <label class="f" style="margin:0"><span class="lbl">文字揃え</span>
+              <div class="seg" id="alignSeg">
+                <button data-v="left">左</button><button data-v="center" class="on">中央</button><button data-v="right">右</button>
+              </div></label>
+          </div>
+        </div>
+        <label class="chk"><input type="checkbox" id="fBold" checked> 太字</label>
+        <div class="hr"></div>
+        <label class="f" style="margin:0"><span class="lbl">アニメーション</span>
+          <select id="fAnim">
+            <option value="none">なし（常時表示）</option>
+            <option value="blink">点滅</option>
+            <option value="pulse">ゆっくり明滅</option>
+            <option value="fade">ふわっと出現</option>
+            <option value="slide">左からスライドイン</option>
+            <option value="marquee">右→左に流れる（電子看板）</option>
+          </select></label>
+        <div class="row" id="mqSpeedRow" style="margin-top:8px">
+          <span class="mini" style="width:78px">流れる速さ</span>
+          <input type="range" class="grow" id="fMQ" min="4" max="40" value="14">
+          <span class="mini" id="mqVal">14秒</span>
+        </div>
+        <label class="f" style="margin-top:10px"><span class="lbl">自動で消える（0 = 消さない）: <b id="durVal">0</b> 秒</span>
+          <input type="range" id="fDuration" min="0" max="120" step="1" value="0"></label>
+        <div class="mini">変更を配信者が反映すると、視聴者側で再度カウントが始まります。</div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">6</span> 全体操作</h2>
+        <div class="row">
+          <button id="masterToggle" class="btn-green grow">👁 表示中（クリックで全消し）</button>
+          <button id="pushNow" class="btn-primary">↻ 今すぐ反映</button>
+        </div>
+        <div class="hr"></div>
+        <div class="row">
+          <button id="exportJson" class="btn-sm">💾 設定を保存</button>
+          <button id="importJson" class="btn-sm">📂 読み込み</button>
+          <button id="resetAll" class="btn-sm">↺ 初期化</button>
+          <label class="chk" style="margin:0 0 0 auto"><input type="checkbox" id="hidePreview"> プレビューの文字を隠す</label>
+        </div>
+        <div class="note warn" style="margin-bottom:0">プレビューを隠しても視聴者への表示は維持されます。配信中にこの画面が映る可能性があるときは ON にしてください。</div>
+      </section>
+    </div>
+
+    <!-- 右：プレビュー＆共有 -->
+    <div>
+      <section class="card">
+        <h2><span class="num">👁</span> プレビュー <span class="mini" style="font-weight:400">（これは配信映像ではありません）</span></h2>
+        <div class="stagewrap">
+          <div class="stage" id="stage">
+            <div class="stagelabel">PREVIEW 1920×1080</div>
+            <div class="mockvideo">— ここに配信映像が入ります —</div>
+            <div class="maskhint">プレビュー非表示中（視聴者には表示されています）</div>
+          </div>
+        </div>
+        <div class="mini" style="margin-top:8px">文字をドラッグ → 位置変更 ／ 文字をクリック → 編集対象を切替</div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">🔗</span> 視聴者に配るリンク</h2>
+        <label class="f" style="margin-top:0"><span class="lbl">視聴者用URL（これを1つ配るだけ）</span>
+          <input id="viewerUrl" readonly></label>
+        <div class="row">
+          <button id="copyUrl" class="btn-primary grow">📋 URLをコピー</button>
+          <button id="openViewer" class="btn-sm">↗ 別タブで確認</button>
+          <button id="copyBookmarklet" class="btn-sm">🔖 公式ページ用ブックマークレット</button>
+        </div>
+        <div class="mini" id="bmHint" style="margin-top:8px">ブックマークレット：公式の視聴ページに重ねたい場合用。視聴者がブックマークバーに登録してクリックします（設定はURLに埋め込まれるため更新時は再配布）。</div>
+        <div id="hostHint" class="note warn hide" style="margin-bottom:0">このファイルをローカルで直接開いています。視聴者に URL を配るには、同梱の <b>server.js</b> を <code>node server.js</code> で起動するか、静的ホスティング（Render など）に置いてください。ローカルのままでも<b>ブックマークレット</b>なら視聴者に配布できます。</div>
+        <div class="hr"></div>
+        <div class="mini">設定は入力から約0.4秒後に自動で全視聴者へ反映されます。反映されない場合は「今すぐ反映」を押してください。</div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">📖</span> 使い方</h2>
+        <ol style="margin:0;padding-left:20px;font-size:12.8px;color:#c6cee0;line-height:1.85">
+          <li>この画面を <b>スマホ or 別PC</b> で開く（配信画面に映らない場所）。</li>
+          <li>①ルームID を配信中のものに合わせ、②チャンネルID を決める。</li>
+          <li>③〜⑤で文字・位置・大きさ・色を設定。</li>
+          <li>「URLをコピー」を視聴者に配布。視聴者は開くだけで自動接続＋文字が出ます。</li>
+          <li>配信者は普段どおり rendercaster で画面送信。自分の画面には文字は出ません。</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 視聴者モード ==================== -->
+<div id="viewer" class="hide">
+  <div id="screen">
+    <video id="remoteVideo" autoplay playsinline muted></video>
+    <div id="waiting"><div><div class="spin"></div><div class="big">配信に接続中…</div><div class="mini" id="waitMsg"></div></div></div>
+  </div>
+  <div id="vbar">
+    <span class="st" id="vStatus">接続準備中</span>
+    <button id="vSound" class="vbtn btn-sm">🔇 音声オンにする</button>
+    <button id="vFull" class="vbtn btn-sm">⛶ 全画面</button>
+    <button id="vHide" class="vbtn btn-sm">🙈 文字を隠す</button>
+    <button id="vOfficial" class="vbtn btn-sm">↗ 公式ページ</button>
+  </div>
+</div>
+<div id="vsetup" class="hide"><div class="box">
+  <h2>📺 視聴するルーム</h2>
+  <div class="mini" style="margin-bottom:12px">配信者から受け取ったルームIDを入力してください。</div>
+  <input id="setupRoom" placeholder="ルームID" style="margin-bottom:10px">
+  <button id="setupGo" class="btn-primary" style="width:100%">視聴開始</button>
+</div></div>
+<div id="toast" class="toast hide"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   こっそりテロップ for Rendercaster
+   - 配信者の画面には一切文字を描かない
+   - 視聴者側で受信映像 <video> の上に DOM を重ねる
+   ========================================================================= */
+const SIGNAL = "wss://rendercaster.onrender.com/signal";
+const OFFICIAL = "https://rendercaster.onrender.com/";
+const FONTS = {
+  gothic:'system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif',
+  mincho:'"Hiragino Mincho ProN","Yu Mincho","MS PMincho",serif',
+  round:'"Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif',
+  mono:'"Courier New",Consolas,"MS Gothic",monospace',
+  impact:'Impact,"Arial Black",system-ui,sans-serif'
+};
+const PRESET_COLORS = ["#ffe14d","#ffffff","#000000","#ff5a5a","#ff9b3d","#59e08a","#57c7ff","#8f7bff","#ff74c8","#c9d1e2"];
+const ANIMS = ["none","blink","pulse","fade","slide","marquee"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp = (v,a,b) => Math.min(b,Math.max(a,v));
+const uid = () => "L"+Math.random().toString(36).slice(2,9);
+
+function defaultLayer(){
+  return {id:uid(),text:"視聴者だけに見えるメッセージ",x:50,y:16,size:64,color:"#ffe14d",
+    opacity:100,bold:true,font:"gothic",align:"center",outlineColor:"#000000",outline:5,
+    shadow:true,bg:false,bgColor:"#000000",bgOpacity:55,anim:"none",mq:14,duration:0,visible:true};
+}
+function defaultConfig(){ return {v:1, show:true, layers:[defaultLayer()]}; }
+function sanitize(raw){
+  const c = (raw && typeof raw === "object") ? raw : defaultConfig();
+  const out = {v:1, show:c.show !== false, layers:[]};
+  const list = Array.isArray(c.layers) ? c.layers.slice(0,12) : [];
+  for(const r of list){
+    const d = defaultLayer();
+    out.layers.push({
+      id: typeof r.id==="string" ? r.id : uid(),
+      text: typeof r.text==="string" ? r.text.slice(0,500) : d.text,
+      x:clamp(Number(r.x)||0,0,100), y:clamp(Number(r.y)||0,0,100),
+      size:clamp(Number(r.size)||64,6,400),
+      color:/^#[0-9a-f]{6}$/i.test(r.color)?r.color:d.color,
+      opacity:clamp(Number(r.opacity ?? 100),0,100),
+      bold:!!r.bold,
+      font:FONTS[r.font]?r.font:"gothic",
+      align:["left","center","right"].includes(r.align)?r.align:"center",
+      outlineColor:/^#[0-9a-f]{6}$/i.test(r.outlineColor)?r.outlineColor:"#000000",
+      outline:clamp(Number(r.outline ?? 5),0,40),
+      shadow:r.shadow!==false, bg:!!r.bg,
+      bgColor:/^#[0-9a-f]{6}$/i.test(r.bgColor)?r.bgColor:"#000000",
+      bgOpacity:clamp(Number(r.bgOpacity ?? 55),0,100),
+      anim:ANIMS.includes(r.anim)?r.anim:"none",
+      mq:clamp(Number(r.mq)||14,2,120),
+      duration:clamp(Number(r.duration)||0,0,3600),
+      visible:r.visible!==false
+    });
+  }
+  if(!out.layers.length) out.layers=[defaultLayer()];
+  return out;
+}
+
+/* ---------- オーバーレイ描画エンジン（3モード共通） ---------- */
+/* stage: position:relative な要素。高さ1080pxを基準にスケールする。 */
+function renderOverlay(stage, cfg, opts){
+  opts = opts || {};
+  const k = (stage.clientHeight || 1080) / 1080;
+  let root = stage.querySelector(".ov-layers");
+  if(!root){ root=document.createElement("div"); root.className="ov-layers"; stage.appendChild(root); }
+  const want = new Set(cfg.show ? cfg.layers.filter(l=>l.visible).map(l=>l.id) : []);
+  for(const el of Array.from(root.children)) if(!want.has(el.dataset.id)) el.remove();
+  if(!cfg.show) return;
+
+  for(const l of cfg.layers){
+    if(!l.visible) continue;
+    let el = root.querySelector('[data-id="'+CSS.escape(l.id)+'"]');
+    const sig = JSON.stringify([l.text,l.size,l.color,l.opacity,l.bold,l.font,l.align,l.outline,l.outlineColor,l.shadow,l.bg,l.bgColor,l.bgOpacity,l.anim,l.mq,l.duration,l.x,l.y]);
+    if(!el){
+      el=document.createElement("div");
+      el.className="ov-item"+(opts.draggable?" draggable":"");
+      el.dataset.id=l.id;
+      root.appendChild(el);
+    }
+    const isNew = el.dataset.sig !== sig;
+    if(isNew && el._timer){ clearTimeout(el._timer); el._timer=null; }
+    if(isNew && l.duration>0){
+      el._timer=setTimeout(()=>{ el.style.transition="opacity .5s"; el.style.opacity="0"; setTimeout(()=>el.remove(),550); }, l.duration*1000);
+    }
+    el.dataset.sig = sig;
+    el.textContent = l.text;
+    el.classList.toggle("sel", !!opts.selected && opts.selected===l.id);
+    el.classList.remove(...ANIMS.map(a=>"ov-anim-"+a));
+    if(l.anim!=="none") el.classList.add("ov-anim-"+l.anim);
+    const px = n => (n*k).toFixed(2)+"px";
+    const cs = el.style;
+    cs.left = l.anim==="marquee" ? "0%" : l.x+"%";
+    cs.top = l.y+"%";
+    cs.transform = l.anim==="marquee" ? "translateY(-50%)" : "translate(-50%,-50%)";
+    cs.maxWidth = l.anim==="marquee" ? "none" : "96%";
+    cs.width = l.anim==="marquee" ? "max-content" : "auto";
+    cs.setProperty("--mqdur", l.mq+"s");
+    cs.fontFamily = FONTS[l.font];
+    cs.fontSize = px(l.size);
+    cs.fontWeight = l.bold ? "800" : "400";
+    cs.textAlign = l.align;
+    cs.opacity = String(l.opacity/100);
+    cs.color = l.color;
+    cs.lineHeight = "1.25";
+    cs.letterSpacing = "0.01em";
+    const ow = px(l.outline);
+    if(l.outline>0){
+      cs.webkitTextStroke = ow+" "+l.outlineColor;
+      cs.paintOrder = "stroke fill";
+    } else { cs.webkitTextStroke = "0"; }
+    cs.textShadow = l.shadow ? `${px(3)} ${px(4)} ${px(6)} rgba(0,0,0,.95), 0 0 ${px(12)} rgba(0,0,0,.7)` : "none";
+    if(l.bg){
+      const a=(l.bgOpacity/100).toFixed(3);
+      cs.backgroundColor = hexA(l.bgColor,a);
+      cs.padding = px(14)+" "+px(26);
+      cs.borderRadius = px(14);
+      cs.boxShadow = `0 ${px(6)} ${px(22)} rgba(0,0,0,.45)`;
+    } else { cs.backgroundColor="transparent"; cs.padding="0"; cs.borderRadius="0"; cs.boxShadow="none"; }
+  }
+}
+function hexA(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+/* ---------- URL エンコード ---------- */
+function b64uEncode(obj){
+  const s = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(s);
+  let bin=""; for(const b of bytes) bin+=String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function b64uDecode(str){
+  const b = str.replace(/-/g,"+").replace(/_/g,"/");
+  const bin = atob(b + "=".repeat((4-b.length%4)%4));
+  const bytes = Uint8Array.from(bin, c=>c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/* =========================================================================
+   モード判定
+   ?view=1 ... 視聴者モード / それ以外 ... 配信者コントロール
+   ========================================================================= */
+const qs = new URLSearchParams(location.search);
+const IS_VIEWER = qs.get("view")==="1";
+const SERVER = location.protocol.startsWith("http") ? location.origin : "";
+
+/* =========================================================================
+   視聴者モード
+   ========================================================================= */
+if(IS_VIEWER){
+  document.body.classList.add("viewer");
+  $("control").classList.add("hide");
+  $("viewer").classList.remove("hide");
+  const video=$("remoteVideo"), screen=$("screen"), waiting=$("waiting");
+  let cfg = defaultConfig(), userHidden=false, pc=null, ws=null, generation=null;
+  let pendingICE=new Map(), reconnectTimer=null, retry=0, es=null, pollTimer=null;
+  let channel = qs.get("ch") || "";
+  let room = qs.get("room") || "";
+
+  // 設定の読み込み順: #c=スナップショット → サーバー(GET) → SSE/ポーリングでライブ更新
+  try{ if(location.hash.startsWith("#c=")) cfg = sanitize(b64uDecode(location.hash.slice(3))); }catch(e){}
+  if(qs.get("c")){ try{ cfg = sanitize(b64uDecode(qs.get("c"))); }catch(e){} }
+
+  function toast(msg){
+    const t=$("toast"); t.textContent=msg; t.classList.remove("hide");
+    clearTimeout(t._t); t._t=setTimeout(()=>t.classList.add("hide"),2200);
+  }
+  function status(s){ $("vStatus").textContent=s; $("waitMsg").textContent=s; }
+  function fitScreen(){
+    const vw=video.videoWidth||1920, vh=video.videoHeight||1080;
+    const W=window.innerWidth, H=window.innerHeight, r=Math.min(W/vw,H/vh);
+    screen.style.width=Math.round(vw*r)+"px";
+    screen.style.height=Math.round(vh*r)+"px";
+    draw();
+  }
+  function draw(){
+    renderOverlay(screen, userHidden?{v:1,show:false,layers:[]}:cfg, {});
+  }
+  window.addEventListener("resize",fitScreen);
+  video.addEventListener("loadedmetadata",()=>{ waiting.classList.add("hide"); fitScreen(); });
+  video.addEventListener("resize",fitScreen);
+
+  function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
+  function teardown(){
+    if(pc){ try{pc.close()}catch(e){} pc=null; }
+    generation=null; pendingICE.clear();
+    video.srcObject=null; waiting.classList.remove("hide"); fitScreen();
+  }
+  function connectSignal(){
+    if(!room) return;
+    clearTimeout(reconnectTimer);
+    status("シグナリングに接続中…");
+    try{ ws=new WebSocket(SIGNAL); }catch(e){ status("WebSocket生成失敗: "+e.message); return; }
+    ws.onopen=()=>{ retry=0; send({type:"join",role:"receiver",room}); status("ルーム「"+room+"」で配信を待機中…"); };
+    ws.onmessage=async ev=>{
+      let d; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+      if(d.type==="room-list"){
+        const exists=(d.rooms||[]).some(r=>r.id===room);
+        if(!exists) status("ルーム「"+room+"」の配信が見つかりません。待機中…");
+      } else if(d.type==="joined"){
+        status("ルーム参加：配信者を待機中…");
+      } else if(d.type==="sender-ready"){
+        status("配信者に接続中…");
+      } else if(d.type==="offer"){
+        await handleOffer(d);
+      } else if(d.type==="ice"){
+        if(d.generation===generation && pc && pc.remoteDescription){
+          try{ await pc.addIceCandidate(d.candidate); }catch(e){}
+        } else {
+          if(!pendingICE.has(d.generation)) pendingICE.set(d.generation,[]);
+          pendingICE.get(d.generation).push(d.candidate);
+        }
+      } else if(d.type==="sender-left"){
+        teardown(); status("配信が終了しました。再開を待機中…");
+      } else if(d.type==="error"){
+        status("エラー: "+d.message);
+      }
+    };
+    ws.onclose=()=>{
+      teardown(); status("切断。再接続します…");
+      retry++; reconnectTimer=setTimeout(connectSignal, Math.min(1000*retry,6000));
+    };
+    ws.onerror=()=>{ status("シグナリング接続エラー"); };
+  }
+  async function handleOffer(d){
+    if(generation!==null && d.generation<=generation) return;
+    if(pc){ try{pc.close()}catch(e){} }
+    generation=d.generation;
+    const p=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]});
+    pc=p;
+    let discAt=0,lastRestart=0;
+    p.ontrack=ev=>{
+      video.srcObject = ev.streams[0] || new MediaStream([ev.track]);
+      video.play().catch(()=>{});
+      status("受信中");
+    };
+    p.onicecandidate=ev=>{ if(ev.candidate) send({type:"ice",generation:d.generation,candidate:ev.candidate}); };
+    p.onconnectionstatechange=()=>{
+      const s=p.connectionState;
+      if(s==="connected"){ discAt=0; status("接続完了"); waiting.classList.add("hide"); }
+      else if(s==="failed"||s==="disconnected"){
+        if(!discAt) discAt=Date.now();
+        if(Date.now()-discAt>8000 && Date.now()-lastRestart>15000){
+          lastRestart=Date.now(); send({type:"restart-request",generation:d.generation});
+        }
+      } else if(s==="closed"){ /* noop */ }
+    };
+    try{
+      await p.setRemoteDescription(d.sdp);
+      if(pc!==p) return;
+      const ans=await p.createAnswer();
+      await p.setLocalDescription(ans);
+      send({type:"answer",generation:d.generation,sdp:p.localDescription});
+      for(const c of (pendingICE.get(d.generation)||[])){ try{ await p.addIceCandidate(c); }catch(e){} }
+      pendingICE.delete(d.generation);
+    }catch(e){ status("受信エラー: "+e.message); }
+  }
+  setInterval(()=>{
+    if(pc && (pc.connectionState==="failed"||pc.connectionState==="disconnected")){
+      send({type:"restart-request",generation});
+    }
+  },9000);
+
+  /* --- 設定の同期 --- */
+  function applyRemote(raw){
+    if(!raw || !raw.layers) return;
+    cfg = sanitize(raw); draw();
+  }
+  function startSync(){
+    if(!channel || !SERVER) return;
+    const base = SERVER+"/api";
+    fetch(base+"/config/"+encodeURIComponent(channel)).then(r=>r.ok?r.json():null)
+      .then(j=>{ if(j&&j.config){ applyRemote(j.config); status("設定を受信しました"); } })
+      .catch(()=>{});
+    try{
+      es=new EventSource(base+"/events/"+encodeURIComponent(channel));
+      es.onmessage=ev=>{ try{ const j=JSON.parse(ev.data); if(j.config) applyRemote(j.config); }catch(e){} };
+      es.onerror=()=>{ /* ポーリングにフォールバック */ };
+    }catch(e){}
+    clearInterval(pollTimer);
+    pollTimer=setInterval(()=>{
+      fetch(base+"/config/"+encodeURIComponent(channel)).then(r=>r.ok?r.json():null)
+        .then(j=>{ if(j&&j.config) applyRemote(j.config); }).catch(()=>{});
+    }, 4000);
+  }
+
+  /* --- UI --- */
+  $("vSound").onclick=()=>{
+    video.muted=!video.muted;
+    $("vSound").textContent = video.muted ? "🔇 音声オンにする" : "🔊 音声オン";
+    if(!video.muted) video.play().catch(()=>{});
+  };
+  $("vFull").onclick=()=>{ (document.fullscreenElement?document.exitFullscreen():screen.requestFullscreen?.()) ; };
+  $("vHide").onclick=()=>{
+    userHidden=!userHidden;
+    $("vHide").textContent = userHidden ? "👁 文字を表示" : "🙈 文字を隠す";
+    draw(); toast(userHidden?"この画面だけ文字を隠しました":"文字を再表示しました");
+  };
+  $("vOfficial").onclick=()=>window.open(OFFICIAL,"_blank","noopener");
+  $("setupGo").onclick=()=>{
+    const v=$("setupRoom").value.trim(); if(!v) return;
+    room=v; history.replaceState(null,"",location.pathname+"?view=1&ch="+encodeURIComponent(channel)+"&room="+encodeURIComponent(room)+location.hash);
+    $("vsetup").classList.add("hide"); connectSignal();
+  };
+  $("setupRoom").addEventListener("keydown",e=>{ if(e.key==="Enter") $("setupGo").click(); });
+
+  fitScreen(); draw();
+  if(room){ connectSignal(); }
+  else { $("vsetup").classList.remove("hide"); $("setupRoom").focus(); }
+  startSync();
+}
+
+/* =========================================================================
+   配信者コントロール画面
+   ========================================================================= */
+else {
+  const stage=$("stage");
+  let cfg = defaultConfig();
+  let selected = cfg.layers[0].id;
+  let pushTimer=null, roomListWS=null, roomListTimer=null;
+
+  try{ const saved=localStorage.getItem("rcot_cfg"); if(saved) cfg=sanitize(JSON.parse(saved)); }catch(e){}
+  selected = cfg.layers[0].id;
+
+  function cur(){ return cfg.layers.find(l=>l.id===selected) || cfg.layers[0]; }
+  function persist(){ try{ localStorage.setItem("rcot_cfg",JSON.stringify(cfg)); }catch(e){} }
+  function draw(){
+    stage.classList.toggle("hidden-text", $("hidePreview").checked);
+    renderOverlay(stage,cfg,{draggable:true,selected});
+    attachDrag();
+  }
+  function toast(msg){
+    let t=$("toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
+    t.textContent=msg; t.classList.remove("hide"); clearTimeout(t._t);
+    t._t=setTimeout(()=>t.classList.add("hide"),2000);
+  }
+
+  /* --- 同期 --- */
+  function channel(){
+    let c=$("channelId").value.trim();
+    if(!c){ c="ch-"+Math.random().toString(36).slice(2,8); $("channelId").value=c; }
+    return c;
+  }
+  function push(){
+    const ch=channel();
+    buildLinks();
+    if(!SERVER){ setSync("offline","オフライン（URL埋め込み）"); return; }
+    setSync("pending","送信中…");
+    fetch(SERVER+"/api/config/"+encodeURIComponent(ch),{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({config:cfg})
+    }).then(r=>{ if(!r.ok) throw new Error(r.status); setSync("on","同期中: "+ch); })
+      .catch(()=>setSync("err","同期失敗（URL埋め込みは有効）"));
+  }
+  function setSync(state,text){
+    const b=$("syncBadge");
+    b.textContent = (state==="on"?"● ":state==="err"?"▲ ":"") + text;
+    b.className = "badge"+(state==="on"?"":" off");
+    if(state==="err") b.style.background="#8a3b32"; else b.style.background="";
+  }
+  function schedulePush(){ persist(); draw(); clearTimeout(pushTimer); pushTimer=setTimeout(push,400); }
+
+  function buildLinks(){
+    const ch=$("channelId").value.trim();
+    const room=$("roomId").value.trim();
+    const snap=b64uEncode(cfg);
+    const base = SERVER ? SERVER+location.pathname : location.href.split(/[?#]/)[0];
+    let u = base+"?view=1";
+    if(SERVER) u += "&ch="+encodeURIComponent(ch);
+    u += "&room="+encodeURIComponent(room)+"#c="+snap;
+    $("viewerUrl").value=u;
+    $("hostHint").classList.toggle("hide", !!SERVER);
+    // ブックマークレット（公式ページに重ねる）
+    const payload={config:cfg, ch:ch, server:SERVER};
+    $("copyBookmarklet").dataset.code = "javascript:(function(){("+overlayCore.toString()+")("+JSON.stringify(payload)+");})();";
+  }
+
+  /* --- 入力バインド --- */
+  function bind(id,key,parse){
+    const el=$(id);
+    el.addEventListener("input",()=>{
+      const l=cur(); l[key]=parse?parse(el.value):el.value;
+      if(key==="text"){ $("charCount").textContent=l.text.length+" 文字"; renderChips(); }
+      schedulePush();
+    });
+  }
+  function bindCheck(id,key){
+    $(id).addEventListener("change",()=>{ cur()[key]=$(id).checked; renderChips(); schedulePush(); });
+  }
+  function syncForm(){
+    const l=cur();
+    $("fText").value=l.text; $("charCount").textContent=l.text.length+" 文字";
+    $("fX").value=l.x; $("xVal").textContent=l.x;
+    $("fY").value=l.y; $("yVal").textContent=l.y;
+    $("fSize").value=l.size; $("sizeVal").textContent=l.size;
+    $("fColor").value=l.color; $("fOpacity").value=l.opacity; $("opVal").textContent=l.opacity;
+    $("fOutlineColor").value=l.outlineColor; $("fOutline").value=l.outline; $("olVal").textContent=l.outline;
+    $("fShadow").checked=l.shadow; $("fBg").checked=l.bg;
+    $("fBgColor").value=l.bgColor; $("fBgOpacity").value=l.bgOpacity; $("bgOpVal").textContent=l.bgOpacity+"%";
+    $("bgOpts").classList.toggle("hide",!l.bg);
+    $("fFont").value=l.font; $("fBold").checked=l.bold;
+    $("alignSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===l.align));
+    $("fAnim").value=l.anim; $("fMQ").value=l.mq; $("mqVal").textContent=l.mq+"秒";
+    $("mqSpeedRow").classList.toggle("hide",l.anim!=="marquee");
+    $("fDuration").value=l.duration; $("durVal").textContent=l.duration;
+    $("layerVisible").checked=l.visible;
+    $("masterToggle").textContent=cfg.show?"👁 表示中（クリックで全消し）":"🙈 全消し中（クリックで表示）";
+    $("masterToggle").className=cfg.show?"btn-green grow":"btn-red grow";
+    renderChips();
+  }
+  function renderChips(){
+    const box=$("layerChips"); box.replaceChildren();
+    cfg.layers.forEach((l,i)=>{
+      const b=document.createElement("button");
+      b.textContent=(l.visible?"":"🚫 ")+((l.text||"（空）").split("\n")[0].slice(0,12)||"テキスト "+(i+1));
+      b.title=l.text; b.className=(l.id===selected?"on ":"")+(l.visible?"":"muted");
+      b.onclick=()=>{ selected=l.id; syncForm(); draw(); };
+      box.appendChild(b);
+    });
+  }
+
+  bind("fText","text");
+  $("fX").addEventListener("input",()=>{ cur().x=+$("fX").value; $("xVal").textContent=$("fX").value; schedulePush(); });
+  $("fY").addEventListener("input",()=>{ cur().y=+$("fY").value; $("yVal").textContent=$("fY").value; schedulePush(); });
+  $("fSize").addEventListener("input",()=>{ cur().size=+$("fSize").value; $("sizeVal").textContent=$("fSize").value; schedulePush(); });
+  $("fColor").addEventListener("input",()=>{ cur().color=$("fColor").value; schedulePush(); });
+  $("fOpacity").addEventListener("input",()=>{ cur().opacity=+$("fOpacity").value; $("opVal").textContent=$("fOpacity").value; schedulePush(); });
+  $("fOutlineColor").addEventListener("input",()=>{ cur().outlineColor=$("fOutlineColor").value; schedulePush(); });
+  $("fOutline").addEventListener("input",()=>{ cur().outline=+$("fOutline").value; $("olVal").textContent=$("fOutline").value; schedulePush(); });
+  $("fBgColor").addEventListener("input",()=>{ cur().bgColor=$("fBgColor").value; schedulePush(); });
+  $("fBgOpacity").addEventListener("input",()=>{ cur().bgOpacity=+$("fBgOpacity").value; $("bgOpVal").textContent=$("fBgOpacity").value+"%"; schedulePush(); });
+  bindCheck("fShadow","shadow"); bindCheck("fBg","bg"); bindCheck("fBold","bold");
+  bind("fFont","font"); bind("fAnim","anim");
+  $("fBg").addEventListener("change",()=>$("bgOpts").classList.toggle("hide",!$("fBg").checked));
+  $("fAnim").addEventListener("change",()=>$("mqSpeedRow").classList.toggle("hide",$("fAnim").value!=="marquee"));
+  $("fMQ").addEventListener("input",()=>{ cur().mq=+$("fMQ").value; $("mqVal").textContent=$("fMQ").value+"秒"; schedulePush(); });
+  $("fDuration").addEventListener("input",()=>{ cur().duration=+$("fDuration").value; $("durVal").textContent=$("fDuration").value; schedulePush(); });
+  $("alignSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    cur().align=b.dataset.v;
+    $("alignSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+    schedulePush();
+  });
+  $("layerVisible").addEventListener("change",()=>{ cur().visible=$("layerVisible").checked; renderChips(); schedulePush(); });
+
+  // 位置プリセット
+  const POS=[["左上",8,8],["上",50,8],["右上",92,8],["左",8,50],["中央",50,50],["右",92,50],["左下",8,92],["下",50,92],["右下",92,92]];
+  POS.forEach(([name,x,y])=>{
+    const b=document.createElement("button"); b.textContent=name;
+    b.onclick=()=>{ cur().x=x; cur().y=y; $("fX").value=x; $("fY").value=y; $("xVal").textContent=x; $("yVal").textContent=y; schedulePush(); };
+    $("posGrid").appendChild(b);
+  });
+  // 色プリセット
+  PRESET_COLORS.forEach(c=>{
+    const b=document.createElement("button"); b.className="sw"; b.style.background=c; b.title=c;
+    b.onclick=()=>{ cur().color=c; $("fColor").value=c; schedulePush(); };
+    $("colorSwatches").appendChild(b);
+  });
+
+  // レイヤー操作
+  $("addLayer").onclick=()=>{ const l=defaultLayer(); l.text="新しいテキスト "+(cfg.layers.length+1); l.y=Math.min(92,16+cfg.layers.length*14); cfg.layers.push(l); selected=l.id; syncForm(); schedulePush(); };
+  $("dupLayer").onclick=()=>{ const c=JSON.parse(JSON.stringify(cur())); c.id=uid(); c.y=Math.min(95,c.y+8); cfg.layers.push(c); selected=c.id; syncForm(); schedulePush(); };
+  $("delLayer").onclick=()=>{
+    if(cfg.layers.length===1){ toast("最後の1つは削除できません（内容を空にしてください）"); return; }
+    cfg.layers=cfg.layers.filter(l=>l.id!==selected); selected=cfg.layers[0].id; syncForm(); schedulePush();
+  };
+
+  // 全体操作
+  $("masterToggle").onclick=()=>{ cfg.show=!cfg.show; syncForm(); schedulePush(); toast(cfg.show?"表示しました":"全消ししました"); };
+  $("pushNow").onclick=()=>{ clearTimeout(pushTimer); push(); toast("反映しました"); };
+  $("hidePreview").addEventListener("change",draw);
+  $("reroll").onclick=()=>{ $("channelId").value="ch-"+Math.random().toString(36).slice(2,8); schedulePush(); };
+  $("channelId").addEventListener("input",()=>{ buildLinks(); });
+  $("roomId").addEventListener("input",buildLinks);
+  $("exportJson").onclick=()=>{
+    const blob=new Blob([JSON.stringify(cfg,null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="kossori-telop.json"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+  $("importJson").onclick=()=>{
+    const i=document.createElement("input"); i.type="file"; i.accept=".json,application/json";
+    i.onchange=async()=>{ try{ cfg=sanitize(JSON.parse(await i.files[0].text())); selected=cfg.layers[0].id; syncForm(); schedulePush(); toast("読み込みました"); }catch(e){ toast("読み込み失敗"); } };
+    i.click();
+  };
+  $("resetAll").onclick=()=>{ if(confirm("設定を初期化しますか？")){ cfg=defaultConfig(); selected=cfg.layers[0].id; syncForm(); schedulePush(); } };
+  $("copyUrl").onclick=async()=>{
+    buildLinks(); const v=$("viewerUrl").value;
+    try{ await navigator.clipboard.writeText(v); toast("コピーしました"); }
+    catch(e){ $("viewerUrl").select(); document.execCommand("copy"); toast("コピーしました"); }
+  };
+  $("openViewer").onclick=()=>{ buildLinks(); window.open($("viewerUrl").value,"_blank","noopener"); };
+  $("copyBookmarklet").onclick=async()=>{
+    buildLinks(); const v=$("copyBookmarklet").dataset.code;
+    try{ await navigator.clipboard.writeText(v); toast("ブックマークレットをコピー → ブックマークのURL欄に貼り付け"); }
+    catch(e){ prompt("これをブックマークのURLに貼り付けてください:",v); }
+  };
+
+  /* --- プレビューのドラッグ --- */
+  function attachDrag(){
+    stage.querySelectorAll(".ov-item.draggable").forEach(el=>{
+      if(el._bound) return; el._bound=true;
+      el.addEventListener("click",()=>{ selected=el.dataset.id; syncForm(); draw(); });
+      el.addEventListener("pointerdown",e=>{
+        const id=el.dataset.id; const l=cfg.layers.find(x=>x.id===id); if(!l) return;
+        selected=id; syncForm();
+        el.setPointerCapture(e.pointerId); el.classList.add("dragging");
+        const rect=stage.getBoundingClientRect();
+        const move=ev=>{
+          l.x=clamp(+(((ev.clientX-rect.left)/rect.width)*100).toFixed(1),0,100);
+          l.y=clamp(+(((ev.clientY-rect.top)/rect.height)*100).toFixed(1),0,100);
+          $("fX").value=l.x; $("fY").value=l.y; $("xVal").textContent=l.x; $("yVal").textContent=l.y;
+          el.style.left=l.x+"%"; el.style.top=l.y+"%";
+        };
+        const up=()=>{ el.classList.remove("dragging"); el.removeEventListener("pointermove",move); el.removeEventListener("pointerup",up); schedulePush(); };
+        el.addEventListener("pointermove",move); el.addEventListener("pointerup",up);
+        e.preventDefault();
+      });
+    });
+  }
+  new ResizeObserver(()=>draw()).observe(stage);
+
+  /* --- 配信中ルーム一覧を取得（任意の補助） --- */
+  function fetchRooms(){
+    try{
+      if(roomListWS && roomListWS.readyState<=1) return;
+      roomListWS=new WebSocket(SIGNAL);
+      roomListWS.onmessage=ev=>{
+        try{
+          const d=JSON.parse(ev.data);
+          if(d.type==="room-list"){
+            const dl=$("roomSuggest"); dl.replaceChildren();
+            (d.rooms||[]).forEach(r=>{ const o=document.createElement("option"); o.value=r.id; o.label=r.name||""; dl.appendChild(o); });
+            $("roomListHint").textContent = d.rooms && d.rooms.length
+              ? "配信中: "+d.rooms.map(r=>"「"+r.id+"」").join(" ")
+              : "現在配信中のルームはありません";
+            if(!$("roomId").value && d.rooms && d.rooms.length){ $("roomId").value=d.rooms[0].id; buildLinks(); }
+          }
+        }catch(e){}
+      };
+      roomListWS.onclose=()=>{ roomListWS=null; };
+      setTimeout(()=>{ try{ roomListWS&&roomListWS.close(); }catch(e){} }, 9000);
+    }catch(e){ $("roomListHint").textContent="ルーム一覧を取得できませんでした（手入力してください）"; }
+  }
+
+  /* --- 初期化 --- */
+  if(!$("channelId").value) $("channelId").value="ch-"+Math.random().toString(36).slice(2,8);
+  if(qs.get("room")) $("roomId").value=qs.get("room");
+  if(qs.get("ch")) $("channelId").value=qs.get("ch");
+  syncForm(); draw(); buildLinks(); push(); fetchRooms();
+  roomListTimer=setInterval(fetchRooms,20000);
+}
+
+/* =========================================================================
+   公式ページ（rendercaster.onrender.com）に注入するブックマークレット本体
+   ※ toString() してブックマークレットに埋め込むため、外部変数を参照しないこと
+   ========================================================================= */
+function overlayCore(payload){
+  const FONTS={
+    gothic:'system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif',
+    mincho:'"Hiragino Mincho ProN","Yu Mincho",serif',
+    round:'"Hiragino Maru Gothic ProN","Yu Gothic",sans-serif',
+    mono:'"Courier New",Consolas,monospace',
+    impact:'Impact,"Arial Black",sans-serif'
+  };
+  const hexA=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;};
+  let cfg=payload.config;
+  const ID="__kossori_overlay_root__";
+  let root=document.getElementById(ID);
+  if(root){ root.remove(); }
+  let style=document.getElementById(ID+"_css");
+  if(!style){
+    style=document.createElement("style"); style.id=ID+"_css";
+    style.textContent=`
+      #${ID}{position:absolute;inset:0;pointer-events:none;z-index:99;overflow:hidden}
+      #${ID} .ov-item{position:absolute;transform:translate(-50%,-50%);white-space:pre-wrap;word-break:break-word;line-height:1.25;text-align:center;max-width:96%}
+      @keyframes ksoBlink{0%,49%{opacity:1}50%,100%{opacity:.05}}
+      @keyframes ksoPulse{0%,100%{opacity:1}50%{opacity:.35}}
+      @keyframes ksoFade{from{opacity:0}to{opacity:1}}
+      @keyframes ksoSlide{from{opacity:0;transform:translate(-50%,-50%) translateX(-70px)}to{opacity:1;transform:translate(-50%,-50%) translateX(0)}}
+      @keyframes ksoMarquee{from{transform:translate(100%,-50%)}to{transform:translate(-120%,-50%)}}
+      .kso-blink{animation:ksoBlink 1.1s steps(1,end) infinite}
+      .kso-pulse{animation:ksoPulse 1.6s ease-in-out infinite}
+      .kso-fade{animation:ksoFade .55s ease-out both}
+      .kso-slide{animation:ksoSlide .55s ease-out both}`;
+    document.head.appendChild(style);
+  }
+  function mount(){
+    const v=document.getElementById("remoteVideo");
+    if(!v) return false;
+    let host=v.parentElement;
+    if(!host) return false;
+    const cs=getComputedStyle(host);
+    if(cs.position==="static") host.style.position="relative";
+    root=document.createElement("div"); root.id=ID;
+    host.appendChild(root);
+    draw();
+    if(window.ResizeObserver){ new ResizeObserver(draw).observe(v); }
+    window.addEventListener("resize",draw);
+    window.addEventListener("scroll",draw,true);
+    setInterval(draw,1200);
+    return true;
+  }
+  function draw(){
+    if(!root) return;
+    const v=document.getElementById("remoteVideo");
+    if(!v||!v.isConnected){ root.remove(); root=null; return; }
+    // video 要素の表示領域にぴったり合わせる
+    const host=root.parentElement;
+    const vr=v.getBoundingClientRect(), hr=host.getBoundingClientRect();
+    const hcs=getComputedStyle(host);
+    const bl=parseFloat(hcs.borderLeftWidth)||0, bt=parseFloat(hcs.borderTopWidth)||0;
+    root.style.left=(vr.left-hr.left-bl)+"px";
+    root.style.top=(vr.top-hr.top-bt)+"px";
+    root.style.width=vr.width+"px";
+    root.style.height=vr.height+"px";
+    const k=(vr.height||1080)/1080;
+    const px=n=>(n*k).toFixed(2)+"px";
+    root.replaceChildren();
+    if(!cfg.show) return;
+    for(const l of cfg.layers){
+      if(!l.visible) continue;
+      const el=document.createElement("div"); el.className="ov-item";
+      if(l.anim&&l.anim!=="none"){
+        if(l.anim==="marquee"){
+          el.style.cssText+="left:0;width:max-content;max-width:none;animation:ksoMarquee "+l.mq+"s linear infinite;";
+        } else el.classList.add("kso-"+l.anim);
+      }
+      el.textContent=l.text;
+      el.style.left=(l.anim==="marquee"?"0%":l.x+"%");
+      el.style.top=l.y+"%";
+      if(l.anim==="marquee") el.style.transform="translateY(-50%)";
+      el.style.fontFamily=FONTS[l.font]||FONTS.gothic;
+      el.style.fontSize=px(l.size);
+      el.style.fontWeight=l.bold?"800":"400";
+      el.style.textAlign=l.align;
+      el.style.opacity=String(l.opacity/100);
+      el.style.color=l.color;
+      if(l.outline>0){el.style.webkitTextStroke=px(l.outline)+" "+l.outlineColor;el.style.paintOrder="stroke fill";}
+      if(l.shadow) el.style.textShadow=px(3)+" "+px(4)+" "+px(6)+" rgba(0,0,0,.95), 0 0 "+px(12)+" rgba(0,0,0,.7)";
+      if(l.bg){
+        el.style.backgroundColor=hexA(l.bgColor,(l.bgOpacity/100).toFixed(3));
+        el.style.padding=px(14)+" "+px(26);
+        el.style.borderRadius=px(14);
+      }
+      root.appendChild(el);
+      if(l.duration>0){ (function(node){setTimeout(()=>{node.style.transition="opacity .5s";node.style.opacity="0";setTimeout(()=>node.remove(),550);},l.duration*1000);})(el); }
+    }
+  }
+  // ライブ同期（サーバーがある場合のみ・4秒ポーリング）
+  if(payload.ch && payload.server){
+    const url=payload.server+"/api/config/"+encodeURIComponent(payload.ch);
+    const poll=()=>fetch(url).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.config){cfg=j.config;draw();}}).catch(()=>{});
+    poll(); setInterval(poll,4000);
+  }
+  let tries=0;
+  const t=setInterval(()=>{ if(mount()){clearInterval(t);} else if(++tries>40){clearInterval(t);alert("rendercaster の視聴ページで実行してください");} },250);
+  mount();
+  console.log("こっそりテロップ: 適用しました");
+}
+</script>
+</body>
+</html>

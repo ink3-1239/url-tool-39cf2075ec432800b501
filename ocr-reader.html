@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>範囲読み上げツール｜配信向け OCR + TTS</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  :root{
+    --bg:#0f1117; --panel:#1a1d29; --panel2:#222636; --line:#333850;
+    --text:#f2f3f7; --sub:#a7adc2; --accent:#7c5cff; --accent2:#00c2a8;
+    --danger:#ff5470; --warn:#ffb020;
+  }
+  body{margin:0;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:16px 20px 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  h1{font-size:20px;margin:0} h1 span{color:var(--accent2)}
+  .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);padding:5px 9px;border-radius:999px;background:var(--panel)}
+  main{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;padding:12px 20px 20px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .card h2{font-size:15px;margin:0 0 12px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  button:hover{filter:brightness(1.2)} button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent)}
+  button.good{background:var(--accent2);border-color:var(--accent2);color:#04251f}
+  button.danger{background:var(--danger);border-color:var(--danger)}
+  button.big{font-size:16px;padding:13px 18px;flex:1}
+  .hint{font-size:12px;color:var(--sub);line-height:1.7}
+  /* capture area */
+  #stage{position:relative;background:#000;border:1px dashed #444a68;border-radius:12px;min-height:300px;overflow:hidden;user-select:none;touch-action:none}
+  #stage video,#stage img{width:100%;display:block}
+  #placeholder{padding:70px 20px;text-align:center;color:var(--sub);line-height:1.9}
+  #selection{position:absolute;border:2px solid var(--accent2);background:rgba(0,194,168,.18);display:none;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.35)}
+  #selInfo{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.75);color:#fff;font-size:12px;padding:4px 8px;border-radius:6px;display:none}
+  progress{width:100%;height:10px;accent-color:var(--accent2)}
+  textarea{width:100%;min-height:180px;background:#10121c;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px;line-height:1.8;resize:vertical}
+  input[type=number],select{background:#10121c;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px}
+  input[type=range]{accent-color:var(--accent);width:140px}
+  label{font-size:13px;color:var(--sub);display:flex;gap:6px;align-items:center}
+  .radioRow{display:flex;gap:8px;flex-wrap:wrap}
+  .radioRow label{background:var(--panel2);border:1px solid var(--line);padding:8px 10px;border-radius:999px;cursor:pointer;color:var(--text)}
+  .radioRow input{accent-color:var(--accent2)}
+  #preview,#readingBox{background:#10121c;border:1px solid var(--line);border-radius:10px;padding:12px;min-height:70px;line-height:1.9;white-space:pre-wrap;word-break:break-all}
+  #readingBox .cur{background:#ffe45e;color:#111;border-radius:4px;padding:1px 2px}
+  #readingBox .done{color:var(--sub)}
+  .stat{font-size:12px;color:var(--sub)}
+  kbd{background:#000;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:11px}
+  .sep{height:1px;background:var(--line);margin:14px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎙️ 範囲読み上げツール <span>OCR + 読み上げ</span></h1>
+  <span class="badge">配信向け / ブラウザだけで動作 / インストール不要</span>
+</header>
+
+<main>
+  <!-- LEFT: capture -->
+  <section class="card">
+    <h2>① 画面・画像を取り込む</h2>
+    <div class="row">
+      <button class="primary" id="btnShare">🖥️ 画面共有を開始</button>
+      <button id="btnStopShare">共有を停止</button>
+      <label style="cursor:pointer;background:var(--panel2);border:1px solid var(--line);padding:10px 14px;border-radius:10px;color:var(--text);font-weight:700">
+        🖼️ 画像を開く <input type="file" id="fileInput" accept="image/*" hidden>
+      </label>
+      <button id="btnPaste">📋 画像を貼り付け</button>
+    </div>
+    <p class="hint" style="margin:10px 0">
+      ゲーム画面・ブラウザ・アプリなどを共有したら、下の画面上で
+      <b style="color:#fff">マウスをドラッグして読みたい範囲を囲んで</b>ください。
+    </p>
+
+    <div id="stage">
+      <div id="placeholder">ここに共有画面が表示されます<br><span style="font-size:12px">※ 画面共有が使えない環境では「画像を開く」でも使えます</span></div>
+      <video id="video" autoplay playsinline style="display:none"></video>
+      <img id="image" style="display:none" alt="">
+      <div id="selection"></div>
+      <div id="selInfo"></div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button class="good big" id="btnOcr" disabled>🔍 選択範囲の文字を読み取る（OCR）</button>
+      <button id="btnShotOcr" disabled title="今の画面全体を読み取ります">全体を読み取る</button>
+    </div>
+    <div id="ocrArea" style="display:none;margin-top:10px">
+      <progress id="ocrProgress" value="0" max="1"></progress>
+      <div class="stat" id="ocrStatus">準備中…</div>
+    </div>
+    <p class="hint">
+      ※ 初回OCRは日本語言語データの読み込みで少し時間がかかります（2回目以降は速くなります）。<br>
+      ※ 文字が小さい・薄い場合は、ゲーム側の文字サイズを大きくすると認識精度が上がります。
+    </p>
+
+    <div class="sep"></div>
+    <h2>🔴 チャット監視モード（自動読み上げ）</h2>
+    <p class="hint" style="margin:0 0 10px">
+      上でドラッグ指定した範囲を一定間隔で自動OCRし、<b style="color:#fff">新しく増えた行だけ</b>を順番に読み上げます。
+      監視開始時点ですでに表示されているコメントは読みません。
+    </p>
+    <div class="row">
+      <label>監視間隔
+        <select id="monitorInterval">
+          <option value="2000">2秒</option>
+          <option value="3000" selected>3秒</option>
+          <option value="5000">5秒</option>
+          <option value="10000">10秒</option>
+        </select>
+      </label>
+      <label>1件の最大文字数 <input type="number" id="monitorMaxLen" value="80" min="10" max="300" style="width:80px"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label><input type="checkbox" id="monitorStripName" checked> ユーザー名（名前: 本文）を読み飛ばす</label>
+      <label><input type="checkbox" id="monitorSkipUrl" checked> URLを読み飛ばす</label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label style="flex:1">NGワード（カンマ区切り） <input type="text" id="monitorNg" placeholder="例: スパム,宣伝" style="flex:1;min-width:180px"></label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="danger big" id="btnMonitorStart">🔴 監視を開始</button>
+      <button id="btnMonitorStop" disabled>監視を停止</button>
+      <button id="btnClearQueue" title="読み上げ待ちをすべて消します">キューをクリア</button>
+    </div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span class="stat"><span class="liveDot" id="liveDot"></span> <span id="monitorStatus">監視していません</span></span>
+      <span class="stat">読み上げ待ち: <b id="queueCount" style="color:#fff">0</b> 件 ｜ 検知: <b id="monitorCount" style="color:#fff">0</b> 件</span>
+    </div>
+    <ul id="monitorLog"></ul>
+  </section>
+
+  <!-- RIGHT: text & TTS -->
+  <section class="card">
+    <h2>② 読み上げる範囲を決める</h2>
+    <textarea id="text" placeholder="OCR結果がここに入ります。直接文章を貼り付けてもOKです。"></textarea>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <span class="stat"><span id="charCount">0</span> 文字 ｜ 選択中: <span id="selCount">0</span> 文字</span>
+      <button id="btnClearText" style="padding:6px 10px">クリア</button>
+    </div>
+
+    <div class="sep"></div>
+    <div class="radioRow" id="rangeModes">
+      <label><input type="radio" name="mode" value="all" checked> 全文</label>
+      <label><input type="radio" name="mode" value="selection"> テキストの選択範囲</label>
+      <label><input type="radio" name="mode" value="range"> 文字数で指定</label>
+    </div>
+    <div class="row" id="rangeInputs" style="margin-top:10px;display:none">
+      <label>開始 <input type="number" id="rangeStart" value="1" min="1" style="width:90px"> 文字目</label>
+      <span>〜</span>
+      <label>終了 <input type="number" id="rangeEnd" value="100" min="1" style="width:90px"> 文字目</label>
+      <button id="btnApplyRange" style="padding:7px 10px">範囲を反映</button>
+    </div>
+    <p class="hint" id="modeHint">全文を読み上げます。</p>
+
+    <label style="margin-bottom:6px">読み上げ対象プレビュー</label>
+    <div id="preview">（テキストを入力してください）</div>
+
+    <div class="sep"></div>
+    <h2>③ 声の設定＆再生</h2>
+    <div class="row">
+      <label>声 <select id="voiceSelect" style="max-width:280px"></select></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label>速度 <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1"><span id="rateVal">1.0</span></label>
+      <label>高さ <input type="range" id="pitch" min="0" max="2" step="0.1" value="1"><span id="pitchVal">1.0</span></label>
+      <label>音量 <input type="range" id="volume" min="0" max="1" step="0.1" value="1"><span id="volVal">1.0</span></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label><input type="checkbox" id="optClean" checked> 記号（※・／など）を読み飛ばす</label>
+      <label><input type="checkbox" id="optSkipEmpty" checked> 空行を飛ばす</label>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="primary big" id="btnPlay">▶ 読み上げ</button>
+      <button id="btnPause">⏸ 一時停止／再開</button>
+      <button class="danger" id="btnStop">⏹ 停止</button>
+    </div>
+    <p class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 読み上げ開始 ／ <kbd>Esc</kbd> 停止</p>
+
+    <label style="margin:10px 0 6px">読み上げ中ハイライト</label>
+    <div id="readingBox">まだ再生していません</div>
+    <div class="stat" id="playStatus" style="margin-top:6px"></div>
+  </section>
+</main>
+
+<p class="hint" style="padding:0 20px 20px">
+  💡 配信での使い方：このページをブラウザで開いたまま、ゲーム画面を共有 → セリフ範囲をドラッグ → OCR → ▶読み上げ。
+  音声はPCのスピーカーから出るので、そのまま配信に乗せられます（OBSでは「デスクトップ音声」またはアプリ音声キャプチャで取り込んでください）。
+</p>
+
+<script>
+const $ = id => document.getElementById(id);
+const stage=$('stage'), video=$('video'), image=$('image'), selBox=$('selection'), selInfo=$('selInfo');
+let stream=null, mediaType=null; // 'video' | 'image'
+let rect=null; // normalized {x,y,w,h} 0..1
+let dragging=false, startPos=null;
+
+// ---------- stage helpers ----------
+function activeMedia(){ return mediaType==='video'?video:image; }
+function showMedia(type){
+  mediaType=type;
+  $('placeholder').style.display='none';
+  video.style.display = type==='video'?'block':'none';
+  image.style.display = type==='image'?'block':'none';
+  clearSelection();
+}
+function clearSelection(){
+  rect=null; selBox.style.display='none'; selInfo.style.display='none';
+  $('btnOcr').disabled = !mediaType;
+}
+function stagePos(e){
+  const r=stage.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  return {x:Math.min(1,Math.max(0,x)), y:Math.min(1,Math.max(0,y))};
+}
+stage.addEventListener('pointerdown', e=>{
+  if(!mediaType) return;
+  dragging=true; startPos=stagePos(e); stage.setPointerCapture(e.pointerId);
+  rect={...startPos,w:0,h:0}; drawSel();
+});
+stage.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const p=stagePos(e);
+  rect={x:Math.min(startPos.x,p.x), y:Math.min(startPos.y,p.y), w:Math.abs(p.x-startPos.x), h:Math.abs(p.y-startPos.y)};
+  drawSel();
+});
+stage.addEventListener('pointerup', ()=>{
+  dragging=false;
+  if(rect && (rect.w<0.01||rect.h<0.01)){ clearSelection(); }
+  else if(rect){ $('btnOcr').disabled=false; }
+});
+function drawSel(){
+  if(!rect) return;
+  selBox.style.display='block';
+  selBox.style.left=(rect.x*100)+'%'; selBox.style.top=(rect.y*100)+'%';
+  selBox.style.width=(rect.w*100)+'%'; selBox.style.height=(rect.h*100)+'%';
+  selInfo.style.display='block';
+  selInfo.textContent=`選択範囲 ${Math.round(rect.w*100)}% × ${Math.round(rect.h*100)}%`;
+}
+
+// ---------- capture ----------
+$('btnShare').onclick=async()=>{
+  try{
+    stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
+    video.srcObject=stream; showMedia('video');
+    $('btnShotOcr').disabled=false;
+    stream.getVideoTracks()[0].addEventListener('ended',()=>$('btnStopShare').click());
+  }catch(e){ alert('画面共有を開始できませんでした。\nブラウザの許可ポップアップで画面を選んでください。\n（'+e.message+'）'); }
+};
+$('btnStopShare').onclick=()=>{
+  if(typeof stopMonitor==='function') stopMonitor();
+  stopSpeak && typeof stopSpeak==='function' && speechSynthesis.cancel();
+  if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}
+  video.srcObject=null; mediaType=null;
+  video.style.display=image.style.display='none'; $('placeholder').style.display='block';
+  clearSelection(); $('btnShotOcr').disabled=true; $('btnOcr').disabled=true;
+};
+$('fileInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  image.src=URL.createObjectURL(f); showMedia('image'); $('btnShotOcr').disabled=false;
+};
+$('btnPaste').onclick=async()=>{
+  try{
+    const items=await navigator.clipboard.read();
+    for(const it of items){
+      const type=it.types.find(t=>t.startsWith('image/'));
+      if(type){ const blob=await it.getType(type); image.src=URL.createObjectURL(blob); showMedia('image'); $('btnShotOcr').disabled=false; return; }
+    }
+    alert('クリップボードに画像がありませんでした。スクリーンショットを撮った後に押してください。');
+  }catch(e){ alert('貼り付けできませんでした。画像をコピーした状態でお試しください。'); }
+};
+document.addEventListener('paste', e=>{
+  const f=[...e.clipboardData.files].find(f=>f.type.startsWith('image/'));
+  if(f){ image.src=URL.createObjectURL(f); showMedia('image'); $('btnShotOcr').disabled=false; }
+});
+
+function captureCanvas(useRect){
+  const m=activeMedia(); if(!m) return null;
+  const srcW = mediaType==='video'? m.videoWidth : m.naturalWidth;
+  const srcH = mediaType==='video'? m.videoHeight : m.naturalHeight;
+  if(!srcW) return null;
+  const r = useRect && rect ? rect : {x:0,y:0,w:1,h:1};
+  const sx=r.x*srcW, sy=r.y*srcH, sw=Math.max(1,r.w*srcW), sh=Math.max(1,r.h*srcH);
+  // OCR精度のため2倍に拡大＋白黒・コントラスト強調
+  const scale = sw<800 ? 2 : 1.5;
+  const c=document.createElement('canvas'); c.width=sw*scale; c.height=sh*scale;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(m, sx,sy,sw,sh, 0,0,c.width,c.height);
+  const img=ctx.getImageData(0,0,c.width,c.height), d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    const v=g>150?255:(g<90?0:Math.min(255,Math.max(0,(g-110)*1.6+128)));
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return c;
+}
+
+async function runOcr(useRect){
+  const canvas=captureCanvas(useRect);
+  if(!canvas){ alert('まず画面共有か画像の読み込みをしてください。'); return; }
+  $('ocrArea').style.display='block'; $('btnOcr').disabled=true;
+  try{
+    const res=await Tesseract.recognize(canvas,'jpn+eng',{
+      logger:m=>{
+        if(m.status==='recognizing text'){ $('ocrProgress').value=m.progress; $('ocrStatus').textContent='読み取り中… '+Math.round(m.progress*100)+'%'; }
+        else $('ocrStatus').textContent='準備中…（初回は言語データをダウンロードします）';
+      }
+    });
+    let text=res.data.text.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+    const ta=$('text');
+    ta.value = ta.value.trim() ? ta.value.trim()+'\n'+text : text;
+    updateTextInfo(); updatePreview();
+    $('ocrStatus').textContent='✅ 読み取り完了（'+text.length+'文字）';
+  }catch(e){
+    $('ocrStatus').textContent='❌ OCRに失敗しました: '+e.message;
+  }finally{ $('btnOcr').disabled=false; }
+}
+$('btnOcr').onclick=()=>runOcr(true);
+$('btnShotOcr').onclick=()=>runOcr(false);
+
+// ---------- text / range ----------
+const ta=$('text');
+function updateTextInfo(){
+  $('charCount').textContent=ta.value.length;
+  $('selCount').textContent=Math.max(0,ta.selectionEnd-ta.selectionStart);
+  const end=$('rangeEnd'); if(+end.value>ta.value.length) end.value=Math.max(1,ta.value.length);
+  end.max=ta.value.length; $('rangeStart').max=ta.value.length;
+}
+ta.addEventListener('input',()=>{updateTextInfo();updatePreview();});
+ta.addEventListener('select',()=>{updateTextInfo(); if(mode()==='selection') updatePreview();});
+function mode(){ return document.querySelector('input[name=mode]:checked').value; }
+document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{
+  $('rangeInputs').style.display = mode()==='range'?'flex':'none';
+  $('modeHint').textContent = {
+    all:'全文を読み上げます。',
+    selection:'テキスト欄でマウス選択した部分だけを読み上げます。先にテキストをドラッグで選んでください。',
+    range:'開始〜終了の文字番号の範囲だけを読み上げます。'
+  }[mode()];
+  updatePreview();
+});
+['rangeStart','rangeEnd'].forEach(id=>$(id).addEventListener('input',updatePreview));
+$('btnApplyRange').onclick=updatePreview;
+$('btnClearText').onclick=()=>{ta.value='';updateTextInfo();updatePreview();stopSpeak();};
+
+function getTargetText(){
+  const m=mode(), v=ta.value;
+  if(m==='selection') return v.slice(ta.selectionStart, ta.selectionEnd);
+  if(m==='range'){
+    const s=Math.max(0,(+$('rangeStart').value||1)-1), e=Math.max(s, +$('rangeEnd').value||v.length);
+    return v.slice(s,e);
+  }
+  return v;
+}
+function updatePreview(){
+  const t=getTargetText();
+  $('preview').textContent = t.trim()? t : '（読み上げ対象が空です。テキストを入力／選択してください）';
+  $('preview').style.color = t.trim()? '' : 'var(--sub)';
+}
+
+// ---------- speech ----------
+let voices=[];
+function loadVoices(){
+  voices=speechSynthesis.getVoices();
+  const sel=$('voiceSelect'); const cur=sel.value;
+  sel.innerHTML='';
+  const sorted=[...voices].sort((a,b)=>(b.lang.startsWith('ja')-a.lang.startsWith('ja')));
+  sorted.forEach((v,i)=>{
+    const o=document.createElement('option'); o.value=voices.indexOf(v);
+    o.textContent=(v.lang.startsWith('ja')?'🇯🇵 ':'')+v.name+' ('+v.lang+')';
+    sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+  if(!voices.length) sel.innerHTML='<option>音声が見つかりません</option>';
+}
+if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+
+[['rate','rateVal'],['pitch','pitchVal'],['volume','volVal']].forEach(([a,b])=>
+  $(a).addEventListener('input',()=>$(b).textContent=(+$(a).value).toFixed(1)));
+
+function splitSentences(t){
+  if($('optClean').checked) t=t.replace(/[※＊*／/｜|「」『』【】〈〉《》・…‥~〜=＝+＋#＃@＠]/g,' ');
+  let parts=t.split(/(?<=[。！？!?])|\n/).map(s=>s.trim());
+  if($('optSkipEmpty').checked) parts=parts.filter(Boolean);
+  return parts.filter(s=>s.length);
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+// ---- speech queue (manual + monitor share this queue) ----
+let speechQueue=[], isSpeaking=false, currentSpeech='';
+function renderReading(){
+  $('queueCount').textContent=speechQueue.length;
+  if(!currentSpeech && !speechQueue.length){ $('readingBox').textContent='まだ再生していません'; return; }
+  $('readingBox').innerHTML =
+    (currentSpeech?`<span class="cur">${esc(currentSpeech)}</span>`:'') +
+    (speechQueue.length?` <span class="done">― 待ち: ${speechQueue.map(esc).join(' / ')}</span>`:'');
+}
+function processQueue(){
+  if(isSpeaking) return;
+  const next=speechQueue.shift();
+  if(next===undefined){ currentSpeech=''; renderReading(); return; }
+  currentSpeech=next; isSpeaking=true; renderReading();
+  const u=new SpeechSynthesisUtterance(next);
+  const v=voices[+$('voiceSelect').value]; if(v) u.voice=v;
+  u.rate=+$('rate').value; u.pitch=+$('pitch').value; u.volume=+$('volume').value;
+  const done=()=>{ isSpeaking=false; currentSpeech=''; $('playStatus').textContent=''; processQueue(); renderReading(); };
+  u.onend=done; u.onerror=done;
+  $('playStatus').textContent='🔊 読み上げ中…（待ち '+speechQueue.length+' 件）';
+  speechSynthesis.speak(u);
+}
+function enqueueSpeech(items, clearFirst=false){
+  if(clearFirst){ speechQueue=[]; speechSynthesis.cancel(); isSpeaking=false; currentSpeech=''; }
+  speechQueue.push(...items);
+  // queue overflow guard: keep newest 30
+  if(speechQueue.length>30) speechQueue=speechQueue.slice(-30);
+  renderReading(); processQueue();
+}
+function stopSpeak(){
+  speechQueue=[]; isSpeaking=false; currentSpeech='';
+  speechSynthesis.cancel(); $('playStatus').textContent='⏹ 停止しました'; renderReading();
+}
+$('btnClearQueue').onclick=()=>{ speechQueue=[]; renderReading(); };
+
+$('btnPlay').onclick=()=>{
+  const t=getTargetText().trim();
+  if(!t){ alert('読み上げるテキストがありません。\nOCRするか、テキストを入力／範囲選択してください。'); return; }
+  const items=splitSentences(t);
+  if(!items.length){ alert('読み上げられる文がありませんでした。'); return; }
+  enqueueSpeech(items, true);
+};
+
+// ---------- chat monitoring ----------
+let monitorTimer=null, monitorBusy=false, prevLines=null, readHistory=new Set(), monitorFound=0;
+const normLine=s=>s.replace(/[\s　]+/g,'').trim();
+function cleanChatLine(line){
+  let s=line.trim().replace(/^\d{1,2}[:：]\d{2}\s*/,''); // timestamp
+  // NG words
+  const ngs=$('monitorNg').value.split(/[,、]/).map(x=>x.trim()).filter(Boolean);
+  if(ngs.some(w=>s.includes(w))) return '';
+  if($('monitorSkipUrl').checked && /https?:\/\/|www\./i.test(s)) s=s.replace(/https?:\/\/\S+|www\.\S+/gi,'');
+  if($('monitorStripName').checked){
+    const m=s.match(/^([^\s:：]{1,20})\s*[:：]\s*(.+)$/);
+    if(m) s=m[2];
+  }
+  s=s.replace(/\s+/g,' ').trim();
+  const max=+$('monitorMaxLen').value||80;
+  if(s.length>max) s=s.slice(0,max);
+  return s.length>=1 ? s : '';
+}
+function addMonitorLog(text, note){
+  const li=document.createElement('li');
+  li.innerHTML=`<small>${new Date().toLocaleTimeString('ja-JP')} ${note||''}</small>${esc(text)}`;
+  const log=$('monitorLog'); log.prepend(li);
+  while(log.children.length>30) log.lastChild.remove();
+}
+function extractNewLines(lines){
+  if(prevLines===null){ prevLines=lines; return []; }
+  const prevN=prevLines.map(normLine), curN=lines.map(normLine);
+  let overlap=0;
+  const maxK=Math.min(prevN.length, curN.length);
+  for(let k=maxK;k>=1;k--){
+    if(prevN.slice(prevN.length-k).join('\n')===curN.slice(0,k).join('\n')){ overlap=k; break; }
+  }
+  let candidates = overlap>0 ? lines.slice(overlap)
+    : lines.filter(l=>!prevN.includes(normLine(l)));
+  prevLines=lines;
+  const fresh=[];
+  for(const raw of candidates){
+    const key=normLine(raw);
+    if(!key || readHistory.has(key)) continue;
+    const cleaned=cleanChatLine(raw);
+    if(!cleaned) continue;
+    readHistory.add(key);
+    if(readHistory.size>200){ readHistory.delete(readHistory.values().next().value); }
+    fresh.push(cleaned);
+  }
+  return fresh;
+}
+async function monitorTick(){
+  if(monitorBusy || !mediaType) return;
+  const canvas=captureCanvas(true);
+  if(!canvas) return;
+  monitorBusy=true;
+  $('monitorStatus').textContent='読み取り中… '+new Date().toLocaleTimeString('ja-JP');
+  try{
+    const res=await Tesseract.recognize(canvas,'jpn+eng');
+    const lines=res.data.text.split('\n').map(s=>s.trim()).filter(Boolean);
+    const isFirst = prevLines===null;
+    const fresh=extractNewLines(lines);
+    if(isFirst){
+      $('monitorStatus').textContent='基準を取得しました。ここからの新着を読みます '+new Date().toLocaleTimeString('ja-JP');
+    } else if(fresh.length){
+      monitorFound+=fresh.length; $('monitorCount').textContent=monitorFound;
+      fresh.forEach(t=>addMonitorLog(t,'🆕 新着としてキューに追加'));
+      enqueueSpeech(fresh.flatMap(t=>splitSentences(t)));
+      $('monitorStatus').textContent='新着 '+fresh.length+' 件を検知 '+new Date().toLocaleTimeString('ja-JP');
+    } else {
+      $('monitorStatus').textContent='監視中（新着なし）'+new Date().toLocaleTimeString('ja-JP');
+    }
+  }catch(e){
+    $('monitorStatus').textContent='OCRエラー: '+e.message;
+  }finally{ monitorBusy=false; }
+}
+$('btnMonitorStart').onclick=()=>{
+  if(!mediaType){ alert('先に「画面共有を開始」して配信画面を表示してください。'); return; }
+  if(!rect){ alert('先に画面上でチャット欄をドラッグして囲んでください。'); return; }
+  prevLines=null; // baseline: don't read what's already on screen
+  stopSpeak();
+  $('btnMonitorStart').disabled=true; $('btnMonitorStop').disabled=false;
+  $('liveDot').classList.add('on');
+  $('monitorStatus').textContent='監視を開始しました（基準取得中…）';
+  addMonitorLog('監視開始：表示中のコメントは読みません。ここからの新着だけ読みます。','ℹ️');
+  monitorTick();
+  monitorTimer=setInterval(monitorTick, +$('monitorInterval').value);
+};
+function stopMonitor(){
+  if(monitorTimer) clearInterval(monitorTimer);
+  monitorTimer=null; prevLines=null;
+  $('btnMonitorStart').disabled=false; $('btnMonitorStop').disabled=true;
+  $('liveDot').classList.remove('on'); $('monitorStatus').textContent='監視を停止しました';
+}
+$('btnMonitorStop').onclick=stopMonitor;
+$('monitorInterval').onchange=()=>{
+  if(monitorTimer){ clearInterval(monitorTimer); monitorTimer=setInterval(monitorTick, +$('monitorInterval').value); }
+};
+$('btnPause').onclick=()=>{
+  if(speechSynthesis.speaking && !speechSynthesis.paused){ speechSynthesis.pause(); $('playStatus').textContent='⏸ 一時停止中'; }
+  else if(speechSynthesis.paused){ speechSynthesis.resume(); $('playStatus').textContent='▶ 再開しました'; }
+};
+$('btnStop').onclick=stopSpeak;
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey && e.key==='Enter'){ e.preventDefault(); $('btnPlay').click(); }
+  if(e.key==='Escape') stopSpeak();
+});
+updateTextInfo(); updatePreview();
+</script>
+</body>
+</html>
