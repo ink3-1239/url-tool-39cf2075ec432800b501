@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>3 in 1 ARCADE ランキング管理</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0e1016; color: #e8eef5; font-family: system-ui, sans-serif; padding: 16px; }
+  h1 { font-size: 1.15rem; color: #00ffff; margin-bottom: 4px; }
+  .sub { font-size: .78rem; color: #8b94a6; margin-bottom: 14px; line-height: 1.6; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  input, button { font-size: .9rem; border-radius: 8px; border: 1px solid #3d4259; padding: 9px 12px; }
+  input { background: #171a24; color: #fff; flex: 1 1 240px; min-width: 200px; }
+  .btn { background: #00ffff; color: #06222a; border: 0; font-weight: bold; cursor: pointer; }
+  .btn.gray { background: #2a2d3d; color: #cfe3ef; }
+  .btn.red { background: #5a1d22; color: #ffb9bd; }
+  .cat { background: #161922; border: 1px solid #262b3a; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .cat h2 { font-size: .95rem; color: #ffd76a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid #262b3a; }
+  th { color: #8b94a6; font-size: .72rem; font-weight: normal; }
+  td.sc { text-align: right; font-weight: bold; }
+  td.id { color: #6b7488; font-size: .68rem; font-family: ui-monospace, monospace; }
+  .del { background: #5a1d22; color: #ffb9bd; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: .75rem; }
+  .empty { color: #6b7488; font-size: .82rem; padding: 8px 2px; }
+  #msg { font-size: .82rem; margin-bottom: 12px; min-height: 18px; }
+  #msg.ok { color: #6fe3a0; } #msg.ng { color: #ff8b8b; }
+</style>
+</head>
+<body>
+  <h1>3 in 1 ARCADE ランキング管理</h1>
+  <div class="sub">すべての順位と名前が見られます。記録の削除もできます。管理キーを知っている人だけが使えます。</div>
+
+  <div class="bar">
+    <input id="key" type="password" placeholder="管理キー" autocomplete="off">
+    <button class="btn" onclick="load()">読み込む</button>
+    <button class="btn gray" onclick="load()">更新</button>
+    <button class="btn red" onclick="clearAll()">全部門を全消去</button>
+  </div>
+  <div id="msg"></div>
+  <div id="out"></div>
+
+<script>
+  var API = "https://science-club-event-private.ink3-tomo-0827.workers.dev/api/rank";
+  var CATS = [["nomiss", "ノーミス部門"], ["short", "短時間部門"], ["pro", "プロ部門"], ["beginner", "ビギナー部門"]];
+
+  function key() { return document.getElementById('key').value.trim(); }
+  function msg(t, ok) {
+    var el = document.getElementById('msg');
+    el.textContent = t; el.className = ok ? 'ok' : 'ng';
+  }
+  function save() { try { localStorage.setItem('rank_admin_key', key()); } catch (e) {} }
+  try {
+    var k0 = localStorage.getItem('rank_admin_key');
+    if (k0) document.getElementById('key').value = k0;
+  } catch (e) {}
+
+  async function load() {
+    if (!key()) { msg('管理キーを入れてください。', false); return; }
+    save();
+    try {
+      var r = await fetch(API + '?admin=' + encodeURIComponent(key()) + '&t=' + Date.now(), { cache: 'no-store' });
+      var j = await r.json();
+      if (!j.ok || !j.admin) { msg('管理キーが違います。', false); return; }
+      render(j.board);
+      msg('読み込みました（' + new Date().toLocaleTimeString('ja-JP') + '）', true);
+    } catch (e) {
+      msg('サーバーに接続できませんでした。', false);
+    }
+  }
+
+  async function post(payload) {
+    payload.admin = key();
+    var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var j = await r.json();
+    if (!j.ok) { msg('失敗しました（' + (j.error || 'error') + '）', false); return null; }
+    render(j.board);
+    return j;
+  }
+
+  async function del(cat, id, nick) {
+    if (!confirm('「' + nick + '」のこの部門の記録を消します。元に戻せません。よろしいですか？')) return;
+    if (await post({ action: 'delete', cat: cat, id: id })) msg('削除しました。', true);
+  }
+  async function delAll(id, nick) {
+    if (!confirm('「' + nick + '」の記録を、4部門すべてから消します。よろしいですか？')) return;
+    if (await post({ action: 'deleteAllOf', id: id })) msg('この人の記録をすべて削除しました。', true);
+  }
+  async function clearCat(cat, label) {
+    if (!confirm(label + 'の記録を全部消します。よろしいですか？')) return;
+    if (await post({ action: 'clearCat', cat: cat })) msg(label + 'を全消去しました。', true);
+  }
+  async function clearAll() {
+    if (!key()) { msg('管理キーを入れてください。', false); return; }
+    if (!confirm('4部門すべての記録を消します。元に戻せません。本当によろしいですか？')) return;
+    if (!confirm('最終確認です。本当に全部消しますか？')) return;
+    if (await post({ action: 'clearAll' })) msg('すべて消去しました。', true);
+  }
+
+  function render(board) {
+    var out = document.getElementById('out');
+    out.innerHTML = '';
+    CATS.forEach(function (c) {
+      var cat = c[0], label = c[1];
+      var list = board[cat] || [];
+      var box = document.createElement('div');
+      box.className = 'cat';
+      var h = document.createElement('h2');
+      h.innerHTML = '<span></span>';
+      h.querySelector('span').textContent = label + '（' + list.length + '件）';
+      var cb = document.createElement('button');
+      cb.className = 'btn red'; cb.textContent = 'この部門を全消去';
+      cb.onclick = function () { clearCat(cat, label); };
+      h.appendChild(cb);
+      box.appendChild(h);
+
+      if (!list.length) {
+        var e = document.createElement('div');
+        e.className = 'empty'; e.textContent = '記録なし';
+        box.appendChild(e);
+        out.appendChild(box);
+        return;
+      }
+      var t = document.createElement('table');
+      t.innerHTML = '<tr><th>順位</th><th>ニックネーム</th><th>スコア</th><th>端末ID</th><th></th></tr>';
+      list.forEach(function (e) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td class="pos"></td><td class="nm"></td><td class="sc"></td><td class="id"></td><td></td>';
+        tr.querySelector('.pos').textContent = e.rank + '位';
+        tr.querySelector('.nm').textContent = e.nick;
+        tr.querySelector('.sc').textContent = e.score.toLocaleString();
+        tr.querySelector('.id').textContent = String(e.id).slice(0, 10);
+        var td = tr.lastElementChild;
+        var b1 = document.createElement('button');
+        b1.className = 'del'; b1.textContent = '削除';
+        b1.onclick = function () { del(cat, e.id, e.nick); };
+        var b2 = document.createElement('button');
+        b2.className = 'del'; b2.style.marginLeft = '6px'; b2.textContent = '全部門から削除';
+        b2.onclick = function () { delAll(e.id, e.nick); };
+        td.appendChild(b1); td.appendChild(b2);
+        t.appendChild(tr);
+      });
+      box.appendChild(t);
+      out.appendChild(box);
+    });
+  }
+
+  if (document.getElementById('key').value) load();
+</script>
+</body>
+</html>
