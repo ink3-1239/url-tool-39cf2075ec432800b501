@@ -70,6 +70,18 @@
   #thanks span{font:800 76px/1.2 "Trebuchet MS",sans-serif;letter-spacing:.05em;color:#ffe9b0;text-align:center;
     text-shadow:0 5px 0 #8c6f24,0 0 30px rgba(255,220,140,.55)}
 </style>
+
+<style id="srEvtStyle">
+#srBanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.7);z-index:60;
+ font-weight:900;font-size:46px;letter-spacing:.06em;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.55);
+ padding:10px 26px;border-radius:14px;opacity:0;pointer-events:none;white-space:nowrap;
+ transition:opacity .25s ease, transform .35s cubic-bezier(.2,1.6,.4,1);}
+#srBanner.on{opacity:1;transform:translate(-50%,-50%) scale(1);}
+#srFlash{position:absolute;inset:0;z-index:55;pointer-events:none;opacity:0;transition:opacity .45s ease;}
+#srFlash.on{opacity:.30;}
+.ch.wavy{animation:srWave .7s ease;}
+@keyframes srWave{0%{transform:translateY(0)}30%{transform:translateY(-7px)}60%{transform:translateY(4px)}100%{transform:translateY(0)}}
+</style>
 </head>
 <body>
 
@@ -220,6 +232,7 @@ function updateHero(dt) {
 }
 
 function buildBlocks() {
+  srEvtDone = {};
   blocks = [];
   const sr = stage.getBoundingClientRect();
   document.querySelectorAll('.ch').forEach(el => {
@@ -346,6 +359,40 @@ function spawnConf() {
   confs.push({ el, x: 30 + Math.random() * (SW - 80), y: -20, vy: 1.6 + Math.random() * 1.4, sway: Math.random() * 6.28 });
 }
 
+
+/* ---- 途中イベント（難しさは一切変えない・見た目と演出だけ） ---- */
+var srEvtDone = {}, srBannerEl = null, srFlashEl = null;
+function srEls() {
+  if (!srBannerEl) {
+    srBannerEl = document.createElement('div'); srBannerEl.id = 'srBanner'; stage.appendChild(srBannerEl);
+    srFlashEl = document.createElement('div'); srFlashEl.id = 'srFlash'; stage.appendChild(srFlashEl);
+  }
+}
+function srEvent(msg, color) {
+  srEls();
+  srBannerEl.textContent = msg;
+  srBannerEl.style.color = color;
+  srFlashEl.style.background = 'radial-gradient(circle at 50% 45%, ' + color + ', transparent 70%)';
+  srBannerEl.classList.add('on'); srFlashEl.classList.add('on');
+  setTimeout(function () { srBannerEl.classList.remove('on'); srFlashEl.classList.remove('on'); }, 1150);
+  for (var k = 0; k < 10; k++) setTimeout(spawnConf, k * 60);
+  var alive = blocks.filter(function (b) { return !b.dead; });
+  alive.forEach(function (b, n) {
+    setTimeout(function () {
+      b.el.classList.add('wavy');
+      setTimeout(function () { b.el.classList.remove('wavy'); }, 700);
+    }, Math.min(600, n * 12));
+  });
+}
+function srCheckEvent(n, total) {
+  if (!total) return;
+  var r = n / total;
+  if (!srEvtDone.a && r <= .75) { srEvtDone.a = 1; srEvent('NICE!', '#ffd76a'); return; }
+  if (!srEvtDone.b && r <= .5) { srEvtDone.b = 1; srEvent('HALF WAY!', '#7fe3ff'); return; }
+  if (!srEvtDone.c && r <= .25) { srEvtDone.c = 1; srEvent('あと少し！', '#ff9ad5'); return; }
+  if (!srEvtDone.d && n <= 5 && n > 0) { srEvtDone.d = 1; srEvent('LAST SPURT!', '#9dff8a'); return; }
+}
+
 function bounceBlocks() {
   for (const b of blocks) {
     if (b.dead) continue;
@@ -360,6 +407,7 @@ function bounceBlocks() {
     const n = aliveCount();
     leftEl.textContent = n;
     if (n === 0) clearAll();
+    else srCheckEvent(n, blocks.length);
     return;
   }
 }
