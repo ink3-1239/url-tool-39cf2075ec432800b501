@@ -390,18 +390,18 @@
 
   /* 3 burger empire: one perfect drop */
   function g3(i) {
-    var g = base(i), fall = null;
-    g.reset = function () { fall = null; g.t = 0; g.aiPhase = 0; };
-    g.label = function () { return "±4px DROP"; };
-    g.cur = function () { return 75 - Math.cos(Math.max(0, g.t - .4) * (DEMO ? 1.2 : 4)) * 55; };
+    var g = base(i), fall = null, armed = false;
+    g.reset = function () { fall = null; armed = false; g.t = 0; g.aiPhase = 0; };
+    g.label = function () { return armed ? "±4px DROP" : "TAP TO START"; };
+    g.cur = function () { return 75 - Math.cos(g.t * (DEMO ? 1.2 : 4)) * 55; };
     g.update = function (dt) {
-      g.t += dt;
+      if (armed) g.t += dt;
       if (fall) {
         fall.vy += 560 * dt; fall.y += fall.vy * dt;
         if (fall.y >= 90) { if (Math.abs(fall.x - 75) <= 3) clearGame(i); else resetGame(i); }
       }
     };
-    g.down = function () { if (g.t < .4) return; if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
+    g.down = function () { if (!armed) { armed = true; g.t = 0; stat(i, g.label()); return; } if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
     g.draw = function (c) {
       cls(c);
       for (var n = 0; n < 4; n++) {
@@ -419,6 +419,7 @@
     };
     g.ai = function (dt) {
       if (fall) return;
+      if (!armed) { g.down(); return; }
       var c = g.cur();
       if (g.t < .5) return;
       if (!g.aiPhase) { if (Math.abs(c - 75) > 40) g.aiPhase = 1; return; }
@@ -1342,9 +1343,9 @@
         etx = 14 + drand() * 122; ety = 14 + drand() * 122;
       }
       var dx = etx - ex, dy = ety - ey, d = Math.hypot(dx, dy) || 1;
-      var mv = Math.min(d, 98 * dt);
+      var mv = Math.min(d, (DEMO ? 58 : 98) * dt);
       ex += dx / d * mv; ey += dy / d * mv;
-      if (ecool <= 0) { ecool = .38; paint(ex, ey, 2, 25); }
+      if (ecool <= 0) { ecool = DEMO ? .62 : .38; paint(ex, ey, 2, DEMO ? 19 : 25); }
       stat(i, g.label());
       if (g.t >= LIMIT) {
         done = true;
@@ -1386,8 +1387,17 @@
       if (g.cleared || done) return;
       g.aiT -= dt;
       if (g.aiT > 0) return;
-      g.aiT = .32;
-      var bx = 14 + drand() * 122, by = 14 + drand() * 122;
+      g.aiT = .3;
+      var bx = 75, by = 75, bd = 1e9;
+      for (var cy = 0; cy < N; cy++) {
+        for (var cx = 0; cx < N; cx++) {
+          var v = grid[cy * N + cx];
+          if (v === 1) continue;
+          var gx = cx * CELL + CELL / 2, gy = cy * CELL + CELL / 2;
+          var dd = Math.hypot(gx - px, gy - py) + (v === 2 ? 0 : 55);
+          if (dd < bd) { bd = dd; bx = gx; by = gy; }
+        }
+      }
       setTarget(g.i, bx, by, function () { g.down(bx, by); }, null);
     };
     return g;
