@@ -393,7 +393,7 @@
     var g = base(i), fall = null;
     g.reset = function () { fall = null; g.t = 0; g.aiPhase = 0; };
     g.label = function () { return "±4px DROP"; };
-    g.cur = function () { return 75 - Math.cos(g.t * (DEMO ? 1.2 : 4)) * 55; };
+    g.cur = function () { return 75 - Math.cos(Math.max(0, g.t - .4) * (DEMO ? 1.2 : 4)) * 55; };
     g.update = function (dt) {
       g.t += dt;
       if (fall) {
@@ -401,7 +401,7 @@
         if (fall.y >= 90) { if (Math.abs(fall.x - 75) <= 3) clearGame(i); else resetGame(i); }
       }
     };
-    g.down = function () { if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
+    g.down = function () { if (g.t < .4) return; if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
     g.draw = function (c) {
       cls(c);
       for (var n = 0; n < 4; n++) {
@@ -420,6 +420,7 @@
     g.ai = function (dt) {
       if (fall) return;
       var c = g.cur();
+      if (g.t < .5) return;
       if (!g.aiPhase) { if (Math.abs(c - 75) > 40) g.aiPhase = 1; return; }
       if (Math.abs(c - 75) <= 1.2) g.down();
     };
@@ -1975,5 +1976,5 @@
   requestAnimationFrame(loop);
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ff89a2ad72b003',t:'MTc5MjkxMzY1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cebe66988db5fb',t:'MTc5MjQwMjAxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

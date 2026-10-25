@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
+<head><style id="eventTimeGateStyle">#eventTimeClosed{display:none}html.event-time-closed body>*:not(#eventTimeClosed){display:none!important}html.event-time-closed #eventTimeClosed{position:fixed;z-index:2147483647;inset:0;display:grid!important;place-items:center;background:#090a0e;color:#d8d8d8;font-family:ui-monospace,monospace;text-align:center;padding:24px}#eventTimeClosed b{display:block;font-size:clamp(46px,14vw,110px);letter-spacing:.08em}#eventTimeClosed span{display:block;margin-top:18px;font-size:13px;letter-spacing:.2em;color:#777}</style><script id="eventTimeGateScript">(()=>{const first=Date.UTC(2026,9,22,3,40),w=[[Date.UTC(2026,9,22,3,40),Date.UTC(2026,9,22,4,10)],[Date.UTC(2026,9,23,3,40),Date.UTC(2026,9,23,4,10)],[Date.UTC(2026,9,26,3,40),Date.UTC(2026,9,26,4,10)],[Date.UTC(2026,9,27,3,40),Date.UTC(2026,9,27,4,10)],[Date.UTC(2026,9,28,3,40),Date.UTC(2026,9,28,4,10)],[Date.UTC(2026,9,29,3,40),Date.UTC(2026,9,29,4,10)]],testStart=Date.UTC(2026,9,21,9,20),testEnd=Date.UTC(2026,9,21,9,40);function isClosed(n){return n>=testStart&&n<testEnd||!(n<first||w.some(x=>n>=x[0]&&n<x[1]))}function tick(){const c=isClosed(Date.now());document.documentElement.classList.toggle('event-time-closed',c);if(!document.body)return;if(c){if(!document.getElementById('eventTimeClosed')){const d=document.createElement('div');d.id='eventTimeClosed';d.innerHTML='<div><b>404</b><span>PAGE NOT FOUND</span></div>';document.body.appendChild(d)}}else document.getElementById('eventTimeClosed')?.remove()}tick();addEventListener('DOMContentLoaded',tick);setInterval(tick,250)})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>スタッフロール</title>
@@ -393,7 +393,7 @@
     var g = base(i), fall = null;
     g.reset = function () { fall = null; g.t = 0; g.aiPhase = 0; };
     g.label = function () { return "±4px DROP"; };
-    g.cur = function () { return 75 - Math.cos(g.t * (DEMO ? 1.2 : 4)) * 55; };
+    g.cur = function () { return 75 - Math.cos(Math.max(0, g.t - .4) * (DEMO ? 1.2 : 4)) * 55; };
     g.update = function (dt) {
       g.t += dt;
       if (fall) {
@@ -401,7 +401,7 @@
         if (fall.y >= 90) { if (Math.abs(fall.x - 75) <= 3) clearGame(i); else resetGame(i); }
       }
     };
-    g.down = function () { if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
+    g.down = function () { if (g.t < .4) return; if (!fall) fall = { x: g.cur(), y: 20, vy: 0 }; };
     g.draw = function (c) {
       cls(c);
       for (var n = 0; n < 4; n++) {
@@ -420,6 +420,7 @@
     g.ai = function (dt) {
       if (fall) return;
       var c = g.cur();
+      if (g.t < .5) return;
       if (!g.aiPhase) { if (Math.abs(c - 75) > 40) g.aiPhase = 1; return; }
       if (Math.abs(c - 75) <= 1.2) g.down();
     };
