@@ -214,11 +214,236 @@
       text-align: center;
     }
     .mole-ctrl-btn:active { background: #ffcc00; color: #000; }
+
+    /* ===== チュートリアル ===== */
+    #tutChoice { position: fixed; inset: 0; z-index: 200; background: rgba(5,6,12,.93);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px; text-align: center; }
+    #tutChoice h2 { color: #00ffff; font-size: 1.3rem; }
+    #tutChoice p { color: #bbb; font-size: .85rem; max-width: 320px; line-height: 1.6; }
+    #tutChoice .btn { width: 240px; }
+    #tutCorner { position: fixed; right: 10px; bottom: 10px; z-index: 150; background: #00323c;
+      color: #00ffff; border: 1px solid #00ffff; border-radius: 20px; padding: 7px 14px; font-size: .78rem;
+      font-weight: bold; cursor: pointer; opacity: .88; }
+    #tutCorner:hover { opacity: 1; }
+    .tut-dim { filter: grayscale(1) brightness(.32); pointer-events: none; }
+    #tutSide { position: fixed; left: 16px; top: 50%; transform: translateY(-50%); z-index: 130;
+      width: min(38vw, 460px); max-height: 94vh; overflow: auto; background: rgba(8,12,22,.97);
+      border: 3px solid #00ffff; border-radius: 14px; padding: 20px 22px; display: none;
+      box-shadow: 0 6px 34px rgba(0,0,0,.85); }
+    #tutSide h3 { color: #00ffff; font-size: 1.5rem; margin-bottom: 14px; line-height: 1.3; }
+    #tutSide p { color: #f0f0f0; font-size: 1.05rem; line-height: 1.9; white-space: pre-line; }
+    /* キーボードのイメージ */
+    .kb { margin: 16px 0 6px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .kb-row { display: flex; gap: 8px; justify-content: center; }
+    .key { min-width: 54px; height: 54px; padding: 0 10px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; border-radius: 8px; background: linear-gradient(#3a4050,#222733);
+      border: 2px solid #5a6479; box-shadow: 0 4px 0 #11141c; color: #fff; font-weight: bold; font-size: 1.15rem; }
+    .key.hot { background: linear-gradient(#00d8e8,#008d9b); border-color: #9ff; color: #04222a;
+      box-shadow: 0 4px 0 #014049, 0 0 16px rgba(0,255,255,.6); }
+    .key small { display: block; font-size: .6rem; font-weight: normal; opacity: .85; margin-top: 2px; }
+    .key.wide { min-width: 220px; }
+    .kb-cap { color: #9fb0c0; font-size: .82rem; text-align: center; margin-top: 4px; line-height: 1.6; }
+
+    /* チュートリアル中は「説明」と「ゲーム筐体」を左右に並べて中央そろえ */
+    body.tut-layout { flex-direction: row; align-items: center; justify-content: center;
+      gap: clamp(12px, 3vw, 40px); min-height: 100vh; padding: 10px; }
+    body.tut-layout #cabinet { margin: 0; flex: 0 0 auto; }
+    body.tut-layout #tutSide { position: static; transform: none; left: auto; top: auto; bottom: auto;
+      flex: 0 1 460px; width: auto; max-width: 460px; max-height: 94vh; overflow: auto;
+      padding: clamp(12px, 1.6vw, 22px); }
+    body.tut-layout #tutSide h3 { font-size: clamp(1.05rem, 1.9vw, 1.6rem); }
+    body.tut-layout #tutSide p { font-size: clamp(.85rem, 1.15vw, 1.08rem); }
+    body.tut-layout #tutOk { padding: clamp(10px, 1.4vw, 18px) 10px; font-size: clamp(.95rem, 1.3vw, 1.25rem); }
+    @media (max-width: 900px) {
+      body.tut-layout { flex-direction: column; justify-content: flex-start; gap: 10px; }
+      body.tut-layout #tutSide { flex: 0 0 auto; width: 100%; max-width: 420px; max-height: 40vh; }
+    }
+    #tutOk { display: block; width: 100%; margin-top: 14px; padding: 16px 10px; font-size: 1.15rem;
+      font-weight: bold; letter-spacing: .08em; color: #06222a; background: #00ffff; border: 0;
+      border-radius: 10px; cursor: pointer; box-shadow: 0 0 18px rgba(0,255,255,.55);
+      animation: tutOkPulse 1.4s ease-in-out infinite; }
+    #tutOk:hover { background: #7bffff; }
+    @keyframes tutOkPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+    @media (max-width: 1100px) {
+      #tutSide { position: fixed; left: 50%; top: auto; bottom: 8px; transform: translateX(-50%);
+        width: 94%; max-width: 460px; max-height: 44vh; padding: 14px 16px; }
+      #tutSide h3 { font-size: 1.15rem; } #tutSide p { font-size: .92rem; line-height: 1.7; }
+      .key { min-width: 44px; height: 44px; font-size: 1rem; } .key.wide { min-width: 170px; }
+    }
+    #tutBox { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: auto; background: transparent; border: 0; padding: 0; z-index: 120; }
+    #tutBox h3 { color: #00ffff; font-size: .9rem; margin-bottom: 6px; }
+    #tutBox p { color: #ddd; font-size: .75rem; line-height: 1.6; white-space: pre-line; }
+    #tutBox .keys { color: #ffd76a; font-weight: bold; }
+    #tutBox button { margin-top: 10px; width: 100%; background: #00ffff; color: #06222a;
+      border: 0; border-radius: 6px; padding: 8px; font-weight: bold; font-size: .85rem; cursor: pointer; }
+
+    /* ===== 総合ランキング ===== */
+    #menuWrap { display: flex; gap: 16px; width: 100%; padding: 16px; align-items: flex-start;
+      justify-content: center; flex-wrap: wrap; }
+    #menuWrap > * { flex: 1 1 320px; max-width: 460px; }
+    #menuWrap #start-screen { margin-top: 0; width: auto; max-width: 460px; }
+    @media (max-width: 860px) { #menuWrap { flex-direction: column; align-items: center; }
+      #menuWrap > * { width: 100%; max-width: 460px; } }
+    .rank-col { background: #1e1e1e; border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+    .rank-col h2 { color: #00ffff; font-size: 1rem; margin-bottom: 10px; text-align: center; }
+    .rank-col label { display: block; font-size: .72rem; color: #9fb0c0; margin: 8px 0 3px; }
+    .rank-col input, .rank-col select { width: 100%; padding: 7px; border-radius: 6px; border: 1px solid #3d4259;
+      background: #12131a; color: #fff; font-size: .85rem; }
+    #rankMsg { font-size: .72rem; margin-top: 8px; min-height: 16px; line-height: 1.5; }
+    #rankMsg.ok { color: #6fe3a0; } #rankMsg.ng { color: #ff7a7a; }
+    .cat-note { font-size: .68rem; color: #8b94a6; margin-top: 6px; line-height: 1.5; }
+    .rank-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+    .rank-tab { flex: 1 1 auto; padding: 5px 4px; font-size: .68rem; border-radius: 6px; border: 1px solid #3d4259;
+      background: #12131a; color: #9fb0c0; cursor: pointer; }
+    .rank-tab.on { background: #00323c; color: #00ffff; border-color: #00ffff; }
+    #rankList { list-style: none; }
+    #rankList li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 6px; font-size: .8rem;
+      border-bottom: 1px solid #2a2d3d; }
+    #rankList li.me { background: #10303a; border-radius: 4px; color: #00ffff; }
+    #rankList .pos { width: 2.2em; color: #f39c12; font-weight: bold; }
+    #rankList .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #rankList .sc { font-weight: bold; }
+
+    /* ===== 一時停止 / 中断 ===== */
+    #sysBtns { display: flex; gap: 6px; margin-left: 8px; }
+    .sys-btn { background: #2a2d3d; color: #cfe3ef; border: 1px solid #4a5168; border-radius: 6px;
+      padding: 4px 9px; font-size: .68rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    .sys-btn:hover { background: #3a4053; }
+    .sys-btn.stop { border-color: #a4434a; color: #ff9aa0; }
+    #pauseOv { position: fixed; inset: 0; z-index: 180; background: rgba(4,6,12,.93);
+      display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px; text-align: center; }
+    #pauseOv h2 { color: #00ffff; font-size: 1.6rem; }
+    #pauseOv p { color: #bbc; font-size: .85rem; line-height: 1.7; max-width: 360px; }
+    #pauseOv .btn { width: 260px; }
+    #pauseOv .btn.danger { background: #5a1d22; color: #ffb9bd; }
+    #countNum { font-size: 5rem; font-weight: bold; color: #00ffff; text-shadow: 0 0 30px rgba(0,255,255,.7); }
   </style>
 </head>
 <body>
 
-  <!-- 設定画面 -->
+
+  <!-- チュートリアル選択 -->
+  <div id="tutChoice">
+    <h2>3 in 1 ARCADE</h2>
+    <p>3つのゲームを同時に遊ぶゲームです。<br>初めての人はチュートリアルがおすすめです。</p>
+    <button class="btn" onclick="startTutorial()">チュートリアルを受ける</button>
+    <button class="btn" onclick="skipTutorial()">スキップ</button>
+  </div>
+  <button id="tutCorner" onclick="startTutorial()">？ チュートリアル</button>
+  <div id="tutSide"><h3></h3><div class="kb" id="tutKb"></div><p></p><button type="button" id="tutOk">OK（次へ）</button></div>
+
+  <!-- ゲーム筐体画面 -->
+  <div id="cabinet">
+    <!-- 上部ヘッダー -->
+    <div class="cabinet-header">
+      <div class="cabinet-title">3 in 1 ARCADE</div>
+      <div class="status-badges">
+        <div class="badge">LIFE: <span id="lifeDisp">3</span></div>
+        <div class="badge">TIME: <span id="timeDisp">05:00</span></div>
+        <div class="badge">TOTAL: <span id="totalSc">0</span><br>HI: <span id="hiSc">0</span></div>
+        <div id="sysBtns">
+          <button class="sys-btn" onclick="pauseGame()">|| 一時停止</button>
+          <button class="sys-btn stop" onclick="askAbort()">■ 中断</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上段：MOLE WHACK と BREAKOUT -->
+    <div class="top-row">
+      <div class="panel" id="tPanel">
+        <div class="panel-title">MOLE WHACK</div>
+        <div class="panel-score">SCORE: <span id="mSc">0</span></div>
+        <canvas id="mCanvas" width="175" height="240"></canvas>
+      </div>
+
+      <div class="panel" id="bPanel">
+        <div class="panel-title">BREAKOUT</div>
+        <div class="panel-score">SCORE: <span id="bSc">0</span></div>
+        <canvas id="bCanvas" width="175" height="240"></canvas>
+      </div>
+    </div>
+
+    <!-- 中段：DINO RUN (横長) -->
+    <div class="middle-row">
+      <div class="panel" id="dPanel">
+        <div class="panel-title">DINO RUN</div>
+        <div class="panel-score">SCORE: <span id="dSc">0</span></div>
+        <canvas id="dCanvas" width="356" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- 下段：操作ボタン行 -->
+    <div class="controls-row-container">
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">MOLE WHACK</div>
+        <div class="mole-pad">
+          <button class="mole-ctrl-btn" id="mBtn0">左上 [W]</button>
+          <button class="mole-ctrl-btn" id="mBtn1">右上 [E]</button>
+          <button class="mole-ctrl-btn" id="mBtn2">左下 [S]</button>
+          <button class="mole-ctrl-btn" id="mBtn3">右下 [D]</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">BREAKOUT</div>
+        <div class="ctrl-buttons">
+          <button class="ctrl-btn" id="bLBtn">← 左</button>
+          <button class="ctrl-btn" id="bRBtn">→ 右</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group-row">
+        <div class="ctrl-label">DINO RUN</div>
+        <div class="ctrl-buttons">
+          <button class="ctrl-btn accent" id="dJumpBtn">SPACE ジャンプ！</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- メニュー（左:エントリー / 中央:設定 / 右:ランキング） -->
+  <div id="menuWrap">
+    <div class="rank-col">
+      <h2>エントリー用紙</h2>
+      <label>ニックネーム（12文字まで）</label>
+      <input id="rankNick" maxlength="12" placeholder="例: ink3">
+      <label>出場部門</label>
+      <select id="rankCat">
+        <option value="nomiss">ノーミス部門（時間無制限・残機1・速度1.0）</option>
+        <option value="short">短時間部門（30秒・ほかは自由）</option>
+        <option value="pro">プロ部門（時間無制限・残機1・速度2.0）</option>
+        <option value="beginner">ビギナー部門（1分・残機5・速度0.5）</option>
+      </select>
+      <div class="cat-note" id="rankCatNote"></div>
+      <div id="shortOpts" style="display:none;">
+        <label>残機（短時間部門は自由）</label>
+        <select id="shortLife">
+          <option value="1">1 (一撃死)</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="inf">無制限 (INF)</option>
+        </select>
+        <label>スピード（短時間部門は自由）</label>
+        <select id="shortSpeed">
+          <option value="0.25">固定 0.25x</option>
+          <option value="0.5">固定 0.5x</option>
+          <option value="0.75">固定 0.75x</option>
+          <option value="1.0" selected>固定 1.0x</option>
+          <option value="1.5">固定 1.5x</option>
+          <option value="2.0">固定 2.0x</option>
+          <option value="3.0">固定 3.0x</option>
+          <option value="5.0">固定 5.0x</option>
+          <option value="accel">徐々に加速（設定画面の設定を使う）</option>
+        </select>
+      </div>
+      <button class="btn" style="margin-top:12px;width:100%" onclick="rankStart()">この部門でスタート</button>
+      <button class="btn" style="margin-top:6px;width:100%;background:#2a2d3d;color:#9fb0c0" onclick="rankSaveNameOnly()">名前だけ登録・変更</button>
+      <div id="rankMsg"></div>
+      <div class="cat-note">1つの端末につき1つのニックネームです。名前を変えると、ランキングに載っている自分の名前もすべて変わります。</div>
+    </div>
   <div id="start-screen">
     <h1>3 in 1 ARCADE</h1>
     
@@ -307,69 +532,36 @@
 
     <button class="btn" onclick="startGame()">START GAME</button>
   </div>
-
-  <!-- ゲーム筐体画面 -->
-  <div id="cabinet">
-    <!-- 上部ヘッダー -->
-    <div class="cabinet-header">
-      <div class="cabinet-title">3 in 1 ARCADE</div>
-      <div class="status-badges">
-        <div class="badge">LIFE: <span id="lifeDisp">3</span></div>
-        <div class="badge">TIME: <span id="timeDisp">05:00</span></div>
-        <div class="badge">TOTAL: <span id="totalSc">0</span><br>HI: <span id="hiSc">0</span></div>
+    <div class="rank-col">
+      <h2>総合ランキング TOP10</h2>
+      <div class="rank-tabs">
+        <button class="rank-tab on" data-cat="nomiss">ノーミス</button>
+        <button class="rank-tab" data-cat="short">短時間</button>
+        <button class="rank-tab" data-cat="pro">プロ</button>
+        <button class="rank-tab" data-cat="beginner">ビギナー</button>
       </div>
+      <ol id="rankList"><li><span class="nm">読み込み中…</span></li></ol>
+      <div class="cat-note" id="rankState"></div>
     </div>
+  </div>
 
-    <!-- 上段：MOLE WHACK と BREAKOUT -->
-    <div class="top-row">
-      <div class="panel" id="tPanel">
-        <div class="panel-title">MOLE WHACK</div>
-        <div class="panel-score">SCORE: <span id="mSc">0</span></div>
-        <canvas id="mCanvas" width="175" height="240"></canvas>
-      </div>
-
-      <div class="panel" id="bPanel">
-        <div class="panel-title">BREAKOUT</div>
-        <div class="panel-score">SCORE: <span id="bSc">0</span></div>
-        <canvas id="bCanvas" width="175" height="240"></canvas>
-      </div>
+  <!-- 一時停止 / 中断 -->
+  <div id="pauseOv">
+    <div id="pauseMain">
+      <h2>一時停止中</h2>
+      <p>ゲームは止まっています。<br>再開を押すと、3カウント数えてから動き出します。</p>
+      <button class="btn" style="margin-top:14px" onclick="resumeGame()">再開する</button>
+      <button class="btn danger" style="margin-top:8px" onclick="askAbort()">ゲームを中断する</button>
     </div>
-
-    <!-- 中段：DINO RUN (横長) -->
-    <div class="middle-row">
-      <div class="panel" id="dPanel">
-        <div class="panel-title">DINO RUN</div>
-        <div class="panel-score">SCORE: <span id="dSc">0</span></div>
-        <canvas id="dCanvas" width="356" height="100"></canvas>
-      </div>
+    <div id="abortMain" style="display:none;">
+      <h2 style="color:#ff9aa0">本当に中断しますか？</h2>
+      <p>中断すると、いまのスコアは<b>一切残りません</b>。ハイスコアにもランキングにも登録されません。<br>途中から再開することもできず、次は最初からになります。</p>
+      <button class="btn danger" style="margin-top:14px" onclick="doAbort()">それでも中断する</button>
+      <button class="btn" style="margin-top:8px" onclick="cancelAbort()">やめる（戻る）</button>
     </div>
-
-    <!-- 下段：操作ボタン行 -->
-    <div class="controls-row-container">
-      <div class="ctrl-group-row">
-        <div class="ctrl-label">MOLE WHACK</div>
-        <div class="mole-pad">
-          <button class="mole-ctrl-btn" id="mBtn0">左上 [W]</button>
-          <button class="mole-ctrl-btn" id="mBtn1">右上 [E]</button>
-          <button class="mole-ctrl-btn" id="mBtn2">左下 [S]</button>
-          <button class="mole-ctrl-btn" id="mBtn3">右下 [D]</button>
-        </div>
-      </div>
-
-      <div class="ctrl-group-row">
-        <div class="ctrl-label">BREAKOUT</div>
-        <div class="ctrl-buttons">
-          <button class="ctrl-btn" id="bLBtn">← 左</button>
-          <button class="ctrl-btn" id="bRBtn">→ 右</button>
-        </div>
-      </div>
-
-      <div class="ctrl-group-row">
-        <div class="ctrl-label">DINO RUN</div>
-        <div class="ctrl-buttons">
-          <button class="ctrl-btn accent" id="dJumpBtn">SPACE ジャンプ！</button>
-        </div>
-      </div>
+    <div id="countMain" style="display:none;">
+      <div id="countNum">3</div>
+      <p>まもなく再開します</p>
     </div>
   </div>
 
@@ -415,6 +607,348 @@
     window.addEventListener('DOMContentLoaded', () => {
       toggleSpeedOptions();
     });
+
+
+    /* ===================== チュートリアル ===================== */
+    const tutOn = { m: true, b: true, d: true };
+    let tutorialMode = false, tutStep = 0, tutSaved = null;
+
+    const TUT_STEPS = [
+      { keys: '<div class="kb-row"><div class="key hot">W<small>左上</small></div><div class="key hot">E<small>右上</small></div></div>'
+             + '<div class="kb-row"><div class="key hot">S<small>左下</small></div><div class="key hot">D<small>右下</small></div></div>'
+             + '<div class="kb-cap">4つのマスと同じ並びです。<br>スマホは画面下の4つのボタン。</div>',
+        on: { m: true, b: false, d: false }, speed: 1.0, host: 'bPanel',
+        title: '① モグラたたき (MOLE WHACK)',
+        body: '左上のマスに黄色いモグラが出ます。出ているマスのキーを押して叩いてください。\n\nキー: W = 左上 / E = 右上 / S = 左下 / D = 右下\nスマホ: 画面下の4つのボタン\n\n違うマスを押す、または逃げられるとライフが1減り、モグラのスコアは0に戻ります。\n\n実際に何回か叩いてみてから OK を押してください。' },
+      { keys: '<div class="kb-row"><div class="key hot">\u2190<small>左へ</small></div><div class="key hot">\u2192<small>右へ</small></div></div>'
+             + '<div class="kb-cap">押している間だけバーが動きます。<br>スマホは「\u2190 左」「\u2192 右」ボタン。</div>',
+        on: { m: false, b: true, d: false }, speed: 1.0, host: 'tPanel',
+        title: '② ブロック崩し (BREAKOUT)',
+        body: '右上のゲームです。水色のバーを動かしてボールを跳ね返し、ブロックを壊します。\n\nキー: ← 左に移動 / → 右に移動\nスマホ: 「← 左」「→ 右」ボタン\n\nボールを下に落とすとライフが1減り、スコアは0に戻ります。1列そろえるとボーナスです。\n\n慣れたら OK を押してください。' },
+      { keys: '<div class="kb-row"><div class="key hot wide">SPACE<small>ジャンプ</small></div></div>'
+             + '<div class="kb-cap">スペースキーでジャンプ。<br>スマホは「SPACE ジャンプ！」ボタン。</div>',
+        on: { m: false, b: false, d: true }, speed: 1.0, host: 'top-row',
+        title: '③ 恐竜ゲーム (DINO RUN)',
+        body: '真ん中の横長のゲームです。走ってくるサボテンをジャンプでよけます。\n\nキー: スペースキー\nスマホ: 「SPACE ジャンプ！」ボタン\n\nぶつかるとライフが1減り、スコアは0に戻ります。\n\n何回かよけられたら OK を押してください。' },
+      { keys: '<div class="kb-row"><div class="key">W</div><div class="key">E</div><div class="key">S</div><div class="key">D</div></div>'
+             + '<div class="kb-row"><div class="key">\u2190</div><div class="key">\u2192</div><div class="key wide">SPACE</div></div>'
+             + '<div class="kb-cap">この7つのキーを全部使います。</div>',
+        on: { m: true, b: true, d: true }, speed: 0.5, host: 'cabinet',
+        title: '④ 3つ同時プレイ（0.5倍速）',
+        body: 'ここからが本番です。3つを同時に進めます。練習なのでゆっくり0.5倍速です。\n\nライフは3つのゲームで共通です。どれかでミスすると減ります。\n\n慣れたと思ったら OK を押してください。設定画面に戻ります。' }
+    ];
+
+    function tutShowChoice(show) {
+      document.getElementById('tutChoice').style.display = show ? 'flex' : 'none';
+    }
+    function tutCornerVisible(show) {
+      document.getElementById('tutCorner').style.display = show ? 'block' : 'none';
+    }
+    function skipTutorial() {
+      tutShowChoice(false);
+      tutCornerVisible(true);
+    }
+    function startTutorial() {
+      rankEntryCat = null;
+      tutShowChoice(false);
+      tutCornerVisible(false);
+      document.getElementById('result-screen').style.display = 'none';
+      tutorialMode = true; tutStep = 0;
+      tutSaved = {
+        speed: document.getElementById('speedSelect').value,
+        fixed: document.getElementById('fixedSpeedSelect').value,
+        life: document.getElementById('lifeSelect').value,
+        time: document.getElementById('timeSelect').value
+      };
+      document.getElementById('speedSelect').value = 'fixed';
+      document.getElementById('fixedSpeedSelect').value = '1.0';
+      document.getElementById('lifeSelect').value = 'inf';
+      document.getElementById('timeSelect').value = 'inf';
+      toggleSpeedOptions();
+      startGame();
+      tutApply(0);
+    }
+    function tutApply(n) {
+      tutStep = n;
+      const st = TUT_STEPS[n];
+      tutOn.m = st.on.m; tutOn.b = st.on.b; tutOn.d = st.on.d;
+      gameSpeed = st.speed; isAccelMode = false; maxGameSpeed = st.speed; speedStepPerSec = 0;
+
+      ['tPanel', 'bPanel', 'dPanel'].forEach(id => document.getElementById(id).classList.remove('tut-dim'));
+      if (!tutOn.m) document.getElementById('tPanel').classList.add('tut-dim');
+      if (!tutOn.b) document.getElementById('bPanel').classList.add('tut-dim');
+      if (!tutOn.d) document.getElementById('dPanel').classList.add('tut-dim');
+
+      // 各ゲームを初期状態に戻す
+      activeMole = -1;
+      mSc = 0; bSc = 0; dSc = 0;
+      document.getElementById('mSc').innerText = 0;
+      document.getElementById('bSc').innerText = 0;
+      document.getElementById('dSc').innerText = 0;
+      initB();
+      pX = (bC.width - pW) / 2; bX = bC.width / 2; bY = bC.height - 30; bDX = 1.5; bDY = -1.5;
+      obs = []; dY = groundY; dDY = 0; isGnd = true; fCount = 0;
+      if (tutOn.m) { clearTimeout(nextMoleTimeout); clearTimeout(moleTimer); scheduleNextMole(600); }
+
+      const side = document.getElementById('tutSide');
+      document.body.classList.add('tut-layout');
+      side.style.display = 'block';
+      side.querySelector('h3').textContent = st.title;
+      side.querySelector('p').textContent = st.body;
+      document.getElementById('tutKb').innerHTML = st.keys || '';
+      const ok = document.getElementById('tutOk');
+      ok.textContent = (n === TUT_STEPS.length - 1) ? 'OK（チュートリアル終了）' : 'OK（次へ）';
+      ok.onclick = tutNext;
+    }
+    function tutNext() {
+      if (tutStep < TUT_STEPS.length - 1) { tutApply(tutStep + 1); return; }
+      tutFinish();
+    }
+    function tutFinish() {
+      document.getElementById('tutSide').style.display = 'none';
+      document.body.classList.remove('tut-layout');
+      ['tPanel', 'bPanel', 'dPanel'].forEach(id => document.getElementById(id).classList.remove('tut-dim'));
+      tutOn.m = tutOn.b = tutOn.d = true;
+      tutorialMode = false;
+      gameActive = false;
+      if (timerInterval) clearInterval(timerInterval);
+      clearTimeout(nextMoleTimeout); clearTimeout(moleTimer);
+      if (tutSaved) {
+        document.getElementById('speedSelect').value = tutSaved.speed;
+        document.getElementById('fixedSpeedSelect').value = tutSaved.fixed;
+        document.getElementById('lifeSelect').value = tutSaved.life;
+        document.getElementById('timeSelect').value = tutSaved.time;
+        toggleSpeedOptions();
+        tutSaved = null;
+      }
+      document.getElementById('cabinet').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'none';
+      document.getElementById('start-screen').style.display = 'flex';
+      document.getElementById('menuWrap').style.display = 'flex';
+      tutCornerVisible(true);
+    }
+    tutCornerVisible(false);
+
+
+    /* ===================== 総合ランキング ===================== */
+    const RANK_API = "https://science-club-event-private.ink3-tomo-0827.workers.dev/api/rank";
+    const RANK_CAT_INFO = {
+      nomiss:   { label: 'ノーミス部門', time: 'inf', life: '1', speed: '1.0', note: '時間無制限・残機1・固定1.0倍速に自動で設定されます。1回のミスで終了です。' },
+      short:    { label: '短時間部門',   time: '30',  life: null, speed: null, note: '制限時間30秒だけ固定。残機とスピードは下で自由に選べます。' },
+      pro:      { label: 'プロ部門',     time: 'inf', life: '1', speed: '2.0', note: '時間無制限・残機1・固定2.0倍速に自動で設定されます。' },
+      beginner: { label: 'ビギナー部門', time: '60',  life: '5', speed: '0.5', note: '1分・残機5・固定0.5倍速に自動で設定されます。初めての人向けです。' }
+    };
+    const RANK_NG = ["ばか","バカ","馬鹿","あほ","アホ","阿呆","しね","死ね","殺す","ころす","きもい","キモい","うざい","ウザい","ぶす","ブス","でぶ","デブ","はげ","ハゲ","クズ","くず","ゴミ","カス","無能","池沼","きちがい","キチガイ","まんこ","ちんこ","ちんちん","おっぱい","せっくす","セックス","エロ","ペニス","レイプ","うんこ","うんち","ちんぽ","くたばれ","自殺","ばかやろう","fuck","fuk","shit","bitch","bastard","asshole","dick","cock","pussy","penis","vagina","sex","porn","rape","nigger","nigga","faggot","slut","whore","cunt","retard","idiot","stupid","unko","manko","chinko","oppai","korosu","shine","淫夢","いんむ","インム","inmu","野獣先輩","やじゅうせんぱい","ヤジュウセンパイ","yaju","yajuu","114514","1145141919","1919810","889464","364364","810114514","田所浩二","田所","多田野","TDN","MUR","KMR","HTN","ASM","遠野","ホモビ","ホモォ","やりますねぇ","ンアッー","アーイクイクイク","暴れんなよ","itm","イキスギ","いきすぎ","すいません許してください","クッキー☆","くっきー☆","淫夢厨","真夏の夜の淫夢"];
+    function rankNG(name) {
+      const flat = String(name).toLowerCase().replace(/[\s　_.\-]/g, '');
+      return RANK_NG.some(w => flat.includes(w.toLowerCase()));
+    }
+    let rankDeviceId = localStorage.getItem('arcade_device_id');
+    if (!rankDeviceId) {
+      rankDeviceId = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('arcade_device_id', rankDeviceId);
+    }
+    let rankNick = localStorage.getItem('arcade_nick') || '';
+    let rankEntryCat = null, rankViewCat = 'nomiss', rankBoard = null;
+
+    function rankMsg(text, ok) {
+      const el = document.getElementById('rankMsg');
+      el.textContent = text;
+      el.className = ok ? 'ok' : 'ng';
+    }
+    function rankRender() {
+      const ol = document.getElementById('rankList');
+      ol.innerHTML = '';
+      const list = (rankBoard && rankBoard[rankViewCat]) || [];
+      if (!list.length) {
+        ol.innerHTML = '<li><span class="nm">まだ記録がありません</span></li>';
+        return;
+      }
+      list.forEach((e, i) => {
+        const li = document.createElement('li');
+        if (rankNick && e.nick === rankNick) li.className = 'me';
+        li.innerHTML = '<span class="pos"></span><span class="nm"></span><span class="sc"></span>';
+        li.querySelector('.pos').textContent = (i + 1) + '位';
+        li.querySelector('.nm').textContent = e.nick;
+        li.querySelector('.sc').textContent = e.score.toLocaleString();
+        ol.appendChild(li);
+      });
+    }
+    async function rankFetch() {
+      const st = document.getElementById('rankState');
+      try {
+        const r = await fetch(RANK_API + '?t=' + Date.now(), { cache: 'no-store' });
+        const j = await r.json();
+        if (!j.ok) throw new Error('ng');
+        rankBoard = j.board;
+        st.textContent = 'オンライン更新: ' + new Date().toLocaleTimeString('ja-JP');
+        rankRender();
+      } catch (e) {
+        st.textContent = 'ランキングサーバーに接続できませんでした。あとでもう一度開いてください。';
+      }
+    }
+    async function rankPost(cat, score) {
+      const payload = { id: rankDeviceId, nick: rankNick };
+      if (cat) { payload.cat = cat; payload.score = score; }
+      try {
+        const r = await fetch(RANK_API, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+        if (j.ok) { rankBoard = j.board; rankRender(); return true; }
+        if (j.error === 'ngword') { rankMsg('その名前は使えません。ほかの名前にしてください。', false); return false; }
+        rankMsg('登録できませんでした（' + (j.error || 'error') + '）', false);
+        return false;
+      } catch (e) {
+        rankMsg('ランキングサーバーに接続できませんでした。', false);
+        return false;
+      }
+    }
+    function rankCheckNick() {
+      const v = document.getElementById('rankNick').value.trim();
+      if (!v) { rankMsg('ニックネームを入れてください。', false); return null; }
+      if (v.length > 12) { rankMsg('ニックネームは12文字までです。', false); return null; }
+      if (rankNG(v)) { rankMsg('その名前は使えません。ほかの名前にしてください。', false); return null; }
+      return v;
+    }
+    async function rankSaveNameOnly() {
+      const v = rankCheckNick();
+      if (!v) return;
+      rankNick = v;
+      localStorage.setItem('arcade_nick', v);
+      const ok = await rankPost(null, 0);
+      if (ok) rankMsg('「' + v + '」で登録しました。ランキングの名前も変わりました。', true);
+    }
+    async function rankStart() {
+      const v = rankCheckNick();
+      if (!v) return;
+      rankNick = v;
+      localStorage.setItem('arcade_nick', v);
+      await rankPost(null, 0);
+      const cat = document.getElementById('rankCat').value;
+      const info = RANK_CAT_INFO[cat];
+      if (info.speed) {
+        document.getElementById('speedSelect').value = 'fixed';
+        document.getElementById('fixedSpeedSelect').value = info.speed;
+        toggleSpeedOptions();
+      }
+      if (info.life) document.getElementById('lifeSelect').value = info.life;
+      if (cat === 'short') {
+        document.getElementById('lifeSelect').value = document.getElementById('shortLife').value;
+        const sp = document.getElementById('shortSpeed').value;
+        if (sp === 'accel') {
+          document.getElementById('speedSelect').value = 'accel';
+        } else {
+          document.getElementById('speedSelect').value = 'fixed';
+          document.getElementById('fixedSpeedSelect').value = sp;
+        }
+        toggleSpeedOptions();
+      }
+      document.getElementById('timeSelect').value = info.time;
+      rankEntryCat = cat;
+      rankMsg(info.label + 'で出場中です。', true);
+      startGame();
+    }
+    async function rankSubmitResult(total) {
+      if (!rankEntryCat || !rankNick) return;
+      const cat = rankEntryCat;
+      rankEntryCat = null;
+      const ok = await rankPost(cat, total);
+      if (ok) {
+        const list = (rankBoard && rankBoard[cat]) || [];
+        const pos = list.findIndex(e => e.nick === rankNick && e.score === total);
+        document.getElementById('resMsg').innerText =
+          RANK_CAT_INFO[cat].label + 'に登録しました' + (pos >= 0 ? '（' + (pos + 1) + '位）' : '');
+      }
+    }
+    document.querySelectorAll('.rank-tab').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.rank-tab').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+        rankViewCat = btn.dataset.cat;
+        rankRender();
+      };
+    });
+    document.getElementById('rankCat').onchange = () => {
+      const c = document.getElementById('rankCat').value;
+      document.getElementById('rankCatNote').textContent = RANK_CAT_INFO[c].note;
+      document.getElementById('shortOpts').style.display = (c === 'short') ? 'block' : 'none';
+    };
+    document.getElementById('rankCatNote').textContent = RANK_CAT_INFO.nomiss.note;
+    if (rankNick) document.getElementById('rankNick').value = rankNick;
+    rankFetch();
+
+
+    /* ===================== 一時停止 / 中断 ===================== */
+    let isPaused = false, countTimer = null;
+
+    function pauseGame() {
+      if (!gameActive || isPaused) return;
+      isPaused = true;
+      clearTimeout(nextMoleTimeout);
+      clearTimeout(moleTimer);
+      activeMole = -1;
+      mL = false; mR = false;           // 押しっぱなし状態を解除（慣性ずれ防止）
+      document.getElementById('pauseMain').style.display = 'block';
+      document.getElementById('abortMain').style.display = 'none';
+      document.getElementById('countMain').style.display = 'none';
+      document.getElementById('pauseOv').style.display = 'flex';
+    }
+    function resumeGame() {
+      document.getElementById('pauseMain').style.display = 'none';
+      document.getElementById('abortMain').style.display = 'none';
+      document.getElementById('countMain').style.display = 'block';
+      let n = 3;
+      const num = document.getElementById('countNum');
+      num.textContent = n;
+      clearInterval(countTimer);
+      countTimer = setInterval(() => {
+        n--;
+        if (n > 0) { num.textContent = n; return; }
+        clearInterval(countTimer);
+        num.textContent = 'START!';
+        setTimeout(() => {
+          document.getElementById('pauseOv').style.display = 'none';
+          // 再開時に動きをそろえる（慣性バグ防止）
+          mL = false; mR = false;
+          dDY = 0; isGnd = (dY >= groundY);
+          isPaused = false;
+          if (tutOn.m) scheduleNextMole(800);
+        }, 450);
+      }, 700);
+    }
+    function askAbort() {
+      if (!gameActive) return;
+      if (!isPaused) pauseGame();
+      document.getElementById('pauseMain').style.display = 'none';
+      document.getElementById('countMain').style.display = 'none';
+      document.getElementById('abortMain').style.display = 'block';
+      document.getElementById('pauseOv').style.display = 'flex';
+    }
+    function cancelAbort() {
+      document.getElementById('abortMain').style.display = 'none';
+      document.getElementById('countMain').style.display = 'none';
+      document.getElementById('pauseMain').style.display = 'block';
+    }
+    function doAbort() {
+      clearInterval(countTimer);
+      gameActive = false;
+      isPaused = false;
+      rankEntryCat = null;                 // 記録は一切残さない
+      if (timerInterval) clearInterval(timerInterval);
+      clearTimeout(nextMoleTimeout);
+      clearTimeout(moleTimer);
+      activeMole = -1;
+      mL = false; mR = false;
+      document.getElementById('pauseOv').style.display = 'none';
+      if (tutorialMode) { tutFinish(); return; }
+      document.getElementById('cabinet').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'none';
+      document.getElementById('start-screen').style.display = 'flex';
+      document.getElementById('menuWrap').style.display = 'flex';
+      tutCornerVisible(true);
+    }
 
     function getStorageKey() {
       return `arcade_hi_sp_${selectedSpeedConfig}_life_${selectedLifeConfig}_time_${selectedTimeConfig}`;
@@ -475,7 +1009,9 @@
       loadHiScore();
 
       document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('menuWrap').style.display = 'none';
       document.getElementById('cabinet').style.display = 'flex';
+      tutCornerVisible(false);
 
       mSc = 0; bSc = 0; dSc = 0;
       document.getElementById('mSc').innerText = 0;
@@ -488,13 +1024,15 @@
       obs = []; dY = 60; dDY = 0; isGnd = true; fCount = 0;
 
       gameActive = true;
-      
+      isPaused = false;
+      document.getElementById('pauseOv').style.display = 'none';
+
       initM();
       initGameLoops();
 
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
-        if (!gameActive) return;
+        if (!gameActive || isPaused) return;
 
         if (isAccelMode && gameSpeed < maxGameSpeed) {
           gameSpeed = Math.min(gameSpeed + speedStepPerSec, maxGameSpeed);
@@ -538,6 +1076,7 @@
 
     function endGame(reason) {
       if (!gameActive) return;
+      if (tutorialMode) { currentLife = Infinity; document.getElementById('lifeDisp').innerText = 'INF'; return; }
       gameActive = false;
       if (timerInterval) clearInterval(timerInterval);
       clearTimeout(nextMoleTimeout);
@@ -551,16 +1090,21 @@
 
       document.getElementById('cabinet').style.display = 'none';
       document.getElementById('result-screen').style.display = 'flex';
+      rankSubmitResult(currentHiScore);
     }
 
     function returnToMenu() {
       document.getElementById('result-screen').style.display = 'none';
       document.getElementById('start-screen').style.display = 'flex';
+      document.getElementById('menuWrap').style.display = 'flex';
+      rankFetch();
+      tutCornerVisible(true);
     }
 
     function updateScores() {
       let total = mSc + bSc + dSc;
       document.getElementById('totalSc').innerText = total;
+      if (tutorialMode) return;
       if (total > currentHiScore) {
         currentHiScore = total;
         localStorage.setItem(getStorageKey(), currentHiScore);
@@ -596,7 +1140,7 @@
     }
 
     function scheduleNextMole(delay) {
-      if (!gameActive) return;
+      if (!gameActive || !tutOn.m || isPaused) return;
       
       clearTimeout(nextMoleTimeout);
       let randomDelay = delay + Math.random() * 1200;
@@ -625,7 +1169,7 @@
     }
 
     function hitMole(index) {
-      if (!gameActive) return;
+      if (!gameActive || !tutOn.m || isPaused) return;
       
       if (activeMole === index) {
         clearTimeout(moleTimer);
@@ -746,7 +1290,7 @@
       bCtx.fillStyle = '#00ffff';
       bCtx.fillRect(pX, bC.height - pH - 6, pW, pH);
 
-      let speedFactor = gameSpeed;
+      let speedFactor = (tutOn.b && !isPaused) ? gameSpeed : 0;
       if(mR && pX < bC.width - pW) pX += 3.2 * speedFactor;
       if(mL && pX > 0) pX -= 3.2 * speedFactor;
 
@@ -815,7 +1359,7 @@
     const groundY = 78;
 
     function dJump() {
-      if(!gameActive) return;
+      if(!gameActive || !tutOn.d || isPaused) return;
       if(isGnd) {
         dDY = -6.2;
         isGnd = false;
@@ -845,7 +1389,7 @@
       dCtx.beginPath();
       dCtx.moveTo(0, groundY + 14); dCtx.lineTo(dC.width, groundY + 14); dCtx.stroke();
 
-      let speedFactor = gameSpeed;
+      let speedFactor = (tutOn.d && !isPaused) ? gameSpeed : 0;
       dY += dDY * speedFactor;
       if(dY < groundY) {
         dDY += 0.35 * speedFactor;
@@ -859,7 +1403,7 @@
       dCtx.fillRect(32, dY + 14, 2, (fCount%10 < 5) ? 3 : 1);
       dCtx.fillRect(36, dY + 14, 2, (fCount%10 >= 5) ? 3 : 1);
 
-      if(Math.random() < 0.012 * Math.min(speedFactor, 2) && (obs.length === 0 || obs[obs.length-1].x < dC.width - 120)) {
+      if(tutOn.d && Math.random() < 0.012 * Math.min(speedFactor, 2) && (obs.length === 0 || obs[obs.length-1].x < dC.width - 120)) {
         obs.push({x: dC.width, w: 9, h: 14});
       }
 
@@ -929,5 +1473,5 @@
     document.getElementById('dJumpBtn').onclick = dJump;
     dC.addEventListener('touchstart', (e) => { e.preventDefault(); dJump(); });
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5011c2b1c194efb',t:'MTc5MjkzMDE0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
