@@ -6,10 +6,21 @@ function norm(u){try{let x=String(u).replace(/^https?:\/\/ink3-1239\.github\.io\
 const ow=window.open;
 window.open=function(u){const n=u?norm(u):null;if(n){location.href=n;return null;}return ow.apply(window,arguments);};
 addEventListener('click',function(ev){
-  let a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;
-  if(!a)return;const n=norm(a.getAttribute('href'));if(!n)return;
+  let t=ev.target;let a=t&&t.closest?(t.closest('a[href]')||t.closest('[data-gurl]')):null;
+  if(!a)return;const n=norm(a.getAttribute('data-gurl')||a.getAttribute('href'));if(!n)return;
   ev.preventDefault();ev.stopPropagation();location.href=n;
 },true);
+function hide(root){
+  try{(root||document).querySelectorAll('a[href]').forEach(function(a){
+    const n=norm(a.getAttribute('href'));if(!n)return;
+    a.setAttribute('data-gurl',n);a.removeAttribute('href');a.removeAttribute('target');
+    a.style.cursor='pointer';a.setAttribute('role','button');a.setAttribute('tabindex','0');
+  });}catch(e){}
+}
+addEventListener('DOMContentLoaded',function(){
+  hide(document);
+  try{new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes&&m.addedNodes.forEach(function(nd){if(nd.nodeType===1)hide(nd)})})}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+});
 document.addEventListener('DOMContentLoaded',function(){
   document.querySelectorAll('a[target="_blank"]').forEach(function(a){if(norm(a.getAttribute('href')))a.removeAttribute('target');});
 });
