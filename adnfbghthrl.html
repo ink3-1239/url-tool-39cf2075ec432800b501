@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYSTEM SECURITY</title>
+<!--
+  ============================================================
+  ◆ ドッキリ用の偽セキュリティ警告 / 偽ロック画面です。実害はありません。
+  ◆ 行わないこと：自己複製・ファイルの読み書き/削除・外部通信・個人情報の取得
+  ◆ 画面に出る端末情報は、どのWebサイトでも取得できる公開情報のみ
+  ◆ 最後の黒画面で「ink3kami」と入力すると解除されます
+  ------------------------------------------------------------
+  ◆ 終了・再読み込みを試みると「ウィルスのスキャンが完了していません。」の
+     確認が出ます（本物の beforeunload ＋ 自作ダイアログ）。
+     自作側は「はい」を何度押しても再表示されます。
+
+  ◆ 解除方法は「合言葉の入力」だけです
+    1) 黒画面で「ink3kami」と入力 → 解除
+    ※ Esc / F11 / F4 を押しても、全画面は解除されません（無反応）
+    ※ それでも抜けたい場合の最終手段（OSレベル・常に可能）
+       Ctrl+R で再読み込み → 最初の画面に戻る
+       Ctrl+Shift+W / タブの ✕ で閉じる
+       Esc を「1秒以上長押し」すると全画面解除（Chrome の仕様。ここだけは回避不可）
+  ============================================================
+-->
+<style>
+  :root{
+    --red:#ff2d40; --dim:#5b6b80; --line:#1d2735;
+    --text:#c9d6e5; --green:#28e07b; --amber:#ffb020;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0}
+  body{
+    background:#000; color:var(--text); overflow:hidden;
+    font-family:"SF Mono",Menlo,Consolas,"BIZ UDゴシック","Hiragino Kaku Gothic ProN",monospace;
+    -webkit-font-smoothing:antialiased; user-select:none;
+  }
+  .screen{position:fixed; inset:0; display:none; flex-direction:column; padding:clamp(14px,2.6vw,38px);}
+  .screen.on{display:flex}
+
+  /* ================= 1. 警告 ================= */
+  #alert{background:radial-gradient(120% 90% at 50% 0%,#2a0a10 0%,#07090d 60%)}
+  .tag{
+    display:inline-flex; align-items:center; gap:8px; align-self:flex-start;
+    font-size:12px; letter-spacing:.14em; color:var(--red);
+    border:1px solid rgba(255,45,64,.4); border-radius:999px; padding:6px 14px;
+    background:rgba(255,45,64,.07);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .wrap{flex:1; display:flex; flex-direction:column; justify-content:center; max-width:920px; margin:0 auto; width:100%}
+  h1{font-size:clamp(28px,6.4vw,62px); line-height:1.06; margin:18px 0 8px; color:#fff; font-weight:800; letter-spacing:-.02em; text-shadow:0 0 34px rgba(255,45,64,.45)}
+  h1 span{color:var(--red)}
+  .sub{color:var(--dim); font-size:clamp(12px,1.5vw,15px); margin-bottom:24px}
+  .kv{display:flex; gap:10px 34px; flex-wrap:wrap; font-size:12.5px; color:var(--dim); margin-bottom:28px}
+  .kv b{color:var(--text); font-weight:600}
+  .btn{
+    appearance:none; border:0; border-radius:10px; cursor:pointer; font-family:inherit;
+    font-size:clamp(14px,1.7vw,17px); font-weight:700; padding:16px 30px; color:#fff;
+    background:var(--red); box-shadow:0 10px 34px rgba(255,45,64,.34);
+    transition:transform .12s ease, box-shadow .2s ease;
+  }
+  .btn:hover{transform:translateY(-1px); box-shadow:0 14px 40px rgba(255,45,64,.5)}
+
+  /* ================= 2. スキャン ================= */
+  #scan{padding-top:clamp(16px,2.6vw,34px); background:#07090d}
+  .bar-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:10px; font-size:13px}
+  .bar-head .pct{font-size:clamp(22px,3vw,30px); color:#fff; font-weight:800}
+  .track{height:8px; border-radius:99px; background:#141c27; overflow:hidden}
+  .fill{height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,#ff2d40,#ff8a3d); transition:width .12s linear}
+  .log{flex:1; margin-top:20px; overflow:hidden; font-size:clamp(10.5px,1.3vw,13px); line-height:1.95;
+       display:flex; flex-direction:column; justify-content:flex-end;
+       mask-image:linear-gradient(to bottom,transparent,#000 26%)}
+  .log div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .log .f{color:#4b5c72} .log .w{color:var(--amber)} .log .e{color:var(--red); font-weight:700}
+  .foot{margin-top:12px; border-top:1px solid var(--line); padding-top:11px; display:flex;
+        justify-content:space-between; font-size:10.5px; color:#3d4b5e; letter-spacing:.06em}
+
+  /* ================= 3. 感染警告（リアル重視） ================= */
+  #infected{
+    justify-content:center; align-items:center; padding:0;
+    background:#0a0c11;
+  }
+  .win{
+    width:min(760px,94vw); border:1px solid #2b3a4d; border-radius:9px; overflow:hidden;
+    box-shadow:0 40px 100px rgba(0,0,0,.9), 0 0 0 1px rgba(255,45,64,.06);
+    background:#11161f; animation:winIn .22s ease-out;
+  }
+  @keyframes winIn{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+  .win-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 12px; background:#1b2331; border-bottom:1px solid #2b3a4d; font-size:12px; color:#a9b8cc;
+  }
+  .win-bar .t{display:flex; align-items:center; gap:8px; font-weight:600}
+  .win-bar .x{
+    width:26px;height:22px; display:grid;place-items:center; border:1px solid #33445c; border-radius:4px;
+    color:#7d8ea6; font-size:13px;
+  }
+  .win-body{padding:clamp(18px,3vw,32px)}
+  .win-head{display:flex; gap:16px; align-items:flex-start}
+  .shield{
+    flex:0 0 auto; width:46px;height:46px; border-radius:50%; display:grid; place-items:center;
+    background:rgba(255,45,64,.12); border:1px solid rgba(255,45,64,.45); color:var(--red);
+    font-size:24px; font-weight:800; animation:blink 1.15s steps(2,end) infinite;
+  }
+  @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:.2}}
+  .win-head h2{
+    margin:0 0 6px; font-size:clamp(17px,2.5vw,23px); color:#fff; line-height:1.4; font-weight:800;
+    font-family:"BIZ UDゴシック","Hiragino Kaku Gothic ProN",sans-serif;
+  }
+  .win-head h2 em{color:var(--red); font-style:normal}
+  .win-head .big{font-size:clamp(14px,1.8vw,17px); color:#ffc2c9; font-weight:700; margin:0;
+    font-family:"BIZ UDゴシック","Hiragino Kaku Gothic ProN",sans-serif}
+
+  .spec{
+    margin-top:18px; border:1px solid #263141; border-radius:8px; overflow:hidden;
+    font-size:clamp(10px,1.2vw,12px); background:#0b0f15;
+  }
+  .spec .row{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#263141}
+  .spec .cell{background:#0b0f15; padding:8px 11px; color:#66788e; letter-spacing:.02em; overflow:hidden}
+  .spec .cell b{display:block; color:#e3edf9; font-weight:600; margin-top:2px; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; letter-spacing:0}
+  .spec .cell b.red{color:#ff6b7b}
+
+  .prog-wrap{margin-top:16px; font-size:11px; color:#6b7d93}
+  .prog-line{display:flex; justify-content:space-between; margin-bottom:6px}
+  .prog{height:6px; background:#1a2431; border-radius:99px; overflow:hidden}
+  .prog i{display:block; height:100%; width:0%; background:linear-gradient(90deg,#ff2d40,#ff8a3d); transition:width .3s linear}
+  .files{
+    margin-top:12px; height:74px; overflow:hidden; font-size:10.5px; line-height:1.7; color:#5b6b80;
+    mask-image:linear-gradient(to bottom,#000 55%,transparent);
+  }
+  .files div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .files b{color:#ff8090; font-weight:600}
+
+  .win-foot{
+    margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    border-top:1px solid #263141; padding-top:14px;
+  }
+  .win-foot .note{font-size:10.5px; color:#4a5a6e; line-height:1.7}
+  .win-btn{
+    appearance:none; border:1px solid #3a4d68; background:#1b2735; color:#d6e3f2; cursor:pointer;
+    border-radius:6px; padding:10px 18px; font-family:inherit; font-size:13px; font-weight:700;
+  }
+  .win-btn:hover{background:#22334a}
+
+  /* ================= 4. 黒画面（ロック） ================= */
+  #black{
+    background:#000; cursor:none; padding:0;
+    justify-content:flex-start; align-items:flex-start;
+  }
+  #black.on{display:block}
+  .term{
+    position:absolute; left:clamp(18px,4vw,54px); top:clamp(18px,4vh,48px);
+    font-size:clamp(11px,1.4vw,14px); line-height:2.05; color:#1d1d1d; letter-spacing:.03em;
+  }
+  .term .p{color:#262626}
+  .term .typed{color:#3a3a3a}
+  .term .warn{color:#3d1015}
+  .cursor{
+    display:inline-block; width:.62em; height:1.05em; background:#3a3a3a; vertical-align:-.16em;
+    animation:cur 1.06s steps(1,end) infinite;
+  }
+  @keyframes cur{0%,49%{opacity:1}50%,100%{opacity:0}}
+  .hintline{color:#1a1a1a; font-size:clamp(9.5px,1.1vw,11px); margin-top:26px; letter-spacing:.14em}
+  .fsnote{
+    position:absolute; inset:0; display:none; place-items:center; text-align:center;
+    background:#000; color:#2a2a2a; font-size:12px; letter-spacing:.1em; line-height:2.2;
+  }
+  .fsnote.on{display:grid}
+
+  /* ================= 5. 種明かし ================= */
+  #reveal{
+    justify-content:center; align-items:center; text-align:center; cursor:auto;
+    background:radial-gradient(120% 90% at 50% 110%,#0d2a1c 0%,#07090d 62%);
+  }
+  .reveal-card{max-width:780px; width:100%; position:relative; z-index:2; padding:0 18px}
+  .emoji{font-size:clamp(50px,10vw,88px); line-height:1; animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+  #reveal h2{font-size:clamp(24px,4.6vw,42px); color:#fff; margin:20px 0 14px; letter-spacing:-.02em}
+  .msg{color:var(--text); font-size:clamp(13px,1.8vw,17px); line-height:1.9; margin:0 auto 8px; max-width:58ch}
+  .from{margin-top:22px; display:inline-block; padding:11px 20px; border:1px solid var(--line);
+        border-radius:999px; font-size:13px; color:var(--dim)}
+  .from b{color:var(--green)}
+  .safe{margin-top:26px; font-size:11px; line-height:2; color:#3d4b5e}
+  .close{margin-top:22px}
+  .confetti{position:fixed; inset:0; pointer-events:none; z-index:1; overflow:hidden}
+  .confetti i{position:absolute; top:-8vh; font-style:normal; font-size:20px; animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(118vh) rotate(420deg); opacity:.9}}
+
+  /* ===== 終了確認ダイアログ ===== */
+  #exitdlg{
+    position:fixed; inset:0; z-index:9999; display:none;
+    align-items:center; justify-content:center; background:rgba(0,0,0,.62);
+  }
+  #exitdlg.on{display:flex}
+  .dlg{
+    width:min(440px,90vw); background:#202124; color:#e8eaed; cursor:auto;
+    border:1px solid #3c4043; border-radius:10px; overflow:hidden;
+    box-shadow:0 24px 80px rgba(0,0,0,.85);
+    font-family:"BIZ UDゴシック","Hiragino Kaku Gothic ProN",sans-serif;
+    animation:dlgIn .16s ease-out;
+  }
+  @keyframes dlgIn{from{transform:scale(.97);opacity:0}to{transform:scale(1);opacity:1}}
+  .dlg-t{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:11px 14px; border-bottom:1px solid #3c4043; font-size:12.5px; color:#9aa0a6;
+  }
+  .dlg-t .x{color:#5f6368}
+  .dlg-b{padding:20px 20px 6px; display:flex; gap:14px; align-items:flex-start}
+  .dlg-ico{flex:0 0 auto; width:30px;height:30px; border-radius:50%; display:grid;place-items:center;
+    background:rgba(255,45,64,.16); border:1px solid rgba(255,45,64,.5); color:#ff6b7b; font-weight:800; font-size:16px}
+  .dlg-m{font-size:14px; line-height:1.75; color:#e8eaed}
+  .dlg-m small{display:block; margin-top:8px; font-size:11.5px; color:#9aa0a6; line-height:1.7}
+  .dlg-f{display:flex; justify-content:flex-end; gap:10px; padding:14px 18px 18px}
+  .dlg-btn{
+    appearance:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700;
+    padding:9px 20px; border-radius:6px; border:1px solid #5f6368; background:transparent; color:#e8eaed;
+  }
+  .dlg-btn.y{background:#8ab4f8; border-color:#8ab4f8; color:#202124}
+  .dlg-btn:hover{filter:brightness(1.12)}
+  .dlg-count{font-size:11px; color:#5f6368; text-align:right; padding:0 20px 12px}
+
+  .glitch{animation:gl .26s steps(2,end) 3}
+  @keyframes gl{0%{filter:none}50%{filter:invert(1) hue-rotate(90deg)}100%{filter:none}}
+  @media (prefers-reduced-motion: reduce){
+    .dot,.shield,.cursor{animation:none}
+    .confetti{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= 1. 警告 ================= -->
+<section class="screen on" id="alert">
+  <div class="tag"><span class="dot"></span>SYSTEM SECURITY ALERT</div>
+  <div class="wrap">
+    <h1>重大な脅威が<br><span id="threatCount">7件</span> 検出されました</h1>
+    <p class="sub">この端末は現在、保護されていません。直ちにフルスキャンを実行してください。</p>
+    <div class="kv">
+      <div>端末 <b id="hostName">chromebook</b></div>
+      <div>日時 <b id="nowTime">--:--</b></div>
+      <div>リスクレベル <b style="color:#ff2d40">CRITICAL</b></div>
+    </div>
+    <div><button class="btn" id="startBtn">今すぐスキャンする</button></div>
+  </div>
+</section>
+
+<!-- ================= 2. スキャン ================= -->
+<section class="screen" id="scan">
+  <div class="bar-head">
+    <div>フルスキャンを実行中… <span style="color:#3d4b5e">/opt/google/chrome &nbsp; /home/chronos &nbsp; /media</span></div>
+    <div class="pct"><span id="pct">0</span>%</div>
+  </div>
+  <div class="track"><div class="fill" id="fill"></div></div>
+  <div class="log" id="log"></div>
+  <div class="foot">
+    <span id="counter">検査済みファイル: 0</span>
+    <span>ESC キーで中止</span>
+  </div>
+</section>
+
+<!-- ================= 3. 感染警告 ================= -->
+<section class="screen" id="infected">
+  <div class="win">
+    <div class="win-bar">
+      <div class="t"><span style="color:#ff2d40">⛊</span> ChromeOS セキュリティ — 脅威の検出</div>
+      <div class="x">✕</div>
+    </div>
+    <div class="win-body">
+      <div class="win-head">
+        <div class="shield">!</div>
+        <div>
+          <h2>この端末は<em>ウイルスに感染</em>されたおそれがあります。</h2>
+          <p class="big">今すぐに画面を閉じてください。</p>
+        </div>
+      </div>
+
+      <div class="spec" id="spec"></div>
+
+      <div class="prog-wrap">
+        <div class="prog-line">
+          <span>ファイルの暗号化</span>
+          <span id="encTxt">0%</span>
+        </div>
+        <div class="prog"><i id="progFill"></i></div>
+      </div>
+
+      <div class="files" id="files"></div>
+
+      <div class="win-foot">
+        <div class="note" id="footNote">
+          推奨処置：このウィンドウを閉じてください。<br>
+          <span style="color:#33414f">回避コードを入力すると処理を中断できます。</span>
+        </div>
+        <button class="win-btn" id="ignoreBtn">閉じる</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 4. 黒画面 ================= -->
+<section class="screen" id="black">
+  <div class="term">
+    <div class="p">SYSTEM HALTED. <span class="warn">LOCKED.</span></div>
+    <div class="p" style="margin-top:10px">＞ <span class="typed" id="dots"></span><span class="cursor"></span></div>
+    <div class="hintline" id="hint"></div>
+  </div>
+  <div class="fsnote" id="fsnote">
+    <div>
+      全画面表示を維持しています<br>
+      <span style="color:#242424">画面のどこかをクリックしてください</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 終了確認ダイアログ ================= -->
+<div id="exitdlg">
+  <div class="dlg">
+    <div class="dlg-t"><span id="dlgTitle">ページから移動しますか？</span><span class="x">✕</span></div>
+    <div class="dlg-b">
+      <div class="dlg-ico">!</div>
+      <div class="dlg-m">
+        <span id="dlgMsg">ウィルスのスキャンが完了していません。</span>
+        <small id="dlgSub">このページを離れると、スキャンは中断されます。</small>
+      </div>
+    </div>
+    <div class="dlg-f">
+      <button class="dlg-btn y" id="dlgYes">はい</button>
+      <button class="dlg-btn" id="dlgNo">いいえ</button>
+    </div>
+    <div class="dlg-count" id="dlgCount"></div>
+  </div>
+</div>
+
+<!-- ================= 5. 種明かし ================= -->
+<section class="screen" id="reveal">
+  <div class="confetti" id="confetti"></div>
+  <div class="reveal-card">
+    <div class="emoji">🎉</div>
+    <h2>ドッキリ成功！</h2>
+    <p class="msg" id="jokeMsg">
+      おめでとうございます。<br>
+      あなたの端末にウイルスは<span style="color:#28e07b">1個もありません</span>。<br>
+      暗号化されたファイルも、外部に送られたデータも、ゼロです。<br>
+      あるのは、この画面を作った友達の愛情だけ。
+    </p>
+    <div class="from">送信者：<b id="senderName">あなたの友達</b></div>
+    <button class="btn close" id="closeBtn">閉じる（何も起きません）</button>
+    <p class="safe">
+      このページは HTML 1枚のジョークです。通信・ファイル操作・自動実行・自己複製は一切行いません。<br>
+      表示された端末情報は、どのWebサイトでも取得できる公開情報（ブラウザの種類・画面サイズなど）だけです。<br>
+      右クリック →「ページのソースを表示」で全部確認できます。
+    </p>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   設定
+   ============================================================ */
+const CONFIG = {
+  SENDER:      "あなたの友達",   // 送信者の名前
+  JOKE:        null,             // 独自メッセージにする場合 "..." を入れる
+  DURATION:    22,               // スキャン演出（秒）
+  BLACK_AFTER: 7,                // 感染警告を出しておく秒数 → 黒画面へ
+  PASSCODE:    "ink3kami",       // 解除コード
+  HINT_AFTER:  60,               // 秒後に薄いヒントを出す（0で無効）
+  HINT_TEXT:   "hint: 送り主に聞いてください",
+  EXIT_MSG:    "ウィルスのスキャンが完了していません。",
+  EXIT_TITLE:  "ページから移動しますか？"
+};
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+/* ---------- 端末情報（公開情報のみ） ---------- */
+function gpuName(){
+  try{
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+    const d = gl.getExtension("WEBGL_debug_renderer_info");
+    return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)).slice(0,46) : "—";
+  }catch(e){ return "—"; }
+}
+const INFO = {
+  ua: navigator.userAgent,
+  screen: `${screen.width}×${screen.height} @${window.devicePixelRatio||1}x`,
+  avail: `${screen.availWidth}×${screen.availHeight}`,
+  cores: navigator.hardwareConcurrency || "—",
+  mem: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "—",
+  gpu: gpuName(),
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "—",
+  lang: navigator.language || "—",
+  plat: navigator.platform || "—",
+  touch: ("ontouchstart" in window) ? "タッチ対応" : "非対応"
+};
+
+/* ---------- 初期化 ---------- */
+$("nowTime").textContent = new Date().toLocaleString("ja-JP",{hour12:false});
+const IS_CROS = /CrOS/i.test(INFO.ua);
+const IS_WIN  = /Win/i.test(INFO.plat);
+const IS_MAC  = /Mac/i.test(INFO.plat);
+$("hostName").textContent = IS_CROS
+  ? "chromebook-" + Math.random().toString(16).slice(2,6)
+  : (IS_WIN ? "DESKTOP-" : "MacBook-") + Math.random().toString(36).slice(2,7).toUpperCase();
+$("senderName").textContent = CONFIG.SENDER;
+$("threatCount").textContent = Math.floor(rnd(4,12)) + "件";
+if (CONFIG.JOKE) $("jokeMsg").innerHTML = CONFIG.JOKE;
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
+  $(id).classList.add("on");
+}
+
+/* ---------- 全画面 ---------- */
+let fsWanted = false;
+
+function goFullscreen(){
+  fsWanted = true;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (req){ try { const r = req.call(el, {navigationUI:"hide"}); if (r && r.catch) r.catch(()=>{}); } catch(e){} }
+}
+
+/* Keyboard Lock API
+   引数なしの lock() は「捕捉可能なキー」をまとめてロックする。
+   → Esc / F11 / F4 / Tab がブラウザ側の操作に取られなくなる。
+   （Chrome / ChromeOS / Edge で有効。フルスクリーン中のみ） */
+let keyLocked = false;
+function lockKeys(){
+  if (!navigator.keyboard || !navigator.keyboard.lock) return;
+  const done = () => { keyLocked = true; };
+  const fallback = () => {
+    try { navigator.keyboard.lock(["Escape","F11","F4","KeyW","Tab"]).then(done).catch(()=>{}); } catch(e){}
+  };
+  try {
+    const r = navigator.keyboard.lock();   // 全キー捕捉
+    if (r && r.then) r.then(done).catch(fallback);
+  } catch(e){ fallback(); }
+}
+
+/* 全画面の解除に使われるキーをページ側で握りつぶす。
+   反応を一切返さないので「押しても何も起きない」ように見える。 */
+const KILL_KEYS = new Set(["Escape","F11","F4","F1"]);
+document.addEventListener("keydown", e => {
+  if (phase === "alert" || phase === "reveal") return;   // 開始前と解除後は通常動作
+  const k = e.key;
+  if (KILL_KEYS.has(k) || (e.ctrlKey && (k === "F" || k === "f"))){
+    e.preventDefault(); e.stopPropagation();
+    if (!document.fullscreenElement) goFullscreen();
+    lockKeys();
+  }
+}, true);
+
+document.addEventListener("keyup", e => {
+  if (phase !== "alert" && phase !== "reveal" && KILL_KEYS.has(e.key)){
+    e.preventDefault(); e.stopPropagation();
+  }
+}, true);
+
+/* 全画面から抜けられたら、とにかく戻す。
+   ブラウザの仕様上「ユーザー操作」が必要なので、
+   クリック / キー入力 / タップのたびに要求し直す */
+function reinforce(){
+  if (!locked) return;
+  if (!document.fullscreenElement){
+    $("fsnote").classList.add("on");
+    goFullscreen();
+  }
+}
+
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement){
+    $("fsnote").classList.remove("on");
+    if (locked) lockKeys();
+  } else if (fsWanted && locked){
+    $("fsnote").classList.add("on");
+  } else {
+    $("fsnote").classList.remove("on");
+  }
+});
+
+["pointerdown","touchstart","click","keydown","wheel"].forEach(ev => {
+  document.addEventListener(ev, reinforce, {passive:true, capture:true});
+});
+
+setInterval(() => {
+  if (!locked) return;
+  if (document.fullscreenElement && !keyLocked) lockKeys();
+  if (!document.fullscreenElement) $("fsnote").classList.add("on");
+}, 700);
+
+/* ================= 2. スキャン ================= */
+/* ChromeOS の実在パスに寄せた検査対象 */
+const UHASH = Math.random().toString(16).slice(2, 14);
+const P = [
+  "/opt/google/chrome/chrome",
+  "/opt/google/chrome/resources.pak",
+  "/opt/google/chrome/libwidevinecdm.so",
+  "/opt/google/chrome/libEGL.so",
+  "/opt/google/chrome/locales/ja.pak",
+  "/usr/lib/libcups.so.2",
+  "/usr/lib/libssl.so.3",
+  "/usr/lib/libdbus-1.so.3",
+  "/mnt/stateful_partition/etc/lsb-release",
+  "/mnt/stateful_partition/encrypted/var/log/messages",
+  "/mnt/stateful_partition/encrypted/var/log/chrome/chrome",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/setup.sh",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/領収書_2026.pdf",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/installer.deb",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/資料_最終版(2).docx",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/backup.tar.gz",
+  "/home/chronos/user/MyFiles/Downloads/.cache/tmp0001",
+  "/media/fuse/drivefs-" + UHASH.slice(0,8) + "/root/共有フォルダ",
+  "/media/fuse/drivefs-" + UHASH.slice(0,8) + "/root/請求書まとめ.zip",
+  "/media/removable/SD Card/DCIM/IMG_2041.JPG",
+  "/media/removable/SD Card/MUSIC/track01.mp3",
+  "/home/" + UHASH.slice(0,5) + "/Documents/check.sh"
+];
+
+/* 検査ログ（パス以外）。実在しそうな検体名のみ */
+const NOTES = [
+  {t:"f", m:"署名データベース: 2026.10.24 (rev." + Math.floor(Math.random()*9000+1000) + ")"},
+  {t:"f", m:"ヒューリスティック解析を有効化"},
+  {t:"f", m:"署名検証: OK"},
+  {t:"f", m:"ELF ヘッダを解析中"},
+  {t:"w", m:"未署名の実行ファイル: /home/chronos/user/MyFiles/Downloads/setup.sh"},
+  {t:"w", m:"実行権限が付与されたスクリプト: .../Downloads/install.sh"},
+  {t:"w", m:"証明書チェーンを検証できません: media/fuse/drivefs"},
+  {t:"w", m:"外部ストレージへの書き込みを検出: /media/removable/SD Card"},
+  {t:"w", m:"権限昇格の試行: /usr/bin/sudo (policy denied)"},
+  {t:"e", m:"検体を検出: ELF/CoinMiner.Gen"},
+  {t:"e", m:"検体を検出: Trojan.JS.Redirector.Z"},
+  {t:"e", m:"検体を検出: Phishing.HTML.FakeLogin"},
+  {t:"e", m:"検体を検出: PDF/Exploit.CVE-2026-1183"},
+  {t:"e", m:"検体を検出: Android/Spy.Agent.CY"},
+  {t:"e", m:"検体を検出: Shell.Bash.Trojan.W"},
+  {t:"e", m:"検疫に失敗しました: アクセス拒否"}
+];
+
+let checked = 0, rafId = null, phase = "alert";
+
+function addLog(html){
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  const box = $("log");
+  box.appendChild(el);
+  while (box.children.length > 15) box.removeChild(box.firstChild);
+}
+
+function startScan(){
+  phase = "scan"; show("scan"); goFullscreen(); setTimeout(lockKeys, 120);
+  const total = CONFIG.DURATION * 1000, t0 = performance.now();
+  const tick = () => {
+    const e = Math.min(1, (performance.now()-t0)/total);
+    const eased = e < .62 ? e*1.15 : e < .68 ? .713 : .713 + (e-.68)*.95;
+    const p = Math.min(100, Math.round(eased*100));
+    $("pct").textContent = p;
+    $("fill").style.width = p + "%";
+    checked += Math.floor(rnd(120,900));
+    $("counter").textContent = "検査済みファイル: " + checked.toLocaleString("ja-JP");
+    if (Math.random() < .6){
+      if (Math.random() < .62){
+        addLog(`<span class="f">[検査]</span> ${pick(P)}`);
+      } else {
+        const n = pick(NOTES);
+        const tag = n.t === "e" ? "検出" : n.t === "w" ? "警告" : "情報";
+        addLog(`<span class="${n.t}">[${tag}]</span> ${n.m}`);
+      }
+    }
+    if (e >= 1){ finishScan(); return; }
+    rafId = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function finishScan(){
+  cancelAnimationFrame(rafId);
+  addLog(`<span class="e">[致命的]</span> 検疫に失敗しました (0x80070005 アクセス拒否)`);
+  addLog(`<span class="e">[致命的]</span> 監視プロセスを終了できません`);
+  addLog(`<span class="f">[情報]</span> 権限の昇格を要求しています…`);
+  document.body.classList.add("glitch");
+  setTimeout(() => { document.body.classList.remove("glitch"); infect(); }, 850);
+}
+
+/* ================= 3. 感染警告 ================= */
+let encTimer = null, blackTimer = null, prog = 0;
+
+function buildSpec(){
+  const rows = [
+    ["デバイス名", $("hostName").textContent, ""],
+    ["OS", IS_CROS ? "ChromeOS (x86_64 / 16181.62.0)" : (IS_WIN ? "Windows (NT 10.0)" : (IS_MAC ? "macOS" : INFO.plat)), ""],
+    ["ブラウザ", INFO.ua.replace(/^Mozilla\/5\.0\s*/,"").slice(0,44), ""],
+    ["解像度", INFO.screen, ""],
+    ["CPU スレッド", INFO.cores + " threads", ""],
+    ["GPU", INFO.gpu, ""],
+    ["タイムゾーン", INFO.tz, ""],
+    ["言語", INFO.lang, ""],
+    ["検体名", "Ransom.Lock." + Math.floor(rnd(3,99)) + ".gen", "red"],
+    ["検出数", Math.floor(rnd(600,4200)).toLocaleString("ja-JP") + " 件", "red"]
+  ];
+  let html = "";
+  for (let i = 0; i < rows.length; i += 2){
+    html += '<div class="row">';
+    for (const r of [rows[i], rows[i+1]].filter(Boolean)){
+      html += `<div class="cell">${r[0]}<b class="${r[2]}">${escapeHtml(r[1])}</b></div>`;
+    }
+    if (!rows[i+1]) html += `<div class="cell">&nbsp;</div>`;
+    html += "</div>";
+  }
+  $("spec").innerHTML = html;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+const FAKE_FILES = [
+  "/home/chronos/user/MyFiles/Downloads/履歴書_最終.docx",
+  "/home/chronos/user/MyFiles/Downloads/見積書_2026.xlsx",
+  "/home/chronos/user/MyFiles/Downloads/確定申告_令和7年.pdf",
+  "/home/chronos/user/MyFiles/Downloads/旅行_2025.mp4",
+  "/home/chronos/user/MyFiles/Downloads/IMG_2041.JPG",
+  "/media/fuse/drivefs-" + UHASH.slice(0,8) + "/root/共有/請求書まとめ.zip",
+  "/media/fuse/drivefs-" + UHASH.slice(0,8) + "/root/名簿.csv",
+  "/media/removable/SD Card/DCIM/IMG_2107.JPG",
+  "/media/removable/SD Card/バックアップ/old.tar.gz",
+  "/home/" + UHASH.slice(0,5) + "/Documents/notes.md",
+  "/home/chronos/u-" + UHASH + "/MyFiles/Downloads/passwords.csv"
+];
+
+function infect(){
+  phase = "infected"; show("infected");
+  buildSpec();
+  $("files").innerHTML = "";
+
+  // 暗号化プログレス
+  prog = 0;
+  encTimer = setInterval(() => {
+    prog = Math.min(97, prog + rnd(1.2, 4.2));
+    $("progFill").style.width = prog + "%";
+    $("encTxt").textContent = Math.round(prog) + "%";
+    if (Math.random() < .5){
+      const d = document.createElement("div");
+      d.innerHTML = `暗号化: <b>${pick(FAKE_FILES)}</b>`;
+      $("files").appendChild(d);
+      while ($("files").children.length > 7) $("files").removeChild($("files").firstChild);
+    }
+  }, 260);
+
+  // 一定時間で黒画面へ
+  blackTimer = setTimeout(blackout, CONFIG.BLACK_AFTER * 1000);
+}
+
+/* ================= 4. 黒画面 ================= */
+let locked = false, buf = "", escPress = 0, hintTimer = null, lockInfo = null;
+
+function blackout(){
+  clearInterval(encTimer);
+  phase = "black"; locked = true;
+  document.title = "SYSTEM HALTED";
+  show("black");
+  $("dots").textContent = "";
+  goFullscreen();
+  lockKeys();
+
+  if (CONFIG.HINT_AFTER > 0){
+    hintTimer = setTimeout(() => { $("hint").textContent = CONFIG.HINT_TEXT; }, CONFIG.HINT_AFTER*1000);
+  }
+
+  // 入力されたキーはこのページ内のバッファに貯めるだけ。外部送信はしません。
+  lockInfo = { start: Date.now(), keys: 0, tries: 0 };
+}
+
+function handleTyping(e){
+  if (phase !== "black") return;
+  if (e.key === "Escape"){
+    // 完全に無反応。案内も出さない（＝偽物だと気づかせない）
+    e.preventDefault();
+    escPress++;
+    if (!document.fullscreenElement) goFullscreen();
+    lockKeys();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "Backspace"){ buf = buf.slice(0,-1); }
+  else if (e.key.length === 1){
+    buf += e.key;
+    lockInfo.keys++;
+    if (buf.toLowerCase().endsWith(CONFIG.PASSCODE)){
+      e.preventDefault();
+      $("dots").textContent = "•".repeat(buf.length);
+      setTimeout(unlock, 320);
+      return;
+    }
+    if (buf.length > 22){
+      buf = ""; lockInfo.tries++;
+      $("dots").textContent = "";
+      $("hint").textContent = "不正な入力です。(試行 " + lockInfo.tries + ")";
+      $("hint").style.color = "#3d1015";
+      setTimeout(() => { $("hint").textContent = ""; $("hint").style.color = ""; }, 1600);
+      return;
+    }
+  }
+  $("dots").textContent = "•".repeat(buf.length);
+}
+
+/* ================= 終了確認（二段構え） =================
+   (A) beforeunload  … 本物のブラウザ確認。タブを閉じる/再読み込み/移動で出る。
+   (B) 自作ダイアログ … 「はい」を押しても再表示され続ける。
+   ブラウザ標準の確認は連続表示に上限があるため、(B) が実質の無限ループを担う。
+   ======================================================== */
+let exitArmed = false, exitCount = 0;
+
+/* --- (A) 本物の確認 --- */
+window.addEventListener("beforeunload", e => {
+  if (!exitArmed) return;
+  e.preventDefault();
+  e.returnValue = CONFIG.EXIT_MSG;
+  return CONFIG.EXIT_MSG;
+});
+["pointerdown","keydown","touchstart","wheel"].forEach(ev => {
+  document.addEventListener(ev, () => { if (locked) exitArmed = true; },
+    {passive:true, capture:true});
+});
+
+/* --- (B) 自作ダイアログ --- */
+const dlg = $("exitdlg");
+function updateDlg(){
+  $("dlgTitle").textContent = CONFIG.EXIT_TITLE;
+  $("dlgMsg").textContent = CONFIG.EXIT_MSG;
+  $("dlgCount").textContent = exitCount > 0
+    ? "スキャンは中断できません。（試行 " + exitCount + " 回）" : "";
+}
+function showExitDlg(){ exitCount++; updateDlg(); dlg.classList.add("on"); }
+function hideExitDlg(){ dlg.classList.remove("on"); }
+
+/* 「はい」→ 何度押しても戻ってくる /「いいえ」→ 元の画面に戻るだけ */
+$("dlgYes").onclick = () => {
+  dlg.classList.remove("on");
+  setTimeout(() => {
+    exitCount++;
+    updateDlg();
+    dlg.classList.add("on");
+  }, 420);
+};
+$("dlgNo").onclick = hideExitDlg;
+
+/* 再読み込み・タブを閉じる系のキー → 自作ダイアログを出す */
+document.addEventListener("keydown", e => {
+  if (phase === "alert" || phase === "reveal") return;
+  const k = (e.key || "").toLowerCase();
+  const mod = e.ctrlKey || e.metaKey;
+  if ((mod && (k === "r" || k === "w")) || k === "f5"){
+    e.preventDefault(); e.stopPropagation();
+    goFullscreen(); lockKeys();
+    showExitDlg();
+  }
+}, true);
+
+/* 全画面から抜けた瞬間も「離れようとしている」とみなして確認を出す */
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && locked){
+    $("fsnote").classList.add("on");
+    if (!dlg.classList.contains("on")) showExitDlg();
+  }
+});
+
+/* ================= 5. 解除 ================= */
+function unlock(){
+  if (phase === "reveal") return;
+  phase = "reveal"; locked = false; fsWanted = false;
+  exitArmed = false; hideExitDlg();
+  clearInterval(encTimer); clearTimeout(blackTimer); clearTimeout(hintTimer);
+  document.title = "ドッキリ成功！";
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+  buf = "";
+  show("reveal");
+  confetti();
+}
+
+function confetti(){
+  const box = $("confetti");
+  if (box.dataset.done) return;
+  box.dataset.done = "1";
+  const chars = ["🎉","✨","🎊","🍰","🦑","💮","🎈","🐟"];
+  for (let i = 0; i < 44; i++){
+    const s = document.createElement("i");
+    s.textContent = chars[i % chars.length];
+    s.style.left = rnd(0,100) + "vw";
+    s.style.animationDuration = rnd(2.6,5.2) + "s";
+    s.style.animationDelay = rnd(0,1.6) + "s";
+    s.style.fontSize = rnd(14,30) + "px";
+    box.appendChild(s);
+  }
+}
+
+/* ================= 操作 ================= */
+$("startBtn").onclick = startScan;
+$("ignoreBtn").onclick = () => { clearTimeout(blackTimer); clearInterval(encTimer); blackout(); };
+$("closeBtn").onclick = (e) => {
+  window.close();
+  if (!e.target.dataset.noted){
+    e.target.dataset.noted = "1";
+    const p = document.createElement("p");
+    p.className = "safe";
+    p.textContent = "（ブラウザがタブを閉じるのを拒否しました。正常な動作です。タブを閉じてください）";
+    e.target.after(p);
+  }
+};
+
+document.addEventListener("keydown", e => {
+  if (phase === "black"){ handleTyping(e); return; }
+  if (e.key === "Escape" && phase !== "alert"){
+    e.preventDefault();      // 何も起きない
+    if (!document.fullscreenElement) goFullscreen();
+    lockKeys();
+  }
+});
+
+// 全画面から抜けられたら、クリックで戻す
+document.addEventListener("click", () => {
+  if (locked && !document.fullscreenElement){ goFullscreen(); $("fsnote").classList.remove("on"); }
+});
+
+document.addEventListener("contextmenu", e => {
+  if (phase === "black" || phase === "infected") e.preventDefault();
+});
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a50fae7f2f4337ed',t:'MTc5MzA4MjkzNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
