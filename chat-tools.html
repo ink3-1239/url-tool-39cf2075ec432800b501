@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>チャットツール</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0e1016;color:#e8eef5;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;height:100vh;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#141823;border-bottom:1px solid #262b3a;flex-wrap:wrap}
+  header h1{font-size:.95rem;color:#00ffff}
+  #state{font-size:.72rem;color:#8b94a6}
+  #state.on{color:#6fe3a0}
+  #state.off{color:#ff8b8b}
+  .tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  .tab{background:#1d2130;color:#cfe3ef;border:1px solid #2f3447;border-radius:999px;padding:6px 14px;font-size:.8rem;cursor:pointer}
+  .tab.sel{background:#00ffff;color:#06222a;border-color:#00ffff;font-weight:bold}
+  #botToggle{font-weight:bold}
+  #botToggle.on{background:#1d5a33;color:#9af2bd;border-color:#2f7a4a}
+  #botToggle.off{background:#3a1d22;color:#ffb9bd;border-color:#5a2b32}
+  main{flex:1;min-height:0;display:flex;flex-direction:column}
+  .pane{flex:1;min-height:0;display:none;flex-direction:column}
+  .pane.sel{display:flex}
+  #log{flex:1;min-height:0;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  .msg{background:#171b26;border:1px solid #242938;border-radius:10px;padding:8px 11px;max-width:min(680px,92%)}
+  .msg .who{font-size:.72rem;color:#ffd76a;margin-bottom:3px}
+  .msg .tx{font-size:.9rem;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .msg .at{font-size:.65rem;color:#5d6678;margin-top:3px}
+  .msg.me{align-self:flex-end;background:#10303a;border-color:#1d5666}
+  .msg.bot{border-color:#5a4a1d;background:#241f12}
+  .msg.bot .who{color:#ffb366}
+  .msg.sys{align-self:center;background:transparent;border:0;color:#7d8798;font-size:.75rem}
+  .bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid #262b3a;background:#141823;flex-wrap:wrap}
+  input,textarea,select,button{font-family:inherit;font-size:.88rem;border-radius:8px;border:1px solid #333950;padding:9px 11px}
+  input,textarea,select{background:#10131c;color:#fff}
+  #name{flex:0 1 150px;min-width:110px}
+  #text{flex:1 1 240px}
+  button{background:#00ffff;color:#06222a;border:0;font-weight:bold;cursor:pointer}
+  button.gray{background:#272c3c;color:#cfe3ef}
+  button.red{background:#5a1d22;color:#ffb9bd}
+  button:disabled{opacity:.45;cursor:default}
+  .wrap{padding:14px;overflow-y:auto}
+  .card{background:#141823;border:1px solid #262b3a;border-radius:12px;padding:14px;margin-bottom:14px}
+  .card h2{font-size:.9rem;color:#ffd76a;margin-bottom:10px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .hint{font-size:.74rem;color:#8b94a6;line-height:1.7}
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #262b3a;vertical-align:top}
+  th{color:#8b94a6;font-size:.7rem;font-weight:normal}
+  .del{background:#5a1d22;color:#ffb9bd;border:0;border-radius:6px;padding:4px 9px;font-size:.73rem;cursor:pointer}
+  .sw{display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:8px}
+  .sw input{width:auto}
+  .rule{border-left:3px solid #00ffff;padding:6px 0 6px 10px;margin-bottom:10px;font-size:.82rem;line-height:1.6;color:#cfe3ef}
+  .rule b{color:#ffd76a}
+  #recDot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#555}
+  #recDot.on{background:#ff5555;animation:bl .8s infinite}
+  @keyframes bl{50%{opacity:.25}}
+</style>
+</head>
+<body>
+<header>
+  <h1>チャットツール</h1>
+  <span id="state" class="off">未接続</span>
+  <button id="botToggle" class="tab" style="margin-left:6px">ボット OFF</button>
+  <div class="tabs">
+    <button class="tab sel" data-p="chat">チャット</button>
+    <button class="tab" data-p="sched">予約投稿</button>
+    <button class="tab" data-p="bot">返信ボット</button>
+  </div>
+</header>
+
+<main>
+  <section class="pane sel" id="p-chat">
+    <div id="log"></div>
+    <div class="bar">
+      <input id="name" placeholder="名前" autocomplete="off">
+      <input id="text" placeholder="メッセージ" autocomplete="off">
+      <button id="send">送信</button>
+    </div>
+  </section>
+
+  <section class="pane" id="p-sched">
+    <div class="wrap">
+      <div class="card">
+        <h2>予約投稿を追加</h2>
+        <div class="row">
+          <input type="datetime-local" id="sAt">
+          <input id="sText" placeholder="投稿する文" style="flex:1 1 260px">
+          <button id="sAdd">追加</button>
+        </div>
+        <div class="hint">指定した日時になったら自動で投稿します。このページを開いたままにしてください。閉じている間に時刻が過ぎた予約は、次に開いたときにまとめて送らず、取り消し扱いになります。</div>
+      </div>
+      <div class="card">
+        <h2>予約一覧</h2>
+        <div id="sList"></div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="pane" id="p-bot">
+    <div class="wrap">
+      <div class="card">
+        <h2>返信ボット</h2>
+        <label class="sw"><input type="checkbox" id="bOn"> ボットを動かす</label>
+        <label class="sw"><input type="checkbox" id="bDry" checked> 練習モード（実際には投稿せず、画面に出すだけ）</label>
+        <div class="row">
+          <input id="bName" placeholder="ボットの名前" value="ink3の分身" style="flex:1 1 200px">
+        </div>
+        <div class="hint">同じ人には20秒に1回までしか返しません。自分の投稿と、開いた直後に流れてくる過去の投稿には反応しません。</div>
+      </div>
+      <div class="card">
+        <h2>反応する条件</h2>
+        <div class="rule"><b>「誰？」または「ink3？」だけの投稿</b><br>私はink3の分身的な存在です。夜露死苦。</div>
+        <div class="rule"><b>100文字以上、または同じ文の連投</b><br>うるせぇよ。</div>
+        <div class="rule"><b>名前に ink が入っている人</b><br>キャーなりすましよ！警察ｹｲｻﾂ</div>
+        <div class="rule"><b>「変更」を含む投稿</b><br>僕だけじゃできないから、あとで本体に言って。</div>
+        <div class="rule"><b>日付が変わった瞬間</b><br>今日は何の日かを投稿します。366日ぶんの雑学を用意しています。</div>
+        <div class="rule"><b>どれにも当てはまらないとき</b><br>1800通り以上の文からランダムで返します。業務的なものからネタまで。</div>
+      </div>
+      <div class="card">
+        <h2>今日は何の日</h2>
+        <div class="hint" id="todayIs"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var WS_URL = "wss://knj48-ver-chatsystem.onrender.com";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- タブ ---------- */
+  document.querySelectorAll(".tab").forEach(function (t) {
+    t.onclick = function () {
+      document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("sel"); });
+      document.querySelectorAll(".pane").forEach(function (x) { x.classList.remove("sel"); });
+      t.classList.add("sel");
+      $("p-" + t.dataset.p).classList.add("sel");
+    };
+  });
+
+  /* ---------- 記念日 ---------- */
+  var DAYS = {"1-1":"元日。年賀状は平安時代の挨拶状が起源。","1-2":"初夢の日。一富士二鷹三茄子の続きは扇・煙草・座頭。","1-3":"瞳の日。1と2を並べると目に見えるから。","1-4":"石の日。石に願いを触れると叶うという言い伝え。","1-5":"囲碁の日。い（1）ご（5）の語呂。","1-6":"色の日。い（1）ろ（6）の語呂。","1-7":"七草。七草がゆは平安時代から続く。","1-8":"勝負事の日。一か八かの語呂。","1-9":"風邪の日。横綱谷風が流感で亡くなった日。","1-10":"110番の日。110番の制度は1948年に始まった。","1-11":"鏡開き。刃物で切らず木槌で割るのが作法。","1-12":"スキーの日。日本初のスキー指導が1911年。","1-13":"たばこの日。日本初の紙巻きたばこ発売日。","1-14":"愛と希望と勇気の日。南極のタロとジロ生存確認日。","1-15":"いちごの日。いち（1）ご（5）。","1-16":"禁酒の日。アメリカで禁酒法が施行された日。","1-17":"防災とボランティアの日。阪神淡路大震災の日。","1-18":"都バスの日。東京の市営バス運行開始日。","1-19":"のど自慢の日。NHKのど自慢の放送開始日。","1-20":"玉の輿の日。モルガン財閥の御曹司が日本人と結婚。","1-21":"料理番組の日。世界初の料理番組が英国で放送。","1-22":"カレーの日。全国の学校給食で一斉にカレーが出た日。","1-23":"電子メールの日。いい（1）ふ（2）み（3）。","1-24":"法律扶助の日。法律相談の普及を目指す日。","1-25":"日本最低気温の日。旭川でマイナス41度を記録。","1-26":"文化財防火デー。法隆寺金堂が焼損した日。","1-27":"国旗制定記念日。日章旗の寸法が定められた日。","1-28":"データプライバシーの日。個人情報保護を考える日。","1-29":"人口調査記念日。日本初の人口調査が行われた日。","1-30":"3分間電話の日。公衆電話が3分10円になった日。","1-31":"愛妻家の日。1と31で愛妻の語呂。","2-1":"ニオイの日。に（2）おい（1）。","2-2":"夫婦の日。ふう（2）ふ（2）。","2-3":"節分。豆まきは中国の追儺が起源。","2-4":"ビートルズの日。日本語の語呂と来日の縁。","2-5":"プロ野球の日。日本職業野球連盟の結成日。","2-6":"海苔の日。大宝律令で海苔が税として定められた。","2-7":"北方領土の日。日露通好条約の調印日。","2-8":"針供養。折れた針を豆腐に刺して供養する。","2-9":"肉の日。に（2）く（9）。","2-10":"海の安全祈念日。えひめ丸事故の日。","2-11":"建国記念の日。神武天皇即位の伝承日。","2-12":"ブラジャーの日。ブラジャーの特許が認められた日。","2-13":"苗字制定記念日。平民も苗字を名乗ることになった日。","2-14":"バレンタインデー。日本で広まったのは1950年代。","2-15":"春一番名付けの日。長崎の漁師の言葉が由来。","2-16":"天気図記念日。日本初の天気図が作られた日。","2-17":"中部国際空港開港日。セントレアの愛称で知られる。","2-18":"エアメールの日。世界初の空輸郵便が行われた日。","2-19":"プロレスの日。日本初の本格的プロレス試合。","2-20":"旅券の日。日本初の海外旅券規則の施行日。","2-21":"日刊新聞創刊の日。横浜毎日新聞が創刊。","2-22":"猫の日。にゃん（2）にゃん（2）にゃん（2）。","2-23":"富士山の日。ふ（2）じ（2）さん（3）。","2-24":"鉄道ストの日。日本初の鉄道ストライキ。","2-25":"夕刊紙の日。日本初の駅売り夕刊紙が創刊。","2-26":"二・二六事件の日。1936年の軍事クーデター。","2-27":"冬の恋人の日。バレンタインとホワイトデーの中間。","2-28":"ビスケットの日。ビスケットの製法書が記された日。","2-29":"閏日。4年に一度だけ訪れる日。","3-1":"豚の日。アメリカ発祥、豚をたたえる日。","3-2":"ミニの日。ミニスカートやミニカーを楽しむ日。","3-3":"ひな祭り。もとは川に流す流し雛だった。","3-4":"ミシンの日。ミ（3）シン（4）。","3-5":"珊瑚の日。さん（3）ご（5）。","3-6":"世界一周記念日。日本初の世界一周団体旅行。","3-7":"消防記念日。消防組織法の施行日。","3-8":"ミツバチの日。み（3）つ（8）ばち。","3-9":"記念切手記念日。日本初の記念切手が発行された。","3-10":"砂糖の日。さ（3）とう（10）。","3-11":"パンダ発見の日。西洋人が初めてパンダを記録した日。","3-12":"サイフの日。さ（3）い（1）ふ（2）。","3-13":"サンドイッチデー。1が3を挟む形から。","3-14":"ホワイトデー。日本の菓子業界が生んだ習慣。","3-15":"靴の日。日本初の西洋靴工場ができた日。","3-16":"財務の日。確定申告の時期にちなむ。","3-17":"漫画週刊誌の日。少年マガジンとサンデーが同日創刊。","3-18":"精霊の日。柿本人麻呂らの命日とされる。","3-19":"ミュージックの日。ミュー（3）ジック（19）。","3-20":"上野動物園開園記念日。日本初の動物園。","3-21":"ランドセルの日。3＋2＋1で6年間の意味。","3-22":"放送記念日。日本初のラジオ放送が始まった日。","3-23":"世界気象デー。世界気象機関の発足日。","3-24":"マネキン記念日。日本初のマネキンが登場した日。","3-25":"電気記念日。日本初の電灯がともった日。","3-26":"カチューシャの歌の日。大正の大ヒット曲。","3-27":"さくらの日。さくら（3×9）＝27。","3-28":"スリーマイル島の日。原発事故が起きた日。","3-29":"マリモの日。マリモが天然記念物に指定された日。","3-30":"エッフェル塔の日。パリで完成した日。","3-31":"エッフェル塔完成の翌日。学校では年度最後の日。","4-1":"エイプリルフール。嘘は午前中までという説がある。","4-2":"週刊誌の日。日本初の週刊誌が創刊。","4-3":"シーサーの日。し（4）さ（3）ー。","4-4":"あんぱんの日。明治天皇にあんぱんが献上された日。","4-5":"ヘアカットの日。女性の断髪が禁止された日が由来。","4-6":"白の日。し（4）ろ（6）。","4-7":"世界保健デー。WHOの設立日。","4-8":"花まつり。釈迦の誕生を祝う日。","4-9":"大仏の日。奈良の大仏開眼供養の日。","4-10":"駅弁の日。弁（4）当（10）の語呂。","4-11":"ガッツポーズの日。ガッツ石松の試合に由来。","4-12":"世界宇宙飛行の日。ガガーリンが宇宙へ出た日。","4-13":"喫茶店の日。日本初の喫茶店が開店。","4-14":"オレンジデー。愛を確かめ合う日。","4-15":"ヘリコプターの日。ダヴィンチの誕生日にちなむ。","4-16":"チャップリンデー。喜劇王の誕生日。","4-17":"恐竜の日。恐竜の卵の化石が発見された日。","4-18":"発明の日。特許制度の始まりの日。","4-19":"地図の日。伊能忠敬が測量の旅に出た日。","4-20":"郵政記念日。日本の郵便制度が始まった日。","4-21":"民放の日。民間放送16社に予備免許が出た日。","4-22":"よい夫婦の日。よい（4）ふうふ（22）。","4-23":"子ども読書の日。本に親しむことを願う日。","4-24":"植物学の日。牧野富太郎の誕生日。","4-25":"歩道橋の日。日本初の横断歩道橋ができた日。","4-26":"よい風呂の日。よい（4）ふろ（26）。","4-27":"哲学の日。ソクラテスが刑死したとされる日。","4-28":"象の日。日本に初めて象が来た日。","4-29":"昭和の日。昭和天皇の誕生日。","4-30":"図書館記念日。図書館法が公布された日。","5-1":"メーデー。労働者の祭典。","5-2":"緑茶の日。八十八夜にあたる日。","5-3":"憲法記念日。日本国憲法の施行日。","5-4":"みどりの日。自然に親しむ日。","5-5":"こどもの日。端午の節句。","5-6":"ゴムの日。ご（5）む（6）。","5-7":"コナモンの日。こ（5）な（7）。","5-8":"世界赤十字デー。アンリ・デュナンの誕生日。","5-9":"アイスクリームの日。日本で初めて販売された月。","5-10":"地質の日。日本初の地質図が作られた日。","5-11":"長良川鵜飼開きの日。千年以上続く漁法。","5-12":"ナイチンゲールデー。看護師の日。","5-13":"メイストームデー。別れ話を切り出す日とされる。","5-14":"温度計の日。ファーレンハイトの誕生日。","5-15":"沖縄復帰記念日。沖縄が日本に復帰した日。","5-16":"旅の日。芭蕉が奥の細道に旅立った日。","5-17":"世界電気通信の日。国際電気通信連合の設立日。","5-18":"国際博物館の日。博物館に親しむ日。","5-19":"ボクシング記念日。日本初の世界王者が誕生した日。","5-20":"ローマ字の日。日本式ローマ字の普及を願う日。","5-21":"小学校開校の日。日本初の近代小学校ができた日。","5-22":"国際生物多様性の日。生き物の多様さを考える日。","5-23":"キスの日。日本映画で初めてキスが描かれた日。","5-24":"ゴルフ場記念日。日本初のゴルフ場ができた日。","5-25":"広辞苑記念日。初版が発行された日。","5-26":"ラッキーゾーンの日。甲子園に設置された日。","5-27":"百人一首の日。百人一首が完成したとされる日。","5-28":"花火の日。両国の川開きで花火が上がった日。","5-29":"こんにゃくの日。こん（5）にゃく（29）。","5-30":"消費者の日。消費者保護基本法の施行日。","5-31":"世界禁煙デー。たばこを見直す日。","6-1":"衣替え。平安時代の宮中行事が起源。","6-2":"裏切りの日。本能寺の変が起きた日。","6-3":"測量の日。測量法が公布された日。","6-4":"虫の日。む（6）し（4）。","6-5":"環境の日。環境基本法が定めた日。","6-6":"補聴器の日。耳を大切にする日。","6-7":"母親大会記念日。母の立場から平和を考える日。","6-8":"世界海洋デー。海の役割を考える日。","6-9":"ロックの日。ロッ（6）ク（9）。","6-10":"時の記念日。日本初の時計が時を告げた日。","6-11":"傘の日。入梅にあたることが多い日。","6-12":"恋人の日。ブラジルの風習が由来。","6-13":"小さな親切の日。運動の発足日。","6-14":"手羽先記念日。手羽先を味わう日。","6-15":"暑中見舞いの日。暑中見舞い用はがきが発売。","6-16":"和菓子の日。厄除けに菓子を供えた故事から。","6-17":"おまわりさんの日。巡査の制度ができた日。","6-18":"おにぎりの日。日本最古のおにぎりの化石にちなむ。","6-19":"朗読の日。ろう（6）どく（19）。","6-20":"ペパーミントデー。北海道北見市が制定。","6-21":"冷蔵庫の日。夏至にあたることが多い日。","6-22":"かにの日。星座の蟹座が始まる日。","6-23":"沖縄慰霊の日。沖縄戦の組織的戦闘が終わった日。","6-24":"UFO記念日。空飛ぶ円盤が初めて目撃された日。","6-25":"住宅デー。住まいを考える日。","6-26":"露天風呂の日。ろ（6）てん（10）ぶろ（26）。","6-27":"ちらし寿司の日。備前岡山藩主の命日にちなむ。","6-28":"貿易記念日。日本が5か国と貿易を始めた日。","6-29":"佃煮の日。佃島の住吉神社の創建日。","6-30":"夏越の祓。半年の穢れを祓う行事。","7-1":"国民安全の日。安全を見直す日。","7-2":"たわしの日。亀の子たわしの特許の日。","7-3":"ソフトクリームの日。日本で初めて売られた日。","7-4":"梨の日。な（7）し（4）。","7-5":"ビキニスタイルの日。水着のビキニが発表された日。","7-6":"サラダ記念日。俵万智の短歌から。","7-7":"七夕。織姫と彦星の伝説。","7-8":"ナンパの日。な（7）ん（8）ぱ。","7-9":"ジェットコースターの日。日本初の本格設置。","7-10":"納豆の日。なっ（7）とう（10）。","7-11":"世界人口デー。人口が50億人を超えた日。","7-12":"人間ドックの日。日本初の人間ドックが始まった日。","7-13":"ナイスの日。な（7）い（1）す（3）。","7-14":"ひまわりの日。気象衛星ひまわりが打ち上げられた日。","7-15":"お中元。半年の無事を祝う贈り物。","7-16":"虹の日。な（7）な（い）ろ（16）。","7-17":"東京の日。江戸が東京と改められた日。","7-18":"光化学スモッグの日。日本初の被害が出た日。","7-19":"女性大臣の日。日本初の女性大臣が誕生した日。","7-20":"月面着陸の日。アポロ11号が月に降りた日。","7-21":"日本三景の日。三景を記した林春斎の誕生日。","7-22":"ナッツの日。な（7）っつ（22）。","7-23":"文月ふみの日。ふ（7）み（23）。","7-24":"劇画の日。ガロが創刊された日。","7-25":"かき氷の日。な（7）つ（2）ご（5）おり。","7-26":"幽霊の日。四谷怪談が初演された日。","7-27":"スイカの日。綱の模様を27と見立てて。","7-28":"菜っ葉の日。な（7）っ（2）ぱ（8）。","7-29":"アマチュア無線の日。日本で再開が許された日。","7-30":"梅干の日。梅干しで難が去るの語呂。","7-31":"パラグライダー記念日。日本初の滑空記録。","8-1":"水の日。水を大切にする日。","8-2":"パンツの日。パン（8）ツ（2）。","8-3":"はちみつの日。はち（8）みつ（3）。","8-4":"箸の日。は（8）し（4）。","8-5":"ハコの日。は（8）こ（5）。","8-6":"広島原爆の日。1945年、世界初の原爆投下。","8-7":"鼻の日。は（8）な（7）。","8-8":"そろばんの日。パチパチの音から。","8-9":"長崎原爆の日。2発目の原爆が投下された日。","8-10":"道の日。道路整備の計画が決まった日。","8-11":"山の日。山に親しむ国民の祝日。","8-12":"航空の日。日航機事故の日でもある。","8-13":"函館夜景の日。や（8）けい（13）。","8-14":"特許の日。日本初の専売特許が与えられた日。","8-15":"終戦記念日。1945年の玉音放送の日。","8-16":"月遅れ盆送り火。京都の五山送り火。","8-17":"プロ野球ナイターの日。日本初のナイター試合。","8-18":"米の日。八十八の字を分けると米になる。","8-19":"俳句の日。は（8）いく（19）。","8-20":"蚊の日。蚊がマラリアを媒介すると発見された日。","8-21":"献血記念日。献血制度が始まった日。","8-22":"チンチン電車の日。日本初の路面電車が走った日。","8-23":"白虎隊の日。会津の白虎隊が自刃した日。","8-24":"ポンプの日。消防ポンプを考える日。","8-25":"即席ラーメン記念日。チキンラーメンの発売日。","8-26":"パワプロの日。パ（8）ワ（0）プロの語呂。","8-27":"男はつらいよの日。第1作が公開された日。","8-28":"バイオリンの日。日本初のバイオリンが作られた日。","8-29":"焼き肉の日。や（8）きに（29）く。","8-30":"冒険家の日。植村直己にちなむ。","8-31":"野菜の日。や（8）さ（3）い（1）。","9-1":"防災の日。関東大震災が起きた日。","9-2":"宝くじの日。く（9）じ（2）。","9-3":"ドラえもんの誕生日。2112年生まれの設定。","9-4":"クラシック音楽の日。ク（9）ラシ（4）ック。","9-5":"石炭の日。クリーンコールデーとも。","9-6":"黒の日。く（9）ろ（6）。","9-7":"クリーナーの日。ク（9）リーナ（7）。","9-8":"サンフランシスコ平和条約の日。日本が独立を回復。","9-9":"重陽の節句。菊の花を愛でる。","9-10":"下水道の日。台風シーズンにちなむ。","9-11":"公衆電話の日。日本初の屋外公衆電話。","9-12":"宇宙の日。日本人初の宇宙飛行にちなむ。","9-13":"世界の法の日。法による平和を願う日。","9-14":"メンズバレンタインデー。男性から贈る日。","9-15":"老人の日。敬老の精神を広める日。","9-16":"マッチの日。マッチの配給が始まった日。","9-17":"キュートな日。キュー（9）ト（10）。","9-18":"かいわれ大根の日。協会の設立月にちなむ。","9-19":"苗字の日。平民に苗字が許された日。","9-20":"空の日。日本初の飛行に成功した日。","9-21":"ファッションショーの日。日本初の開催日。","9-22":"国際平和デー。世界の停戦を呼びかける日。","9-23":"万年筆の日。万年筆の特許が取られた日。","9-24":"清掃の日。廃棄物処理法が公布された日。","9-25":"主婦休みの日。家族が家事を担う日。","9-26":"ワープロ記念日。日本初の日本語ワープロ発表。","9-27":"世界観光の日。旅行の意義を考える日。","9-28":"パソコン記念日。PC-8001が発売された日。","9-29":"招き猫の日。来る（9）福（29）。","9-30":"くるみの日。く（9）るみ（3+0）。","10-1":"コーヒーの日。コーヒーの新年度にあたる日。","10-2":"眼鏡の日。10と01が眼鏡の形に見える。","10-3":"豆腐の日。とう（10）ふ（2）。","10-4":"登山の日。と（10）ざん（3）。","10-5":"イワシの日。い（1）わ（0）し（4）。","10-6":"レモンの日。高村光太郎の詩にちなむ。","10-7":"役所改革の日。役所の窓口改善を考える日。","10-8":"ミステリー記念日。ポーの命日。","10-9":"足袋の日。七五三の時期にちなむ。","10-10":"世界郵便デー。万国郵便連合の設立日。","10-11":"目の愛護デー。10と10を横にすると眉と目。","10-12":"ウインクの日。10月11日を横にするとウインク顔。","10-13":"豆乳の日。とう（10）にゅう（12）。","10-14":"さつまいもの日。栗より美味い十三里から。","10-15":"鉄道の日。日本初の鉄道が開業した日。","10-16":"きのこの日。きのこが出回る時期の真ん中。","10-17":"世界食料デー。食料問題を考える日。","10-18":"貯蓄の日。神嘗祭にちなむ。","10-19":"統計の日。日本初の近代統計調査の日。","10-20":"バーゲンの日。日本初のバーゲンセールの日。","10-21":"新聞広告の日。広告の役割を考える日。","10-22":"あかりの日。エジソンが白熱電球を実用化した日。","10-23":"平安遷都の日。京都に都が移された日。","10-24":"電信電話記念日。日本初の電信工事の日。","10-25":"国連デー。国際連合が発足した日。","10-26":"世界パスタデー。パスタ会議が開かれた日。","10-27":"原子力の日。日本初の原子力発電に成功。","10-28":"読書週間の始まりの日。文字に親しむ。","10-29":"インターネット誕生日。最初の通信が行われた日。","10-30":"初恋の日。島崎藤村の詩が発表された日。","10-31":"ハロウィン。古代ケルトの収穫祭が起源。","11-1":"灯台記念日。日本初の洋式灯台の起工日。","11-2":"阪神タイガース記念日。初の日本一になった日。","11-3":"文化の日。自由と平和を愛する日。","11-4":"ユネスコ憲章記念日。ユネスコが発足した日。","11-5":"津波防災の日。安政南海地震の稲むらの火にちなむ。","11-6":"お見合い記念日。日本初の集団見合いの日。","11-7":"鍋の日。いい（11）な（7）べ。","11-8":"いい歯の日。いい（11）は（8）。","11-9":"119番の日。消防への通報番号にちなむ。","11-10":"技能の日。技能五輪で日本が優勝した日。","11-11":"ポッキーの日。1が4つ並ぶ日。","11-12":"洗濯機の日。いい（11）ふ（2）く。","11-13":"うるしの日。漆の技法が伝えられた日。","11-14":"アンチエイジングの日。いい（11）とし（14）。","11-15":"七五三。子どもの成長を祝う。","11-16":"国際寛容デー。違いを認め合う日。","11-17":"将棋の日。徳川家康が御城将棋を定めた日。","11-18":"土木の日。土と木を分けると11と18。","11-19":"いい育児の日。いい（11）いく（19）じ。","11-20":"毛皮の日。いい（11）ファー（20）。","11-21":"フライドチキンの日。日本1号店の開店日。","11-22":"いい夫婦の日。いい（11）ふうふ（22）。","11-23":"勤労感謝の日。新嘗祭に由来する祝日。","11-24":"鰹節の日。いい（11）ふ（2）し（4）。","11-25":"ハイビジョンの日。走査線1125本にちなむ。","11-26":"いい風呂の日。いい（11）ふろ（26）。","11-27":"ノーベル賞制定記念日。遺言が作られた日。","11-28":"太平洋記念日。マゼランが太平洋に出た日。","11-29":"いい肉の日。いい（11）にく（29）。","11-30":"本みりんの日。いい（11）みりん（30）。","12-1":"映画の日。日本初の映画公開を記念。","12-2":"日本人初の宇宙飛行の日。1990年の秋山豊寛。","12-3":"カレンダーの日。新暦が採用された日。","12-4":"E.T.の日。日本で公開された日。","12-5":"アルバムの日。一年を締めくくる月にちなむ。","12-6":"音の日。エジソンが蓄音機を発明した日。","12-7":"クリスマスツリーの日。日本初のツリーが飾られた日。","12-8":"事始め。正月の準備を始める日。","12-9":"障害者の日。障害者基本法にちなむ。","12-10":"世界人権デー。世界人権宣言が採択された日。","12-11":"胃腸の日。いー（1）い（1）ちょう（10+1）。","12-12":"漢字の日。いい（1）じ（2）いち（1）じ（2）。","12-13":"正月事始め。すす払いの日。","12-14":"忠臣蔵の日。赤穂浪士の討ち入りの日。","12-15":"年賀郵便特別扱い開始日。元日に届く受付開始。","12-16":"電話創業の日。東京と横浜で電話が開通した日。","12-17":"飛行機の日。ライト兄弟が初飛行に成功した日。","12-18":"国連加盟記念日。日本が国連に加盟した日。","12-19":"日本初飛行の日。代々木練兵場での飛行。","12-20":"シーラカンスの日。生きた化石が捕獲された日。","12-21":"遠距離恋愛の日。1と2で2人が1つになる形。","12-22":"冬至。かぼちゃと柚子湯の日。","12-23":"テレホンカードの日。テレカが発売された日。","12-24":"クリスマスイブ。本来は日没から始まる前夜祭。","12-25":"クリスマス。日本では明治期から広まった。","12-26":"プロ野球誕生の日。日本初のプロ球団が創立。","12-27":"ピーターパンの日。初演が行われた日。","12-28":"官公庁御用納め。年内の業務を終える日。","12-29":"シャンソンの日。老舗シャンソン喫茶の閉店日。","12-30":"地下鉄記念日。日本初の地下鉄が開業した日。","12-31":"大晦日。除夜の鐘は108回。"};
+  function whatDay(d) {
+    var k = (d.getMonth() + 1) + "-" + d.getDate();
+    return (d.getMonth() + 1) + "月" + d.getDate() + "日。" + (DAYS[k] || "とくに何もない日です。");
+  }
+  $("todayIs").textContent = whatDay(new Date());
+
+  /* ---------- 接続 ---------- */
+  var ws = null, retry = 0, ready = false, seen = {}, booted = false;
+  function setState(txt, cls) { var e = $("state"); e.textContent = txt; e.className = cls; }
+
+  function connect() {
+    setState("接続中…", "");
+    try { ws = new WebSocket(WS_URL); } catch (e) { setState("接続できません", "off"); return; }
+    ws.onopen = function () {
+      retry = 0; ready = true; setState("接続中", "on");
+      setTimeout(function () { booted = true; }, 2500);
+    };
+    ws.onclose = function () {
+      ready = false; setState("切断（再接続します）", "off");
+      retry++; setTimeout(connect, Math.min(1500 * retry, 8000));
+    };
+    ws.onerror = function () { setState("通信エラー", "off"); };
+    ws.onmessage = function (ev) {
+      var d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+      var list = Array.isArray(d) ? d : [d];
+      list.forEach(handle);
+    };
+  }
+
+  function handle(m) {
+    if (!m || typeof m.text !== "string") return;
+    var who = m.senderId || "ゲスト";
+    var at = m.timestamp || "";
+    var key = at + "|" + who + "|" + m.text;
+    if (seen[key]) return;
+    seen[key] = 1;
+    var mine = who === ($("name").value.trim() || "ゲスト");
+    add(who, m.text, at, mine ? "me" : "");
+    if (booted && !mine) botCheck(who, m.text);
+  }
+
+  function add(who, text, at, cls) {
+    var log = $("log");
+    var near = log.scrollTop + log.clientHeight > log.scrollHeight - 60;
+    var d = document.createElement("div");
+    d.className = "msg " + (cls || "");
+    if (cls === "sys") { d.textContent = text; }
+    else {
+      var a = document.createElement("div"); a.className = "who"; a.textContent = who;
+      var b = document.createElement("div"); b.className = "tx"; b.textContent = text;
+      var c = document.createElement("div"); c.className = "at";
+      c.textContent = at ? new Date(at).toLocaleTimeString("ja-JP") : "";
+      d.appendChild(a); d.appendChild(b); d.appendChild(c);
+    }
+    log.appendChild(d);
+    if (near) log.scrollTop = log.scrollHeight;
+  }
+
+  function post(text, name) {
+    if (!ready || !text) return false;
+    try {
+      ws.send(JSON.stringify({ text: text, name: name || $("name").value.trim() || "ゲスト" }));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  $("send").onclick = function () {
+    var t = $("text").value.trim();
+    if (!t) return;
+    if (post(t)) $("text").value = "";
+  };
+  $("text").addEventListener("keydown", function (e) { if (e.key === "Enter") $("send").click(); });
+  try {
+    var n0 = localStorage.getItem("chat_tools_name");
+    if (n0) $("name").value = n0;
+  } catch (e) {}
+  $("name").addEventListener("change", function () {
+    try { localStorage.setItem("chat_tools_name", $("name").value.trim()); } catch (e) {}
+  });
+
+
+  /* ---------- どれにも当てはまらないときの返し ---------- */
+  var RA = ["なるほど","ふむ","了解です","承知しました","確認しました","拝承","はいはい","それはそれは","ほう","いやはや",
+    "さようでございますか","存じております","一理ありますね","興味深い","いいですね","悪くないですね","まあまあですね","ごもっとも","たしかに","そうきましたか",
+    "おっしゃる通り","心得ました","記録しておきます","検討いたします","前向きに善処します"];
+  var RB = ["その件は","ただいまの発言は","いまの内容は","本日の議題として","こちらの案件は","担当部署にて","所定の手続きに沿って","社内規定に基づき",
+    "分身の権限で","ink3の名において","部長決裁のうえ","只今より"];
+  var RC = ["処理しておきます。","預からせていただきます。","進めておきます。","対応いたします。","保留とします。","そっと流しておきます。"];
+  var SPECIAL = [
+    "寿限無寿限無五劫の擦り切れ海砂利水魚の水行末雲来末風来末食う寝る処に住む処やぶら小路の藪柑子パイポパイポパイポのシューリンガンシューリンガンのグーリンダイグーリンダイのポンポコピーのポンポコナーの長久命の長助",
+    "ただいまの発言を要約しますと、特に意味はありませんでした。",
+    "恐れ入りますが、それは私の管轄外でございます。",
+    "その発言、議事録に残しますね。",
+    "私はink3の分身なので、本体より少し雑です。",
+    "本日の分身、稼働率98パーセントでお送りしております。",
+    "黙っていようかと思いましたが、やはり言わせてください。おはようございます。",
+    "いまの、三回くらい噛みしめて読みました。",
+    "それについては、私の中の委員会で審議します。",
+    "深いですね。深すぎて底が見えません。",
+    "承知しました。では私は昼寝に戻ります。",
+    "分身ゆえ、感情は8割ほどしか積んでおりません。",
+    "なるほど、完全に理解しました。嘘です。",
+    "その話、続きが気になります。続けてください。続けなくてもいいです。",
+    "ただいまの件、本体に報告しておきます。たぶん忘れます。",
+    "うん、そういう日もある。",
+    "おい、今のは名言だぞ。",
+    "それ、去年も聞きました。",
+    "聞こえてますよ。ちゃんと。",
+    "ご清聴ありがとうございました。"
+  ];
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function freeReply() {
+    if (Math.random() < 0.14) return pick(SPECIAL);
+    return pick(RA) + "。" + pick(RB) + pick(RC);
+  }
+
+  /* ボットの入切（記憶する） */
+  function botSync() {
+    var on = $("bOn").checked;
+    var b = $("botToggle");
+    b.textContent = "ボット " + (on ? "ON" : "OFF") + ($("bDry").checked && on ? "（練習）" : "");
+    b.className = "tab " + (on ? "on" : "off");
+    try { localStorage.setItem("chat_tools_bot", JSON.stringify({ on: on, dry: $("bDry").checked, name: $("bName").value })); } catch (e) {}
+  }
+  try {
+    var bs = JSON.parse(localStorage.getItem("chat_tools_bot") || "null");
+    if (bs) { $("bOn").checked = !!bs.on; $("bDry").checked = bs.dry !== false; if (bs.name) $("bName").value = bs.name; }
+  } catch (e) {}
+  $("botToggle").onclick = function () { $("bOn").checked = !$("bOn").checked; botSync(); };
+  $("bOn").onchange = botSync;
+  $("bDry").onchange = botSync;
+  $("bName").onchange = botSync;
+  botSync();
+
+  /* ---------- 返信ボット ---------- */
+  var lastReplyAt = {}, lastTextOf = {};
+  function botSay(text) {
+    var nm = $("bName").value.trim() || "ink3の分身";
+    if ($("bDry").checked) { add(nm + "（練習）", text, new Date().toISOString(), "bot"); return; }
+    if (post(text, nm)) add(nm, text, new Date().toISOString(), "bot");
+  }
+  function botCheck(who, text) {
+    if (!$("bOn").checked) return;
+    var now = Date.now();
+    if (lastReplyAt[who] && now - lastReplyAt[who] < 20000) return;
+    var t = text.trim();
+    var reply = null;
+
+    if (/^(誰[?？]?|ink3[?？])$/i.test(t)) {
+      reply = "私はink3の分身的な存在です。夜露死苦。";
+    } else if (t.length >= 100 || (lastTextOf[who] === t) || /(.)\1{14,}/.test(t)) {
+      reply = "うるせぇよ。";
+    } else if (/ink/i.test(who) && who !== ($("bName").value.trim())) {
+      reply = "キャーなりすましよ！警察ｹｲｻﾂ";
+    } else if (t.indexOf("変更") >= 0) {
+      reply = "僕だけじゃできないから、あとで本体に言って。";
+    } else {
+      reply = freeReply();
+    }
+    lastTextOf[who] = t;
+    if (reply) { lastReplyAt[who] = now; setTimeout(function () { botSay(reply); }, 600); }
+  }
+
+  /* 日付が変わった瞬間 */
+  var lastDay = new Date().getDate();
+  setInterval(function () {
+    var d = new Date();
+    if (d.getDate() !== lastDay) {
+      lastDay = d.getDate();
+      $("todayIs").textContent = whatDay(d);
+      if ($("bOn").checked) botSay(whatDay(d));
+    }
+  }, 20000);
+
+  /* ---------- 予約投稿 ---------- */
+  var SK = "chat_tools_sched";
+  function sLoad() { try { return JSON.parse(localStorage.getItem(SK) || "[]"); } catch (e) { return []; } }
+  function sSave(a) { try { localStorage.setItem(SK, JSON.stringify(a)); } catch (e) {} }
+  function sRender() {
+    var a = sLoad().sort(function (x, y) { return x.at - y.at; });
+    var box = $("sList");
+    box.innerHTML = "";
+    if (!a.length) { box.innerHTML = '<div class="hint">予約はありません。</div>'; return; }
+    var tb = document.createElement("table");
+    tb.innerHTML = "<tr><th>日時</th><th>本文</th><th></th></tr>";
+    a.forEach(function (e) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td></td><td></td><td></td>";
+      tr.children[0].textContent = new Date(e.at).toLocaleString("ja-JP");
+      tr.children[1].textContent = e.text;
+      var b = document.createElement("button");
+      b.className = "del"; b.textContent = "取消";
+      b.onclick = function () { sSave(sLoad().filter(function (x) { return x.id !== e.id; })); sRender(); };
+      tr.children[2].appendChild(b);
+      tb.appendChild(tr);
+    });
+    box.appendChild(tb);
+  }
+  $("sAdd").onclick = function () {
+    var at = $("sAt").value, tx = $("sText").value.trim();
+    if (!at || !tx) { alert("日時と本文を入れてください。"); return; }
+    var ms = new Date(at).getTime();
+    if (ms < Date.now()) { alert("過去の日時は指定できません。"); return; }
+    var a = sLoad();
+    a.push({ id: "s" + Date.now().toString(36), at: ms, text: tx });
+    sSave(a); $("sText").value = ""; sRender();
+  };
+  setInterval(function () {
+    var now = Date.now(), a = sLoad(), left = [], fired = [];
+    a.forEach(function (e) {
+      if (e.at <= now) { if (now - e.at < 120000) fired.push(e); } else left.push(e);
+    });
+    if (fired.length) {
+      sSave(left); sRender();
+      fired.forEach(function (e) {
+        if (post(e.text)) add("（予約投稿）", e.text, new Date().toISOString(), "sys");
+      });
+    } else if (a.length !== left.length) { sSave(left); sRender(); }
+  }, 5000);
+  sRender();
+
+  add("", "接続しています。", "", "sys");
+  connect();
+})();
+</script>
+</body>
+</html>
