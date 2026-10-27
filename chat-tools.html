@@ -86,10 +86,16 @@
         <h2>予約投稿を追加</h2>
         <div class="row">
           <input type="datetime-local" id="sAt">
+          <input id="sName" placeholder="投稿する名前" value="ink3" style="flex:0 1 140px">
           <input id="sText" placeholder="投稿する文" style="flex:1 1 260px">
           <button id="sAdd">追加</button>
         </div>
-        <div class="hint">指定した日時になったら自動で投稿します。このページを開いたままにしてください。閉じている間に時刻が過ぎた予約は、次に開いたときにまとめて送らず、取り消し扱いになります。</div>
+        <div class="row">
+          <input id="sKey" type="password" placeholder="管理キー" style="flex:0 1 160px">
+          <button id="sLoad" class="gray">サーバーから読み込む</button>
+        </div>
+        <div class="hint">サーバーに預けるので、このページを閉じていても指定した時刻に投稿されます。実際に送られるまで最大1分ほどずれます。管理キーを入れてから使ってください。</div>
+        <div class="hint" id="sMsg"></div>
       </div>
       <div class="card">
         <h2>予約一覧</h2>
@@ -106,9 +112,18 @@
         <label class="sw"><input type="checkbox" id="bOn"> ボットを動かす</label>
         <label class="sw"><input type="checkbox" id="bDry" checked> 練習モード（実際には投稿せず、画面に出すだけ）</label>
         <div class="row">
-          <input id="bName" placeholder="ボットの名前" value="ink3の分身" style="flex:1 1 200px">
+          <input id="bName" placeholder="ボットの名前" value="インクボット" style="flex:1 1 200px">
         </div>
         <div class="hint">同じ人には20秒に1回までしか返しません。自分の投稿と、開いた直後に流れてくる過去の投稿には反応しません。</div>
+      </div>
+      <div class="card">
+        <h2>動作テスト</h2>
+        <div class="row">
+          <input id="tName" placeholder="相手の名前" value="テスト太郎" style="flex:0 1 150px">
+          <input id="tText" placeholder="相手の投稿" value="誰？" style="flex:1 1 200px">
+          <button id="tRun">試す</button>
+        </div>
+        <div class="hint" id="tOut">ここに、ボットが返す文が出ます。実際には投稿されません。</div>
       </div>
       <div class="card">
         <h2>反応する条件</h2>
@@ -160,7 +175,7 @@
     try { ws = new WebSocket(WS_URL); } catch (e) { setState("接続できません", "off"); return; }
     ws.onopen = function () {
       retry = 0; ready = true; setState("接続中", "on");
-      setTimeout(function () { booted = true; }, 2500);
+      setTimeout(function () { booted = true; add("", "過去ログの読み込みが終わりました。ここから先の投稿にボットが反応します。", "", "sys"); }, 2500);
     };
     ws.onclose = function () {
       ready = false; setState("切断（再接続します）", "off");
@@ -282,31 +297,32 @@
   /* ---------- 返信ボット ---------- */
   var lastReplyAt = {}, lastTextOf = {};
   function botSay(text) {
-    var nm = $("bName").value.trim() || "ink3の分身";
+    var nm = $("bName").value.trim() || "インクボット";
     if ($("bDry").checked) { add(nm + "（練習）", text, new Date().toISOString(), "bot"); return; }
     if (post(text, nm)) add(nm, text, new Date().toISOString(), "bot");
+  }
+  function decide(who, text) {
+    var t = String(text).trim();
+    if (/^(誰[?？]?|ink3[?？])$/i.test(t)) return ["名前を聞かれた", "私はink3の分身的な存在です。夜露死苦。"];
+    if (t.length >= 100) return ["100文字以上", "うるせぇよ。"];
+    if (lastTextOf[who] === t || /(.)\1{14,}/.test(t)) return ["連投・スパム", "うるせぇよ。"];
+    if (/ink/i.test(who) && who !== ($("bName").value.trim())) return ["名前にink", "キャーなりすましよ！警察ｹｲｻﾂ"];
+    if (t.indexOf("変更") >= 0) return ["変更の話", "僕だけじゃできないから、あとで本体に言って。"];
+    return ["通常", freeReply()];
   }
   function botCheck(who, text) {
     if (!$("bOn").checked) return;
     var now = Date.now();
     if (lastReplyAt[who] && now - lastReplyAt[who] < 20000) return;
-    var t = text.trim();
-    var reply = null;
-
-    if (/^(誰[?？]?|ink3[?？])$/i.test(t)) {
-      reply = "私はink3の分身的な存在です。夜露死苦。";
-    } else if (t.length >= 100 || (lastTextOf[who] === t) || /(.)\1{14,}/.test(t)) {
-      reply = "うるせぇよ。";
-    } else if (/ink/i.test(who) && who !== ($("bName").value.trim())) {
-      reply = "キャーなりすましよ！警察ｹｲｻﾂ";
-    } else if (t.indexOf("変更") >= 0) {
-      reply = "僕だけじゃできないから、あとで本体に言って。";
-    } else {
-      reply = freeReply();
-    }
-    lastTextOf[who] = t;
-    if (reply) { lastReplyAt[who] = now; setTimeout(function () { botSay(reply); }, 600); }
+    var r = decide(who, text);
+    lastTextOf[who] = String(text).trim();
+    lastReplyAt[who] = now;
+    setTimeout(function () { botSay(r[1]); }, 600);
   }
+  $("tRun").onclick = function () {
+    var r = decide($("tName").value.trim() || "テスト太郎", $("tText").value);
+    $("tOut").textContent = "判定：" + r[0] + " ／ 返事：" + r[1];
+  };
 
   /* 日付が変わった瞬間 */
   var lastDay = new Date().getDate();
@@ -319,52 +335,56 @@
     }
   }, 20000);
 
-  /* ---------- 予約投稿 ---------- */
-  var SK = "chat_tools_sched";
-  function sLoad() { try { return JSON.parse(localStorage.getItem(SK) || "[]"); } catch (e) { return []; } }
-  function sSave(a) { try { localStorage.setItem(SK, JSON.stringify(a)); } catch (e) {} }
-  function sRender() {
-    var a = sLoad().sort(function (x, y) { return x.at - y.at; });
+  /* ---------- 予約投稿（サーバー保存） ---------- */
+  var SAPI = "https://science-club-event-private.ink3-tomo-0827.workers.dev/api/sched";
+  function sKey() { return $("sKey").value.trim(); }
+  try { var sk = localStorage.getItem("chat_tools_key"); if (sk) $("sKey").value = sk; } catch (e) {}
+  function sMsg(t, ok) { var e = $("sMsg"); e.textContent = t; e.style.color = ok ? "#6fe3a0" : "#ff8b8b"; }
+
+  function sRender(list) {
     var box = $("sList");
     box.innerHTML = "";
-    if (!a.length) { box.innerHTML = '<div class="hint">予約はありません。</div>'; return; }
+    if (!list || !list.length) { box.innerHTML = '<div class="hint">予約はありません。</div>'; return; }
+    list.sort(function (x, y) { return x.at - y.at; });
     var tb = document.createElement("table");
-    tb.innerHTML = "<tr><th>日時</th><th>本文</th><th></th></tr>";
-    a.forEach(function (e) {
+    tb.innerHTML = "<tr><th>日時</th><th>名前と本文</th><th></th></tr>";
+    list.forEach(function (e) {
       var tr = document.createElement("tr");
       tr.innerHTML = "<td></td><td></td><td></td>";
       tr.children[0].textContent = new Date(e.at).toLocaleString("ja-JP");
-      tr.children[1].textContent = e.text;
+      tr.children[1].textContent = (e.name || "ink3") + "：" + e.text;
       var b = document.createElement("button");
       b.className = "del"; b.textContent = "取消";
-      b.onclick = function () { sSave(sLoad().filter(function (x) { return x.id !== e.id; })); sRender(); };
+      b.onclick = function () { sApi({ action: "del", id: e.id }); };
       tr.children[2].appendChild(b);
       tb.appendChild(tr);
     });
     box.appendChild(tb);
   }
+
+  function sApi(payload) {
+    if (!sKey()) { sMsg("管理キーを入れてください。", false); return; }
+    try { localStorage.setItem("chat_tools_key", sKey()); } catch (e) {}
+    payload.key = sKey();
+    return fetch(SAPI, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { sMsg("失敗しました（" + (j.error || "error") + "）", false); return; }
+        sRender(j.list); sMsg("更新しました。", true);
+      })
+      .catch(function () { sMsg("サーバーに接続できませんでした。", false); });
+  }
+
+  $("sLoad").onclick = function () { sApi({ action: "list" }); };
   $("sAdd").onclick = function () {
     var at = $("sAt").value, tx = $("sText").value.trim();
-    if (!at || !tx) { alert("日時と本文を入れてください。"); return; }
+    if (!at || !tx) { sMsg("日時と本文を入れてください。", false); return; }
     var ms = new Date(at).getTime();
-    if (ms < Date.now()) { alert("過去の日時は指定できません。"); return; }
-    var a = sLoad();
-    a.push({ id: "s" + Date.now().toString(36), at: ms, text: tx });
-    sSave(a); $("sText").value = ""; sRender();
+    if (ms < Date.now()) { sMsg("過去の日時は指定できません。", false); return; }
+    sApi({ action: "add", at: ms, text: tx, name: $("sName").value.trim() || "ink3" });
+    $("sText").value = "";
   };
-  setInterval(function () {
-    var now = Date.now(), a = sLoad(), left = [], fired = [];
-    a.forEach(function (e) {
-      if (e.at <= now) { if (now - e.at < 120000) fired.push(e); } else left.push(e);
-    });
-    if (fired.length) {
-      sSave(left); sRender();
-      fired.forEach(function (e) {
-        if (post(e.text)) add("（予約投稿）", e.text, new Date().toISOString(), "sys");
-      });
-    } else if (a.length !== left.length) { sSave(left); sRender(); }
-  }, 5000);
-  sRender();
+  if ($("sKey").value) sApi({ action: "list" });
 
   add("", "接続しています。", "", "sys");
   connect();
