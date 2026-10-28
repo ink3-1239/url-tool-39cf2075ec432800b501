@@ -198,7 +198,9 @@
     seen[key] = 1;
     var mine = who === ($("name").value.trim() || "ゲスト");
     add(who, m.text, at, mine ? "me" : "");
-    if (booted && !mine) botCheck(who, m.text);
+    var botName = $("bName").value.trim() || "インクボット";
+    var isSelf = mine || who === botName || sentByMe[m.text] === 1;
+    if (booted && !isSelf) botCheck(who, m.text);
   }
 
   function add(who, text, at, cls) {
@@ -218,8 +220,11 @@
     if (near) log.scrollTop = log.scrollHeight;
   }
 
+  var sentByMe = {};
   function post(text, name) {
     if (!ready || !text) return false;
+    sentByMe[text] = 1;
+    setTimeout(function () { delete sentByMe[text]; }, 60000);
     try {
       ws.send(JSON.stringify({ text: text, name: name || $("name").value.trim() || "ゲスト" }));
       return true;
@@ -306,7 +311,9 @@
     if (/^(誰[?？]?|ink3[?？])$/i.test(t)) return ["名前を聞かれた", "私はink3の分身的な存在です。夜露死苦。"];
     if (t.length >= 100) return ["100文字以上", "うるせぇよ。"];
     if (lastTextOf[who] === t || /(.)\1{14,}/.test(t)) return ["連投・スパム", "うるせぇよ。"];
-    if (/ink/i.test(who) && who !== ($("bName").value.trim())) return ["名前にink", "キャーなりすましよ！警察ｹｲｻﾂ"];
+    var bn = $("bName").value.trim() || "インクボット";
+    if (who === bn) return ["自分の投稿", null];
+    if (/ink/i.test(who) && who !== bn) return ["名前にink", "キャーなりすましよ！警察ｹｲｻﾂ"];
     if (t.indexOf("変更") >= 0) return ["変更の話", "僕だけじゃできないから、あとで本体に言って。"];
     return ["通常", freeReply()];
   }
@@ -316,12 +323,13 @@
     if (lastReplyAt[who] && now - lastReplyAt[who] < 20000) return;
     var r = decide(who, text);
     lastTextOf[who] = String(text).trim();
+    if (!r[1]) return;
     lastReplyAt[who] = now;
     setTimeout(function () { botSay(r[1]); }, 600);
   }
   $("tRun").onclick = function () {
     var r = decide($("tName").value.trim() || "テスト太郎", $("tText").value);
-    $("tOut").textContent = "判定：" + r[0] + " ／ 返事：" + r[1];
+    $("tOut").textContent = "判定：" + r[0] + " ／ 返事：" + (r[1] || "返さない");
   };
 
   /* 日付が変わった瞬間 */
