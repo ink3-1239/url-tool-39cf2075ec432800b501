@@ -12,6 +12,10 @@
 #     4. git push origin main
 #
 #   push の時に GitHub の認証（Personal Access Token）が求められます。
+#
+#   トークンを使う場合:
+#     export GH_TOKEN=ghp_xxxxxxxxxxxxxxxx
+#     bash tools/publish-github.sh
 # =============================================================================
 set -euo pipefail
 
@@ -62,7 +66,12 @@ echo "==> commit: $MESSAGE"
 git commit -m "$MESSAGE"
 
 echo "==> push します（GitHub の認証が必要になることがあります）"
-git push origin main
+if [ -n "${GH_TOKEN:-}" ]; then
+  # Personal Access Token を使う（環境変数 GH_TOKEN に入れておきます）
+  git push "https://ink3-1239:${GH_TOKEN}@github.com/${REPO_NAME}.git" main
+else
+  git push origin main
+fi
 
 echo
 echo "==> 完了しました"

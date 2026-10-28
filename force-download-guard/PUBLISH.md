@@ -59,13 +59,13 @@
 ```bash
 cd /home/user
 
-# ① リポジトリを落とす（すでにあるclone を使い回してよい）
+# ① リポジトリを落とす（すでにある clone を使い回してよい）
 git clone https://github.com/ink3-1239/url-tool-39cf2075ec432800b501.git
 
 # ② 拡張機能を force-download-guard/ サブディレクトリへコピー
 cp -r force-download-guard url-tool-39cf2075ec432800b501/force-download-guard
 
-# ③ コピー掉了不要なフォルダを削除（.git と CI はpush しない）
+# ③ コピーした不要なフォルダを削除（.git と CI は push しない）
 rm -rf url-tool-39cf2075ec432800b501/force-download-guard/.git
 rm -rf url-tool-39cf2075ec432800b501/force-download-guard/.github
 rm -rf url-tool-39cf2075ec432800b501/force-download-guard/dist
@@ -86,6 +86,14 @@ git push origin main
 
 ```bash
 cd /home/user/force-download-guard
+bash tools/publish-github.sh
+```
+
+トークンを使う場合は、実行前に環境変数に入れておきます。
+入力が画面に出ないようにするには `read -s` を使います。
+
+```bash
+read -s -p "GitHub Token: " GH_TOKEN && export GH_TOKEN && echo
 bash tools/publish-github.sh
 ```
 
@@ -156,8 +164,8 @@ git push origin v1.1.0
 | 配布 zip | `https://github.com/ink3-1239/url-tool-39cf2075ec432800b501/releases` |
 | 拡張機能を直接開く | `https://github.com/ink3-1239/url-tool-39cf2075ec432800b501/blob/main/force-download-guard/README.md` |
 
-> `force-download-guard/` はサブディレクトリなので、**拡張機能の zip をReleases に置く場合だけ**
-> .store への提出は Releases の zip ではなく `dist/` でビルドした zip を使ってください。
+> `force-download-guard/` はサブディレクトリなので、**拡張機能の zip を Releases に置く場合だけ**
+> ストアへの提出は Releases の zip ではなく `dist/` でビルドした zip を使ってください。
 
 ---
 
