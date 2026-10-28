@@ -1,0 +1,113 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "short_name": "FD Guard",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy5M7cKKHK+ENFDaESDMYxx9nnd7EyKkOc2/GAb+v9Rkv7boXaMzLLeS9/xw9fKNkuRtDVggjzC/Cqjzt/QgHUfrUf1wDSesZdzTd5X7HNKJsBG8cXdEHi/fHDrO4TA3JiHayfSrQ34P8VLIZ9x5LfrevzynW+dzXHkkmPDlBWXmtGHUC0iQbGQXnLbMupMmFbNTfkpgJ9kOc7Bf/+EZ0gknQ8XTPF1StXo6XOFnZvg6fHQcklXQL5nvkFlr45nqdvjq9eRA5FV5IJFKG+RTiRSDJL19oFWOthtyalJXN44gXbWylgGRznOM4Xd0mN4u+/WQ5si6l+kpNFIDC2kkSfwIDAQAB",
+  "description": "__MSG_extDescription__",
+  "default_locale": "ja",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "downloads",
+    "storage",
+    "tabs",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "notifications",
+    "omnibox",
+    "scripting",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "https://chromewebstore.google.com/*",
+    "https://chrome.google.com/webstore/*",
+    "https://addons.mozilla.org/*",
+    "https://microsoftedge.microsoft.com/*",
+    "https://addons.opera.com/*",
+    "https://addons.amigo.ru/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "sites.html",
+  "action": {
+    "default_title": "強制ダウンロード ガード — このサイトで強制ダウンロードを止める（クリックで設定）",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chromewebstore.google.com/*",
+        "https://chrome.google.com/webstore/*",
+        "https://addons.mozilla.org/*",
+        "https://microsoftedge.microsoft.com/*",
+        "https://addons.opera.com/*",
+        "https://addons.amigo.ru/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "shared.js",
+        "guard-isolated.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chromewebstore.google.com/*",
+        "https://chrome.google.com/webstore/*",
+        "https://addons.mozilla.org/*",
+        "https://microsoftedge.microsoft.com/*",
+        "https://addons.opera.com/*",
+        "https://addons.amigo.ru/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "guard-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "tests/forced-download.html",
+        "tests/fake-update.html",
+        "tests/sample.exe",
+        "activate.html"
+      ],
+      "matches": [
+        "https://chromewebstore.google.com/*",
+        "https://chrome.google.com/webstore/*",
+        "https://addons.mozilla.org/*",
+        "https://microsoftedge.microsoft.com/*",
+        "https://addons.opera.com/*",
+        "https://addons.amigo.ru/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ]
+    }
+  ],
+  "omnibox": {
+    "keyword": "guard"
+  }
+}

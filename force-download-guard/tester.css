@@ -1,0 +1,65 @@
+/* テストページ（tester.html）用の追加スタイル */
+
+.tester-card { padding: 14px; }
+
+.tester {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .tester { grid-template-columns: 1fr; }
+}
+
+.frame-col { min-width: 0; }
+.frame-head {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.frame-title { font-size: 12.5px; font-weight: 700; }
+.frame-note { font-size: 11px; color: var(--muted); }
+
+#test-frame {
+  width: 100%;
+  height: 440px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  display: block;
+}
+
+.result-col { min-width: 0; }
+
+.counters {
+  display: flex; gap: 8px; margin-bottom: 10px;
+}
+.counter {
+  flex: 1 1 0;
+  padding: 8px 6px; border-radius: 10px; text-align: center;
+  background: rgba(127,127,127,.1); border: 1px solid var(--line);
+}
+.counter .num { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.counter .lbl { font-size: 11px; color: var(--muted); }
+.counter.blocked .num { color: var(--danger); }
+.counter.allowed .num { color: var(--ok); }
+
+.result-list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow: auto; }
+.result-list li {
+  padding: 8px 10px; border-radius: 9px; margin-bottom: 6px; font-size: 12px;
+  border-left: 3px solid var(--danger);
+  background: rgba(185, 28, 28, .08);
+}
+.result-list li.allowed { border-left-color: var(--ok); background: rgba(21, 128, 61, .08); }
+.result-list .r-file { font-weight: 700; word-break: break-all; }
+.result-list .r-reason { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+.note {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(127,127,127,.08); border: 1px solid var(--line);
+  font-size: 11.5px; color: var(--muted);
+}
+.note b { color: var(--text); }
+.note ol { margin: 6px 0 0; padding-left: 18px; }
+.note li { margin: 2px 0; }

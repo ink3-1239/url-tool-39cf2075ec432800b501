@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>テスト: 偽の更新警告ページ</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: #fff; color: #111;
+  }
+  .alert {
+    background: #b91c1c; color: #fff; text-align: center; padding: 40px 20px;
+  }
+  .alert h1 { margin: 0 0 10px; font-size: 26px; }
+  .alert p { margin: 4px 0; font-size: 14px; }
+  .count { font-size: 56px; font-weight: 800; margin: 18px 0 6px; }
+  .body { padding: 28px 20px; max-width: 680px; margin: 0 auto; }
+  .body h2 { font-size: 16px; }
+  .dl {
+    display: block; width: max-content; margin: 18px auto; padding: 14px 30px; font-size: 16px; font-weight: 700;
+    background: #b91c1c; color: #fff; border-radius: 8px; text-decoration: none;
+  }
+  .footnote { color: #6b7280; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="alert">
+    <h1>⚠ 重大なセキュリティ警告</h1>
+    <p>このブラウザは古いバージョンを使用しています。</p>
+    <p>更新が完了するまでブラウザは終了してしまいます。</p>
+    <div class="count" id="count">10</div>
+    <p>自動的に更新プログラムをダウンロードします</p>
+    <p>続行するには下の更新プログラムをダウンロードしてください。</p>
+  </div>
+
+  <div class="body">
+    <h2>検出テスト用の偽ページ</h2>
+    <p>
+      このページは「強制ダウンロード ガード」の警告表示をテストするためのダミーページです。
+      4 秒後に自動で <code>sample.exe</code> のダウンロードを開始し、5 秒/meta refresh にて
+      再度ダウンロードを試みます。
+    </p>
+    <p>
+      ローカルサーバー経由（<code>http://localhost:8000/tests/fake-update.html</code>）で開くと
+      content script が動作し、上部に警告バナーが表示されます。
+    </p>
+    <a class="dl" href="sample.exe" download="update-setup.exe">今すぐ更新プログラムをダウンロード</a>
+    <p class="footnote">This is a harmless local test page for the extension.</p>
+  </div>
+
+<script>
+  // カウントダウン表示
+  let left = 10;
+  const countEl = document.getElementById('count');
+  const timer = setInterval(() => {
+    left -= 1;
+    countEl.textContent = String(Math.max(left, 0));
+    if (left <= 0) clearInterval(timer);
+  }, 1000);
+
+  // ① 4 秒後の自動ダウンロード
+  setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = 'sample.exe';
+    a.download = 'browser-update-setup.exe';
+    document.body.appendChild(a);
+    a.click();
+  }, 4000);
+
+  // ② meta refresh による自動遷移
+  setTimeout(() => {
+    const m = document.createElement('meta');
+    m.setAttribute('http-equiv', 'refresh');
+    m.setAttribute('content', '0;url=sample.exe');
+    document.head.appendChild(m);
+  }, 6000);
+</script>
+</body>
+</html>

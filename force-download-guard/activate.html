@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>このサイトで強制ダウンロードを止める — 強制ダウンロード ガード</title>
+<!-- CSS は埋め込み（この HTML 1 ファイルだけダウンロードしても同じ見た目になります） -->
+<style>
+/* FDG:CSS:BEGIN */
+/* --- sites.css --- */
+:root {
+  --bg: #f4f5f7;
+  --card: #fff;
+  --text: #1c1f23;
+  --muted: #767d87;
+  --line: #e6e8ec;
+  --accent: #2563eb;
+  --danger: #c02626;
+  --ok: #15803d;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171b;
+    --card: #1e2127;
+    --text: #e9ebee;
+    --muted: #98a0aa;
+    --line: #31353d;
+    --accent: #6ea8fe;
+    --danger: #f0736f;
+    --ok: #5fd08a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
+.wrap.narrow { max-width: 600px; }
+
+/* ヘッダー */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -16px 16px;
+  padding: 14px 22px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.head-icon { font-size: 24px; line-height: 1; }
+.head-text { flex: 1 1 auto; min-width: 0; }
+.head h1 { margin: 0; font-size: 17px; font-weight: 700; }
+.head p { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
+.head p b { color: var(--text); }
+
+main { display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.hint { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.hint.small { font-size: 11.5px; margin: 6px 0 0; }
+code {
+  background: rgba(127,127,127,.16);
+  padding: 1px 5px; border-radius: 4px; font-size: 12px;
+}
+
+/* ボタン・入力 */
+.row { display: flex; gap: 8px; }
+.row input[type="text"] {
+  flex: 1 1 auto; min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13.5px;
+}
+.row input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .16);
+}
+
+.btn {
+  appearance: none; border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  border-radius: 9px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:hover { filter: brightness(1.07); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.big { padding: 12px 24px; font-size: 15px; }
+.row.center { justify-content: center; margin-top: 14px; }
+
+.status {
+  margin: 10px 0 0; padding: 8px 10px; border-radius: 9px; font-size: 12.5px;
+  background: rgba(127,127,127,.12);
+}
+.status.ok { background: rgba(21, 128, 61, .14); color: var(--ok); }
+.status.error { background: rgba(192, 38, 38, .12); color: var(--danger); }
+.status.warn { background: rgba(180, 83, 9, .14); color: #b45309; }
+
+/* 即席追加 */
+.quick {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 10px; background: rgba(37, 99, 235, .07);
+  border: 1px solid rgba(37, 99, 235, .2);
+}
+.quick-note { color: var(--muted); font-size: 12px; }
+
+/* URL 表示欄 */
+.linkbox { margin: 10px 0 0; }
+.linkbox label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.linkbox input[type="text"] {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--bg); color: var(--text); font-size: 12.5px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.linkbox .row { margin-top: 0; }
+.linkbox .row input[type="text"] { flex: 1 1 auto; }
+
+/* 許可ボタン */
+.grant {
+  border: 1px solid var(--accent); background: transparent; color: var(--accent);
+  border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+
+/* サイト一覧 */
+.site-list { list-style: none; margin: 0; padding: 0; }
+.site-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 9px; background: rgba(127,127,127,.09);
+  margin-bottom: 6px;
+}
+.site-list .host { font-weight: 700; font-size: 13px; word-break: break-all; }
+.site-list .mode {
+  font-size: 11px; padding: 2px 9px; border-radius: 999px;
+  background: rgba(37, 99, 235, .15); color: var(--accent); white-space: nowrap;
+}
+.site-list .mode.strict { background: rgba(192, 38, 38, .14); color: var(--danger); }
+.site-list .spacer { flex: 1 1 auto; }
+.site-list .del {
+  border: 1px solid var(--line); background: transparent; color: var(--danger);
+  border-radius: 8px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+}
+.site-list .del:hover { background: rgba(192, 38, 38, .1); }
+
+.count {
+  display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 10.5px; text-align: center;
+}
+
+/* 有効化ページ（activate.html） */
+.mini-title {
+  margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--muted);
+}
+.steps { margin: 0 0 10px; padding-left: 20px; font-size: 13px; }
+.steps li { margin: 4px 0; }
+.steps b { color: var(--text); }
+.how { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.how summary { cursor: pointer; font-size: 12.5px; color: var(--accent); font-weight: 600; list-style: none; }
+.how summary::-webkit-details-marker { display: none; }
+.how summary::before { content: "▸ "; }
+.how[open] summary::before { content: "▾ "; }
+.mini { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.target {
+  padding: 12px 14px; border-radius: 10px; background: rgba(127,127,127,.1);
+  border: 1px solid var(--line); margin-bottom: 12px;
+}
+.target-label { font-size: 11.5px; color: var(--muted); }
+.target-host { font-size: 18px; font-weight: 800; word-break: break-all; margin: 2px 0; }
+.target-url { font-size: 12px; color: var(--muted); word-break: break-all; }
+
+.check {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 12px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+}
+.check input { margin-top: 4px; accent-color: var(--accent); }
+.check b { color: var(--text); }
+
+/* プレビュー（拡張機能以外）でのみ表示 */
+.standalone-only { display: none; }
+body.standalone .standalone-only { display: block; }
+body.standalone #add-current { opacity: .5; }
+
+.foot {
+  display: flex; justify-content: space-between;
+  color: var(--muted); font-size: 11.5px; padding: 4px;
+}
+/* FDG:CSS:END */
+</style>
+</head>
+<body>
+  <div class="wrap narrow">
+    <header class="head">
+      <div class="head-icon">🛡️</div>
+      <div class="head-text">
+        <h1>このサイトで強制ダウンロードを止める</h1>
+        <p>そのページの「自動でファイルを取得される」を止めます。</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="target">
+          <div class="target-label">対象のサイト</div>
+          <div id="target-host" class="target-host">—</div>
+          <div id="target-url" class="target-url"></div>
+        </div>
+        <p id="explain" class="status error" hidden></p>
+
+        <h2 class="mini-title">この操作で起きること</h2>
+        <ol class="steps">
+          <li>Chrome が「<b>このサイトへのアクセスを許可しますか？</b>」と尋ねます → <b>許可</b></li>
+          <li><b>操作のない自動ダウンロード</b>がすべて止まります</li>
+          <li><b>実行ファイル</b>（.exe/.msi/.dmg 等）と<b>追加拡張</b>（.crx/.xpi）は、クリックしても止まります</li>
+          <li>同じサイトの他のタブにも<b>再読み込みなし</b>で適用されます</li>
+          <li>ページに「🛡 保護中」バッジが出ます</li>
+        </ol>
+
+        <p class="hint">自分でクリックした<b>正規のダウンロードは通ります</b>。</p>
+
+        <div class="row center">
+          <button id="activate" class="btn big">このサイトで強制DLを止める</button>
+        </div>
+        <p id="status" class="status" hidden></p>
+
+        <label class="check">
+          <input type="checkbox" id="keep" />
+          <span><b>ブラウザを閉じても保持する</b>（チェックを外すとブラウザ再起動で解除）</span>
+        </label>
+
+        <details class="how">
+          <summary>許可を拒否した場合どうなりますか？</summary>
+          <p class="mini">
+            操作の検知ができないため、<b>そのサイトのすべてのダウンロード</b>（自分でクリックしたものも）を止めます。
+            あとから許可したい場合は、一覧の「アクセス許可」ボタンから追加できます。
+          </p>
+        </details>
+      </section>
+
+      <footer class="foot">
+        <span id="version"></span>
+        <span>強制ダウンロード ガード</span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="activate.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+This is a harmless dummy file used to test the download blocker.
+It is NOT an executable. Chrome will warn about the .exe extension, which is exactly what we want to observe.

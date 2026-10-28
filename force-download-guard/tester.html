@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>テスト — 強制ダウンロード ガード</title>
+<!-- CSS は埋め込み（この HTML 1 ファイルだけダウンロードしても同じ見た目になります） -->
+<style>
+/* FDG:CSS:BEGIN */
+/* --- sites.css --- */
+:root {
+  --bg: #f4f5f7;
+  --card: #fff;
+  --text: #1c1f23;
+  --muted: #767d87;
+  --line: #e6e8ec;
+  --accent: #2563eb;
+  --danger: #c02626;
+  --ok: #15803d;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171b;
+    --card: #1e2127;
+    --text: #e9ebee;
+    --muted: #98a0aa;
+    --line: #31353d;
+    --accent: #6ea8fe;
+    --danger: #f0736f;
+    --ok: #5fd08a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
+.wrap.narrow { max-width: 600px; }
+
+/* ヘッダー */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -16px 16px;
+  padding: 14px 22px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.head-icon { font-size: 24px; line-height: 1; }
+.head-text { flex: 1 1 auto; min-width: 0; }
+.head h1 { margin: 0; font-size: 17px; font-weight: 700; }
+.head p { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
+.head p b { color: var(--text); }
+
+main { display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.hint { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.hint.small { font-size: 11.5px; margin: 6px 0 0; }
+code {
+  background: rgba(127,127,127,.16);
+  padding: 1px 5px; border-radius: 4px; font-size: 12px;
+}
+
+/* ボタン・入力 */
+.row { display: flex; gap: 8px; }
+.row input[type="text"] {
+  flex: 1 1 auto; min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13.5px;
+}
+.row input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .16);
+}
+
+.btn {
+  appearance: none; border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  border-radius: 9px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:hover { filter: brightness(1.07); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.big { padding: 12px 24px; font-size: 15px; }
+.row.center { justify-content: center; margin-top: 14px; }
+
+.status {
+  margin: 10px 0 0; padding: 8px 10px; border-radius: 9px; font-size: 12.5px;
+  background: rgba(127,127,127,.12);
+}
+.status.ok { background: rgba(21, 128, 61, .14); color: var(--ok); }
+.status.error { background: rgba(192, 38, 38, .12); color: var(--danger); }
+.status.warn { background: rgba(180, 83, 9, .14); color: #b45309; }
+
+/* 即席追加 */
+.quick {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 10px; background: rgba(37, 99, 235, .07);
+  border: 1px solid rgba(37, 99, 235, .2);
+}
+.quick-note { color: var(--muted); font-size: 12px; }
+
+/* URL 表示欄 */
+.linkbox { margin: 10px 0 0; }
+.linkbox label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.linkbox input[type="text"] {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--bg); color: var(--text); font-size: 12.5px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.linkbox .row { margin-top: 0; }
+.linkbox .row input[type="text"] { flex: 1 1 auto; }
+
+/* 許可ボタン */
+.grant {
+  border: 1px solid var(--accent); background: transparent; color: var(--accent);
+  border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+
+/* サイト一覧 */
+.site-list { list-style: none; margin: 0; padding: 0; }
+.site-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 9px; background: rgba(127,127,127,.09);
+  margin-bottom: 6px;
+}
+.site-list .host { font-weight: 700; font-size: 13px; word-break: break-all; }
+.site-list .mode {
+  font-size: 11px; padding: 2px 9px; border-radius: 999px;
+  background: rgba(37, 99, 235, .15); color: var(--accent); white-space: nowrap;
+}
+.site-list .mode.strict { background: rgba(192, 38, 38, .14); color: var(--danger); }
+.site-list .spacer { flex: 1 1 auto; }
+.site-list .del {
+  border: 1px solid var(--line); background: transparent; color: var(--danger);
+  border-radius: 8px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+}
+.site-list .del:hover { background: rgba(192, 38, 38, .1); }
+
+.count {
+  display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 10.5px; text-align: center;
+}
+
+/* 有効化ページ（activate.html） */
+.mini-title {
+  margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--muted);
+}
+.steps { margin: 0 0 10px; padding-left: 20px; font-size: 13px; }
+.steps li { margin: 4px 0; }
+.steps b { color: var(--text); }
+.how { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.how summary { cursor: pointer; font-size: 12.5px; color: var(--accent); font-weight: 600; list-style: none; }
+.how summary::-webkit-details-marker { display: none; }
+.how summary::before { content: "▸ "; }
+.how[open] summary::before { content: "▾ "; }
+.mini { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.target {
+  padding: 12px 14px; border-radius: 10px; background: rgba(127,127,127,.1);
+  border: 1px solid var(--line); margin-bottom: 12px;
+}
+.target-label { font-size: 11.5px; color: var(--muted); }
+.target-host { font-size: 18px; font-weight: 800; word-break: break-all; margin: 2px 0; }
+.target-url { font-size: 12px; color: var(--muted); word-break: break-all; }
+
+.check {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 12px; font-size: 12.5px; color: var(--muted); cursor: pointer;
+}
+.check input { margin-top: 4px; accent-color: var(--accent); }
+.check b { color: var(--text); }
+
+/* プレビュー（拡張機能以外）でのみ表示 */
+.standalone-only { display: none; }
+body.standalone .standalone-only { display: block; }
+body.standalone #add-current { opacity: .5; }
+
+.foot {
+  display: flex; justify-content: space-between;
+  color: var(--muted); font-size: 11.5px; padding: 4px;
+}
+
+/* --- tester.css --- */
+/* テストページ（tester.html）用の追加スタイル */
+
+.tester-card { padding: 14px; }
+
+.tester {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .tester { grid-template-columns: 1fr; }
+}
+
+.frame-col { min-width: 0; }
+.frame-head {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.frame-title { font-size: 12.5px; font-weight: 700; }
+.frame-note { font-size: 11px; color: var(--muted); }
+
+#test-frame {
+  width: 100%;
+  height: 440px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  display: block;
+}
+
+.result-col { min-width: 0; }
+
+.counters {
+  display: flex; gap: 8px; margin-bottom: 10px;
+}
+.counter {
+  flex: 1 1 0;
+  padding: 8px 6px; border-radius: 10px; text-align: center;
+  background: rgba(127,127,127,.1); border: 1px solid var(--line);
+}
+.counter .num { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.counter .lbl { font-size: 11px; color: var(--muted); }
+.counter.blocked .num { color: var(--danger); }
+.counter.allowed .num { color: var(--ok); }
+
+.result-list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow: auto; }
+.result-list li {
+  padding: 8px 10px; border-radius: 9px; margin-bottom: 6px; font-size: 12px;
+  border-left: 3px solid var(--danger);
+  background: rgba(185, 28, 28, .08);
+}
+.result-list li.allowed { border-left-color: var(--ok); background: rgba(21, 128, 61, .08); }
+.result-list .r-file { font-weight: 700; word-break: break-all; }
+.result-list .r-reason { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+.note {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(127,127,127,.08); border: 1px solid var(--line);
+  font-size: 11.5px; color: var(--muted);
+}
+.note b { color: var(--text); }
+.note ol { margin: 6px 0 0; padding-left: 18px; }
+.note li { margin: 2px 0; }
+/* FDG:CSS:END */
+</style>
+<!-- CSS は埋め込み（この HTML 1 ファイルだけダウンロードしても同じ見た目になります） -->
+<style>
+/* FDG:CSS:BEGIN */
+/* FDG:CSS:END */
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <div class="head-icon">🛡️</div>
+      <div class="head-text">
+        <h1>強制ダウンロード ガード — テスト</h1>
+        <p>偽の更新ページが自動でファイルをDLしようとすると、右に結果が出ます。</p>
+      </div>
+      <button id="open-popup" class="btn ghost">設定を開く</button>
+    </header>
+
+    <main>
+      <section class="card tester-card">
+        <div class="tester">
+          <!-- テスト用の偽ページ（この中が「攻撃」側） -->
+          <div class="frame-col">
+            <div class="frame-head">
+              <span class="frame-title">偽の更新ページ（テスト用）</span>
+              <span class="frame-note">4 秒後に自動で DL → 6 秒後に meta refresh</span>
+            </div>
+            <iframe id="test-frame" src="tests/fake-update.html" title="偽の更新ページのテスト"></iframe>
+            <div class="row" style="margin-top:8px">
+              <button id="reload" class="btn">再実行</button>
+              <button id="open-fake" class="btn ghost">偽ページを別タブで開く</button>
+            </div>
+          </div>
+
+          <!-- 結果 -->
+          <div class="result-col">
+            <h2 class="mini-title">結果</h2>
+            <div class="counters">
+              <div class="counter"><span id="c-blocked" class="num">0</span><span class="lbl">ブロック</span></div>
+              <div class="counter"><span id="c-allowed" class="num">0</span><span class="lbl">許可</span></div>
+              <div class="counter"><span id="c-total" class="num">0</span><span class="lbl">試行</span></div>
+            </div>
+            <ul id="result-list" class="result-list"></ul>
+            <p id="result-empty" class="hint">偽ページが 4 秒後に自動でダウンロードを試みます。</p>
+            <div class="note">
+              <b>このテストで起きること</b>
+              <ol>
+                <li>偽ページが自動で <code>sample.exe</code> を取得しようとします</li>
+                <li>「操作のない自動ダウンロード」と判定して <b>中断</b> します</li>
+                <li>偽ページに警告バナー（黄色い帯）も表示されます</li>
+                <li>6 秒後の meta refresh による再試行も止まります</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <span id="version"></span>
+        <span>強制ダウンロード ガード</span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="tester.js"></script>
+</body>
+</html>

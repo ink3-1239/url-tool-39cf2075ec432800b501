@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>テスト: 強制ダウンロード ガード</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; line-height: 1.7;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { color: #6b7280; margin: 0 0 24px; }
+  .case {
+    border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+    background: rgba(127,127,127,.05);
+  }
+  .case h2 { font-size: 14px; margin: 0 0 4px; }
+  .case p { margin: 4px 0 10px; font-size: 12.5px; color: #6b7280; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+  .tag.block { background: #fee2e2; color: #b91c1c; }
+  .tag.allow { background: #dcfce7; color: #15803d; }
+  button, a.btn {
+    display: inline-block; border: 1px solid #2563eb; background: #2563eb; color: #fff;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; text-decoration: none;
+  }
+  a.btn.ghost, button.ghost { background: transparent; color: #2563eb; }
+  code { background: rgba(127,127,127,.16); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  #log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .logline { padding: 4px 0; border-bottom: 1px dashed #e5e7eb; }
+</style>
+</head>
+<body>
+  <h1>強制ダウンロード ガード — 動作テスト</h1>
+  <p class="lead">このページは拡張機能自身に同梱されたテスト用ページです。実行後、拡張機能のポップアップにある「ブロック履歴」と合わせて確認してください。</p>
+
+  <div class="case">
+    <h2><span class="tag block">ブロック期待</span> ① ページ表示 2 秒後に自動でダウンロード</h2>
+    <p>スクリプトが <code>a.click()</code> を実行します。ユーザーの操作，没有任何ので遮断されます。</p>
+    <button id="run-auto">① を実行</button>
+  </div>
+
+  <div class="case">
+    <h2><span class="tag block">ブロック期待</span> ② meta refresh で自動遷移</h2>
+    <p><code>&lt;meta http-equiv="refresh" content="0;url=sample.exe"&gt;</code> を挿入します。</p>
+    <button id="run-meta">② を実行</button>
+  </div>
+
+  <div class="case">
+    <h2><span class="tag block">ブロック期待</span> ③ window.open で別タブに展開</h2>
+    <p>新しいタブで <code>sample.exe</code> を開きます。</p>
+    <button id="run-open">③ を実行</button>
+  </div>
+
+  <div class="case">
+    <h2><span class="tag allow">許可期待</span> ④ ユーザー操作による手動ダウンロード</h2>
+    <p>ボタンを押した直後のクリックは「ユーザー操作」として扱われ、実行ファイル以外は許可されます。</p>
+    <a class="btn ghost" href="sample.txt" download="sample.txt">sample.txt をダウンロード</a>
+  </div>
+
+  <div class="case">
+    <h2>実行ログ</h2>
+    <div id="log"></div>
+  </div>
+
+<script>
+  const logEl = document.getElementById('log');
+  function log(msg) {
+    const d = document.createElement('div');
+    d.className = 'logline';
+    d.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+    logEl.appendChild(d);
+  }
+
+  document.getElementById('run-auto').addEventListener('click', () => {
+    log('① 2 秒後に自動で sample.exe をダウンロードします…');
+    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = 'sample.exe';
+      a.download = 'sample.exe';
+      document.body.appendChild(a);
+      a.click();
+    }, 2000);
+  });
+
+  document.getElementById('run-meta').addEventListener('click', () => {
+    log('② meta refresh で sample.exe へ遷移します…');
+    const m = document.createElement('meta');
+    m.setAttribute('http-equiv', 'refresh');
+    m.setAttribute('content', '0;url=sample.exe');
+    document.head.appendChild(m);
+  });
+
+  document.getElementById('run-open').addEventListener('click', () => {
+    log('③ 別タブで sample.exe を開きます…');
+    window.open('sample.exe', '_blank');
+  });
+
+  log('ページを開きました。');
+</script>
+</body>
+</html>
