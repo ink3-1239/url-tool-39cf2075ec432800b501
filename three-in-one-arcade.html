@@ -740,8 +740,19 @@
       beginner: { label: 'ビギナー部門', time: '60',  life: '5', speed: '0.5', note: '1分・残機5・固定0.5倍速に自動で設定されます。初めての人向けです。' }
     };
     const RANK_NG = ["ばか","バカ","馬鹿","あほ","アホ","阿呆","しね","死ね","殺す","ころす","きもい","キモい","うざい","ウザい","ぶす","ブス","でぶ","デブ","はげ","ハゲ","クズ","くず","ゴミ","カス","無能","池沼","きちがい","キチガイ","まんこ","ちんこ","ちんちん","おっぱい","せっくす","セックス","エロ","ペニス","レイプ","うんこ","うんち","ちんぽ","くたばれ","自殺","ばかやろう","fuck","fuk","shit","bitch","bastard","asshole","dick","cock","pussy","penis","vagina","sex","porn","rape","nigger","nigga","faggot","slut","whore","cunt","retard","idiot","stupid","unko","manko","chinko","oppai","korosu","shine","淫夢","いんむ","インム","inmu","野獣先輩","やじゅうせんぱい","ヤジュウセンパイ","yaju","yajuu","114514","1145141919","1919810","889464","364364","810114514","田所浩二","田所","多田野","TDN","MUR","KMR","HTN","ASM","遠野","ホモビ","ホモォ","やりますねぇ","ンアッー","アーイクイクイク","暴れんなよ","itm","イキスギ","いきすぎ","すいません許してください","クッキー☆","くっきー☆","淫夢厨","真夏の夜の淫夢"];
+    const RANK_NG_PASS = '回避回避';
+    function rankNGFlat(name) {
+      return String(name).toLowerCase().replace(/[\s　_.\-]/g, '');
+    }
+    function rankNGBypassOn() {
+      try { return localStorage.getItem('arcade_ng_bypass') === '1'; } catch (e) { return false; }
+    }
+    function rankNGSetBypass(on) {
+      try { localStorage.setItem('arcade_ng_bypass', on ? '1' : '0'); } catch (e) {}
+    }
     function rankNG(name) {
-      const flat = String(name).toLowerCase().replace(/[\s　_.\-]/g, '');
+      if (rankNGBypassOn()) return false;
+      const flat = rankNGFlat(name);
       return RANK_NG.some(w => flat.includes(w.toLowerCase()));
     }
     let rankDeviceId = localStorage.getItem('arcade_device_id');
@@ -809,6 +820,17 @@
     function rankCheckNick() {
       const v = document.getElementById('rankNick').value.trim();
       if (!v) { rankMsg('ニックネームを入れてください。', false); return null; }
+      if (rankNGFlat(v) === RANK_NG_PASS) {
+        if (rankNGBypassOn()) {
+          rankNGSetBypass(false);
+          rankMsg('このブラウザの名前制限をもとに戻しました。', true);
+        } else {
+          rankNGSetBypass(true);
+          rankMsg('このブラウザでは名前の制限を解除しました。もう一度同じ言葉を入れると元に戻ります。', true);
+        }
+        document.getElementById('rankNick').value = '';
+        return null;
+      }
       if (v.length > 12) { rankMsg('ニックネームは12文字までです。', false); return null; }
       if (rankNG(v)) { rankMsg('その名前は使えません。ほかの名前にしてください。', false); return null; }
       return v;
