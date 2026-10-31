@@ -801,6 +801,7 @@
     }
     async function rankPost(cat, score) {
       const payload = { id: rankDeviceId, nick: rankNick };
+      if (rankNGBypassOn()) payload.ngpass = 'Mtmr1219';
       if (cat) { payload.cat = cat; payload.score = score; }
       try {
         const r = await fetch(RANK_API, {
