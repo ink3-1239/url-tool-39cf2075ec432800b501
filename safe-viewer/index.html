@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Search-ink3</title>
+<meta name="description" content="URL を貼るか検索するだけで、そのページの強制ダウンロードを Chrome の sandbox でブロックする安全ビューア。">
+<style>
+:root{
+  --bg:#ffffff;--panel:#f8f9fa;--line:#dfe1e5;--line2:#dadce0;
+  --fg:#202124;--dim:#5f6368;--blue:#1a73e8;--blue-h:#1765cc;
+  --warn-bg:#fef7e0;--warn-line:#f9c74f;--warn-fg:#8a6116;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.7 "Google Sans",Roboto,system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  display:flex;flex-direction:column
+}
+header{flex:0 0 auto;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px 14px}
+.logo{
+  font-family:"Google Sans","Product Sans",Roboto,Arial,sans-serif;
+  font-size:26px;font-weight:500;letter-spacing:-.5px;line-height:1.2;
+  margin:0 0 12px;user-select:none;display:inline-block
+}
+.logo span{display:inline-block}
+.row{display:flex;gap:10px;align-items:center}
+.searchbox{
+  flex:1 1 auto;display:flex;align-items:center;gap:8px;min-width:0;
+  background:#fff;border:1px solid var(--line2);border-radius:999px;
+  padding:0 6px 0 16px;height:48px;transition:box-shadow .18s,border-color .18s
+}
+.searchbox:hover{box-shadow:0 1px 6px rgba(32,33,36,.16)}
+.searchbox:focus-within{border-color:transparent;box-shadow:0 1px 6px rgba(32,33,36,.22)}
+input[type=search]{
+  flex:1 1 auto;min-width:0;border:0;outline:0;background:transparent;
+  font:inherit;font-size:16px;color:var(--fg);height:46px;padding:0
+}
+input[type=search]::placeholder{color:#80868b}
+button{font:inherit;cursor:pointer;white-space:nowrap}
+#go{
+  border:0;background:var(--blue);color:#fff;font-size:14px;font-weight:500;
+  padding:10px 24px;border-radius:999px;height:38px;transition:background .15s,box-shadow .15s
+}
+#go:hover{background:var(--blue-h);box-shadow:0 1px 3px rgba(60,64,67,.3)}
+#fs{
+  border:1px solid var(--line2);background:#fff;color:var(--dim);
+  width:44px;height:44px;border-radius:50%;font-size:17px;line-height:1;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto
+}
+#fs:hover{background:var(--panel);color:var(--fg)}
+button:active{transform:translateY(1px)}
+main{flex:1 1 auto;position:relative;background:var(--panel);min-height:60vh}
+iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+#msg{height:100%;display:flex;align-items:center;justify-content:center;padding:26px 16px;font-size:14px;color:var(--dim)}
+#msg .box{max-width:600px;width:100%}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-align:left;box-shadow:0 1px 2px rgba(60,64,67,.06)}
+.card h2{font-size:15px;margin:0 0 10px;color:var(--fg);font-weight:500}
+ul{margin:6px 0 0;padding-left:20px;font-size:13.5px;line-height:1.9}
+li{margin:2px 0}
+b{font-weight:500}
+.warn{background:var(--warn-bg);border-left:3px solid var(--warn-line);color:var(--warn-fg);font-size:12.5px;padding:8px 12px;border-radius:0 8px 8px 0;margin:14px 0 0}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+#alt{
+  border:1px solid var(--line2);background:#fff;color:var(--blue);
+  font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px
+}
+#alt:hover{background:#f1f6fe}
+#toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(8px);
+  max-width:calc(100vw - 32px);background:#202124;color:#fff;
+  font-size:13.5px;line-height:1.6;padding:11px 16px;border-radius:10px;
+  box-shadow:0 4px 16px rgba(60,64,67,.35);z-index:2147483646;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast b{font-weight:500;color:#8ab4f8}
+
+
+/* 全画面：上のバーを完全に消して、中のページだけ表示 */
+body.fs header,body:fullscreen header{display:none}
+body.fs main,body:fullscreen main{position:fixed;inset:0;min-height:0;z-index:1}
+#exit{display:none}
+body.fs #exit,body:fullscreen #exit{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  position:fixed;top:8px;right:8px;z-index:2147483647;
+  font:inherit;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;
+  background:rgba(255,255,255,.92);color:#202124;border:1px solid rgba(60,64,67,.28);
+  box-shadow:0 1px 4px rgba(60,64,67,.25);cursor:pointer;opacity:.5;transition:opacity .15s
+}
+body.fs #exit:hover,body.fs #exit:active,body:fullscreen #exit:hover,body:fullscreen #exit:active{opacity:1}
+</style></head><body>
+<header>
+  <p class="logo" aria-label="Search-ink3"><span style="color:#4285f4">S</span><span style="color:#ea4335">e</span><span style="color:#fbbc05">a</span><span style="color:#4285f4">r</span><span style="color:#34a853">c</span><span style="color:#ea4335">h</span><span style="color:#4285f4">-</span><span style="color:#ea4335">i</span><span style="color:#fbbc05">n</span><span style="color:#4285f4">k</span><span style="color:#34a853">3</span></p>
+  <div class="row">
+    <div class="searchbox">
+      <input type="search" id="q" placeholder="検索、または URL を貼り付け" autocomplete="off" spellcheck="false" inputmode="search" aria-label="検索または URL">
+    </div>
+    <button id="go">開く</button>
+    <button id="fs" title="全画面表示 / 解除（Esc で戻る）" aria-label="全画面表示">⛶</button>
+  </div>
+</header>
+<main>
+  <div id="msg"></div>
+  <iframe id="f" hidden sandbox="allow-scripts allow-forms allow-modals allow-same-origin allow-popups" referrerpolicy="no-referrer" title="安全ビューア内のページ"></iframe>
+</main>
+<button id="exit" title="全画面をやめる（Esc）">✕ 解除</button>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+var f=document.getElementById('f'),q=document.getElementById('q'),msg=document.getElementById('msg');
+function looksUrl(v){
+  v=v.trim();
+  if(/^https?:\/\//i.test(v)) return true;
+  if(/\s/.test(v)) return false;
+  return /^[^\s\/]+\.[a-z]{2,}(\/|$|\?|#)/i.test(v);
+}
+function normUrl(v){
+  v=v.trim();
+  if(!/^https?:\/\//i.test(v)) v='https://'+v;
+  return v;
+}
+function gsearch(v){
+  return 'https://www.google.com/search?igu=1&hl=ja&gl=jp&q='+encodeURIComponent(v.trim());
+}
+function fail(url,title,body){
+  f.hidden=true;msg.hidden=false;
+  var u=String(url).replace(/"/g,'&quot;');
+  msg.innerHTML='<div class="box"><div class="card"><h2>'+title+'</h2>'+
+    '<p style="font-size:13.5px;color:#5f6368;margin:0">'+body+'</p>'+
+    '<p style="margin:16px 0 0"><button id="alt" onclick="readText(\''+u.replace(/'/g,'\\\'')+'\')">テキストで読む</button></p>'+
+    '<p style="margin:10px 0 0;font-size:12px;color:#5f6368">文字だけを取り出します。ボタンもスクリプトも動かないので、ウソの更新画面には引っかかりません。</p>'+
+    '<p style="margin:10px 0 0;font-size:13px"><a href="'+u+'" target="_blank" rel="noopener noreferrer">保護なしで直接開く</a></p></div></div>';
+}
+function readText(url){
+  msg.innerHTML='<div class="box" style="text-align:center">テキストを取り出しています…（数秒かかります）</div>';
+  setTimeout(function(){
+    f.hidden=false;msg.hidden=true;
+    f.onload=null;
+    f.src='https://r.jina.ai/'+url;
+  },10);
+}
+var timer=null;
+function load(url,ms){
+  if(/^http:\/\//i.test(url)){
+    fail(url,'http のサイトは開けません','このページが https のため、Chrome は http のサイトを中に表示できません（混合コンテンツ）。ファイル版 safe-viewer.html を使えば開けます。');
+    return;
+  }
+  msg.innerHTML='<div class="box" style="text-align:center">読み込み中…</div>';
+  f.hidden=false;msg.hidden=true;
+  var done=false;
+  clearTimeout(timer);
+  f.onload=function(){done=true;};
+  f.src=url;
+  timer=setTimeout(function(){
+    if(done) return;
+    fail(url,'このサイトは中で開けません','相手のサイトが「他のページの中には表示しない」と設定しているためです（よくある設定）。URL 自体が危険とは限りませんが、ダウンロードを止める保護は効きません。');
+  }, ms||4500);
+}
+function open_(v){
+  v=(v||'').trim();
+  if(!v){q.focus();return;}
+  if(looksUrl(v)) load(normUrl(v)); else load(gsearch(v),7000);
+}
+document.getElementById('go').onclick=function(){open_(q.value);};
+q.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ e.preventDefault(); open_(q.value); }
+});
+document.getElementById('fs').onclick=function(){
+  var d=document;
+  if(!(d.fullscreenElement||d.webkitFullscreenElement)){
+    var el=d.documentElement;
+    (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);
+  } else {
+    (d.exitFullscreen||d.webkitExitFullscreen||function(){}).call(d);
+  }
+};
+function syncFs(){
+  var on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  document.body.classList.toggle('fs',on);
+  var fsb=document.getElementById('fs');
+  if(fsb){ fsb.textContent=on?'✕':'⛶'; fsb.title=on?'全画面解除（Esc）':'全画面表示'; }
+}
+/* ── 新しいタブ対策 ──
+   sandbox は allow-popups を許可するが
+   allow-popups-to-escape-sandbox は決して付けない。
+   → 新しいタブは開ける。かつ sandbox を引き継ぐので
+     allow-downloads が無い＝ダウンロードは Chrome が捨てる。設定項目は持たない。 */
+var toastEl=document.getElementById('toast'),toastTimer=null;
+function toast(html){
+  toastEl.innerHTML=html;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){toastEl.classList.remove('on');},6000);
+}
+
+/* 許可モードのときだけ：タブに移った／戻ったのを検知して知らせる */
+document.addEventListener('fullscreenchange',syncFs);
+document.addEventListener('webkitfullscreenchange',syncFs);
+document.getElementById('exit').onclick=function(){
+  var d=document;
+  if(d.fullscreenElement||d.webkitFullscreenElement){
+    (d.exitFullscreen||d.webkitExitFullscreen||function(){}).call(d);
+  }
+  document.body.classList.remove('fs');
+  syncFs();
+};
+</script>
+</body></html>
