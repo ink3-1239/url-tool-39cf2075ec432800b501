@@ -1,1 +1,57 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>科学技術部のゲーム案内所</title><style>html,body,#frame{margin:0;width:100%;height:100%;border:0;display:block;background:#050813;overflow:hidden}#load{position:fixed;inset:0;display:grid;place-items:center;background:#050813;color:#efe8da;font:900 13px ui-monospace;letter-spacing:.18em}</style></head><body><div id="load">NOW LOADING</div><iframe id="frame" title="科学技術部のゲーム案内所" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe><script>(()=>{const t="e9bb6ffa3b87364662c.html";const f=document.getElementById('frame');f.onload=()=>document.getElementById('load')?.remove();f.src=t})();</script></body></html>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>科学技術部のゲーム案内所</title><style>html,body,#frame{margin:0;width:100%;height:100%;border:0;display:block;background:#050813;overflow:hidden}#load{position:fixed;inset:0;display:grid;place-items:center;background:#050813;color:#efe8da;font:900 13px ui-monospace;letter-spacing:.18em}</style></head><body><div id="load">NOW LOADING</div><iframe id="frame" title="科学技術部のゲーム案内所" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe><script>(()=>{
+  const t = "e9bb6ffa3b87364662c.html";
+  const f = document.getElementById('frame');
+  const PREFIX = "/url-tool-39cf2075ec432800b501/";
+
+  function install(win){
+    try{
+      if(!win || win.__tcSameFrameOpen) return;
+      win.__tcSameFrameOpen = 1;
+      const doc = win.document;
+      function norm(u){
+        try{
+          if(!u) return null;
+          const s = String(u).trim();
+          if(/^(javascript:|mailto:|#)/i.test(s)) return null;
+          const a = doc.createElement("a");
+          a.href = s;
+          if(a.host && a.host !== win.location.host) return null;
+          let p = a.pathname || "";
+          const i = p.indexOf(PREFIX);
+          if(i >= 0) p = p.slice(i + PREFIX.length);
+          p = p.replace(/^\/+/, "").replace(/\?v=\d+/g, "");
+          if(!/\.html$/i.test(p)) return null;
+          return p;
+        }catch(e){ return null; }
+      }
+      const open0 = win.open;
+      win.open = function(u){
+        const x = norm(u);
+        if(x){ win.location.href = x; return win; }
+        try{ return open0.apply(win, arguments); }catch(e){ return null; }
+      };
+      doc.addEventListener("click", function(e){
+        let el = e.target;
+        while(el && el.tagName !== "A") el = el.parentNode;
+        if(!el || !el.getAttribute) return;
+        const x = norm(el.getAttribute("href"));
+        if(!x) return;
+        e.preventDefault();
+        e.stopPropagation();
+        win.location.href = x;
+      }, true);
+      const strip = () => {
+        const list = doc.querySelectorAll('a[target="_blank"]');
+        for(let i=0;i<list.length;i++) list[i].removeAttribute("target");
+      };
+      strip();
+      setInterval(strip, 1500);
+    }catch(e){}
+  }
+
+  f.onload = () => {
+    document.getElementById('load')?.remove();
+    install(f.contentWindow);
+  };
+  f.src = t;
+})();</script></body></html>
