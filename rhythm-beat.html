@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RHYTHM BEAT!! — 音源から譜面を自動生成する音ゲー</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    width:100%; height:100%; overflow:hidden; background:#05060d; color:#fff;
+    font-family:"M PLUS 1p","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,-apple-system,sans-serif;
+    user-select:none; touch-action:none;
+  }
+  #wrap{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  #stage{ position:relative; width:100%; height:100%; max-width:1000px; margin:0 auto; overflow:hidden; background:#05060d; }
+  canvas{ display:block; width:100%; height:100%; }
+
+  /* ---------------- ロビー ---------------- */
+  .screen{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    padding:max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom));
+    background:
+      radial-gradient(120% 70% at 50% -10%, rgba(120,90,255,.35), transparent 60%),
+      radial-gradient(100% 60% at 100% 100%, rgba(0,220,255,.18), transparent 60%),
+      linear-gradient(180deg,#080a19 0%,#0d0a1f 55%,#12071c 100%);
+    overflow-y:auto; z-index:10;
+  }
+  .screen.hide{ display:none; }
+  .brand{ text-align:center; margin:6px 0 2px; }
+  .brand h1{
+    font-size:clamp(26px,6.6vw,46px); letter-spacing:.05em; font-weight:900; line-height:1;
+    background:linear-gradient(90deg,#7ef9ff,#a78bfa 45%,#ff9ad5 80%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 16px rgba(150,120,255,.6));
+  }
+  .brand p{ margin-top:8px; font-size:10.5px; letter-spacing:.26em; color:#9aa4d6; }
+
+  .drop{
+    position:relative; margin:16px 0 6px; border-radius:20px; padding:20px 16px; text-align:center; cursor:pointer;
+    border:2px dashed rgba(160,140,255,.45); background:rgba(120,90,255,.09);
+    transition:.18s;
+  }
+  .drop:hover{ background:rgba(120,90,255,.16); border-color:rgba(190,170,255,.8); }
+  .drop.drag{ background:rgba(160,120,255,.28); border-color:#fff; transform:scale(1.01); }
+  .drop .ico{ font-size:26px; margin-bottom:6px; }
+  .drop .t1{ font-size:14px; font-weight:900; letter-spacing:.04em; }
+  .drop .t2{ font-size:11px; color:#a8b0dd; margin-top:6px; line-height:1.6; }
+  .drop input{ display:none; }
+
+  .tabs{ display:flex; gap:8px; margin:10px 0 8px; justify-content:center; flex-wrap:wrap; }
+  .tab{
+    padding:7px 14px; border-radius:999px; font-size:12px; font-weight:700; cursor:pointer;
+    border:1px solid rgba(160,140,255,.28); color:#b7bff0; background:rgba(255,255,255,.03); transition:.18s;
+  }
+  .tab.on{ background:linear-gradient(135deg,#6d5bff,#b04bff); color:#fff; border-color:transparent; box-shadow:0 6px 22px rgba(140,80,255,.45); }
+
+  .cards{ display:flex; flex-direction:column; gap:12px; padding-bottom:16px; }
+  .card{
+    position:relative; border-radius:20px; padding:14px 16px 13px; overflow:hidden; cursor:pointer;
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 14px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.14);
+    transition:transform .16s ease;
+  }
+  .card:active{ transform:scale(.985); }
+  .card .glow{ position:absolute; inset:-40% -10% auto auto; width:70%; height:200%; filter:blur(38px); opacity:.55; pointer-events:none; }
+  .card .inner{ position:relative; z-index:2; }
+  .card .tag{ display:inline-block; font-size:10px; font-weight:800; letter-spacing:.14em; padding:3px 9px;
+    border-radius:999px; background:rgba(0,0,0,.42); border:1px solid rgba(255,255,255,.25); margin-bottom:7px; }
+  .card h3{ font-size:clamp(15px,4vw,19px); font-weight:900; letter-spacing:.01em; text-shadow:0 2px 12px rgba(0,0,0,.55);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:70px; }
+  .card .sub{ font-size:11px; color:rgba(255,255,255,.82); margin-top:4px; line-height:1.5; }
+  .card .meta{ display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .pill{ font-size:10px; font-weight:800; padding:4px 9px; border-radius:999px;
+    background:rgba(0,0,0,.42); border:1px solid rgba(255,255,255,.22); color:#fff; }
+  .pill.fc{ background:rgba(0,255,190,.16); border-color:rgba(0,255,190,.5); color:#9bffe4; }
+  .card .diffwrap{ display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
+  .diffchip{ font-size:10px; font-weight:900; letter-spacing:.04em; padding:4px 8px; border-radius:8px; cursor:pointer;
+    background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.22); color:#e7ebff; }
+  .diffchip.dan{ background:rgba(255,209,102,.16); border-color:rgba(255,209,102,.5); color:#ffe6a6; }
+  .diffchip.kyu{ background:rgba(126,249,255,.13); border-color:rgba(126,249,255,.4); color:#bff6ff; }
+  .diffchip.sensei{ background:linear-gradient(135deg,#ff3b5c,#ff9a3b); border-color:transparent; color:#fff;
+    box-shadow:0 4px 16px rgba(255,80,80,.45); }
+  .diffchip:active{ transform:scale(.95); }
+  .card .arrow{ position:absolute; right:15px; bottom:12px; font-size:18px; color:rgba(255,255,255,.75); z-index:3; }
+  .card .del{ position:absolute; right:12px; top:12px; z-index:4; width:26px; height:26px; border-radius:50%;
+    border:1px solid rgba(255,255,255,.3); background:rgba(0,0,0,.45); color:#fff; font-size:14px; line-height:1;
+    cursor:pointer; }
+  .note{ font-size:10.5px; color:#7d86b8; text-align:center; line-height:1.7; padding:2px 8px 10px; }
+
+  /* ---------------- 設定バー ---------------- */
+  .optrow{ display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; margin:2px 0 12px; }
+  .opt{ display:flex; align-items:center; gap:7px; white-space:nowrap; font-size:11.5px; font-weight:700; color:#c3caf5;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:6px 10px; }
+  .opt b{ color:#8ef4ff; font-size:13px; font-variant-numeric:tabular-nums; }
+  .opt b, .opt button{ white-space:nowrap; }
+  .opt button{ width:22px; height:22px; border-radius:7px; border:none; cursor:pointer; font-weight:900; font-size:13px;
+    background:rgba(255,255,255,.14); color:#fff; line-height:1; }
+  .opt button:active{ background:#6d5bff; }
+
+  /* ---------------- 解析オーバーレイ ---------------- */
+  #spin{
+    position:absolute; inset:0; z-index:35; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    background:rgba(5,6,16,.92); backdrop-filter:blur(10px); text-align:center; padding:24px;
+  }
+  #spin.on{ display:flex; }
+  #spin .ring{ width:54px; height:54px; border-radius:50%; border:4px solid rgba(255,255,255,.15);
+    border-top-color:#8ef4ff; animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #spin .txt{ font-size:13px; font-weight:800; letter-spacing:.1em; }
+  #spin .sub{ font-size:11px; color:#96a0d0; line-height:1.7; }
+
+  /* ---------------- プレイUI ---------------- */
+  #play{ position:absolute; inset:0; z-index:20; display:none; }
+  #play.on{ display:block; }
+  #hud{ position:absolute; inset:0; pointer-events:none; z-index:3; }
+  .hud-top{ position:absolute; top:max(10px,env(safe-area-inset-top)); left:0; right:0; padding:0 14px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .hud-score{ font-size:clamp(20px,5.6vw,30px); font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.02em;
+    text-shadow:0 0 18px rgba(140,120,255,.9); }
+  .hud-jacket{ width:clamp(48px,13vw,66px); aspect-ratio:1/1; border-radius:12px; overflow:hidden; flex:none;
+    border:1.5px solid rgba(255,255,255,.5); box-shadow:0 8px 26px rgba(0,0,0,.6); }
+  .hud-jacket canvas{ width:100%; height:100%; }
+  .hud-mid{ text-align:center; flex:1; min-width:0; }
+  .hud-mid .t{ font-size:12px; font-weight:800; letter-spacing:.04em; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; text-shadow:0 2px 10px #000; }
+  .hud-mid .l{ font-size:10px; color:#a9b1e0; letter-spacing:.1em; margin-top:2px; }
+  #lifebar{ position:absolute; top:max(92px,calc(env(safe-area-inset-top) + 82px)); left:14px; right:14px; height:7px;
+    border-radius:99px; background:rgba(255,255,255,.13); overflow:hidden; border:1px solid rgba(255,255,255,.16); }
+  #lifebar i{ display:block; height:100%; width:80%; border-radius:99px;
+    background:linear-gradient(90deg,#3ef2c0,#7ef9ff,#a78bfa); box-shadow:0 0 14px rgba(120,240,255,.9); transition:width .12s linear; }
+  #combo{ position:absolute; left:0; right:0; top:26%; text-align:center; pointer-events:none; z-index:4;
+    font-weight:900; font-style:italic; text-shadow:0 0 22px rgba(160,120,255,.95), 0 6px 18px rgba(0,0,0,.85); transition:opacity .25s; }
+  #combo .n{ font-size:clamp(42px,12vw,64px); line-height:1;
+    background:linear-gradient(180deg,#fff,#9ff6ff 55%,#c9b4ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #combo .c{ font-size:12px; letter-spacing:.4em; color:#c9d0ff; font-style:normal; font-weight:800; }
+  #pauseBtn{ position:absolute; right:14px; bottom:max(12px,env(safe-area-inset-bottom)); z-index:6; width:38px; height:38px;
+    border-radius:50%; border:1px solid rgba(255,255,255,.28); background:rgba(0,0,0,.42); color:#fff;
+    font-size:13px; font-weight:900; cursor:pointer; pointer-events:auto; backdrop-filter:blur(6px); }
+
+  /* ---------------- リザルト ---------------- */
+  #result{ position:absolute; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:22px; text-align:center; overflow-y:auto;
+    background:radial-gradient(120% 80% at 50% 0%,rgba(120,80,255,.4),transparent 60%),rgba(6,6,16,.94); backdrop-filter:blur(14px); }
+  #result.on{ display:flex; }
+  #result .rank{ font-size:clamp(64px,18vw,110px); font-weight:900; font-style:italic; line-height:.9; letter-spacing:-.02em;
+    background:linear-gradient(180deg,#fff,#8ef4ff 45%,#b98bff); -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 26px rgba(150,120,255,.9)); }
+  #result .rlabel{ font-size:11px; letter-spacing:.42em; color:#9aa4d6; margin-top:6px; }
+  #result .rscore{ font-size:clamp(22px,6vw,30px); font-weight:900; margin-top:14px; font-variant-numeric:tabular-nums; }
+  #result .rsub{ font-size:11px; color:#8d96c8; margin-top:4px; letter-spacing:.08em; }
+  #result .grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:16px; width:100%; max-width:340px; }
+  .stat{ display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border-radius:11px;
+    background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.1); font-size:12px; font-weight:800; }
+  .stat span{ color:#a4add9; font-weight:700; font-size:11px; letter-spacing:.08em; }
+  .stat.perfect b{ color:#9ef7ff; } .stat.great b{ color:#a8ffb1; } .stat.good b{ color:#ffe08a; } .stat.miss b{ color:#ff8fa0; }
+  #result .btns{ display:flex; gap:10px; margin-top:20px; width:100%; max-width:340px; }
+  .btn{ flex:1; padding:13px 10px; border-radius:14px; cursor:pointer; font-size:13.5px; font-weight:900; letter-spacing:.06em;
+    color:#fff; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); }
+  .btn.primary{ background:linear-gradient(135deg,#6d5bff,#c04bff); border-color:transparent; box-shadow:0 10px 28px rgba(140,80,255,.5); }
+  .btn:active{ transform:scale(.97); }
+  #result .best{ margin-top:12px; font-size:11px; color:#8ef4ff; font-weight:800; letter-spacing:.1em; }
+
+  #center{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:25; pointer-events:none; }
+  #center.on{ display:flex; }
+  #center .big{ font-size:clamp(48px,16vw,96px); font-weight:900; font-style:italic; text-shadow:0 0 34px rgba(150,120,255,.95); animation:pop .5s ease-out; }
+  @keyframes pop{ from{ transform:scale(1.6); opacity:0 } to{ transform:scale(1); opacity:1 } }
+  #pause{ position:absolute; inset:0; z-index:40; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(5,6,16,.86); backdrop-filter:blur(10px); padding:24px; }
+  #pause.on{ display:flex; }
+  #pause h2{ font-size:22px; letter-spacing:.3em; font-weight:900; }
+  #pause .btn{ width:210px; flex:none; }
+  #pause .vol{ font-size:11px; color:#9aa4d6; letter-spacing:.1em; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+
+    <!-- ============ ロビー ============ -->
+    <div class="screen" id="lobby">
+      <div class="brand">
+        <h1>RHYTHM BEAT!!</h1>
+        <p>Y O U R &nbsp; M U S I C , &nbsp; Y O U R &nbsp; C H A R T</p>
+      </div>
+
+      <label class="drop" id="drop">
+        <input type="file" id="fileIn" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac" multiple>
+        <div class="ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="url(#g1)" stroke-width="2" stroke-linecap="round"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7ef9ff"/><stop offset="1" stop-color="#b98bff"/></linearGradient></defs><path d="M9 18V5l10-2v13"/><circle cx="7" cy="18" r="2.6"/><circle cx="17" cy="16" r="2.6"/></svg></div>
+        <div class="t1">音源を読み込む（タップ／ドロップ）</div>
+        <div class="t2">MP3・WAV・M4A・OGG 対応／複数まとめてOK<br>読み込んだ音源から譜面を自動生成します<br>
+        <span style="color:#8ef4ff">別班儀礼曲・VIVANTメインテーマ・コンギョ も、手持ちの音源を入れればそのまま遊べます</span></div>
+      </label>
+
+      <div class="tabs" id="tabs"></div>
+
+      <div class="optrow">
+        <div class="opt">SPEED
+          <button data-speed="-1">−</button><b id="spdVal">6.0</b><button data-speed="1">+</button>
+        </div>
+        <div class="opt">OFFSET
+          <button data-off="-50">−</button><b id="ofsVal">0ms</b><button data-off="50">+</button>
+        </div>
+      </div>
+
+      <div class="cards" id="cards"></div>
+      <div class="note" id="syncNote" style="margin-bottom:4px"></div>
+      <div class="note">
+        キーボード：D F J K ／ 画面タップ・クリックでもプレイ可能<br>
+        ロングノーツは押しっぱなし。ライフが0になると失敗。<br>
+        音源は端末内（ブラウザ内）だけで処理され、どこにも送信されません。<br>
+        <span style="color:#8ef4ff">一度読み込んだ曲は譜面だけ保存されます（音源は再読み込みで消えるので、その時は選び直してください）。</span>
+      </div>
+    </div>
+
+    <!-- ============ 解析中 ============ -->
+    <div id="spin">
+      <div class="ring"></div>
+      <div class="txt" id="spinTxt">解析中…</div>
+      <div class="sub" id="spinSub">音源を読み込んでいます</div>
+    </div>
+
+    <!-- ============ プレイ ============ -->
+    <div id="play">
+      <div id="hud">
+        <div class="hud-top">
+          <div class="hud-jacket"><canvas id="jacket"></canvas></div>
+          <div class="hud-mid">
+            <div class="t" id="hudTitle">TITLE</div>
+            <div class="l" id="hudLevel">LEVEL 0</div>
+          </div>
+          <div class="hud-score" id="hudScore">0</div>
+        </div>
+        <div id="lifebar"><i></i></div>
+        <div id="combo"><div class="n">0</div><div class="c">COMBO</div></div>
+        <button id="pauseBtn">II</button>
+      </div>
+      <div id="center"><div class="big"></div></div>
+    </div>
+
+    <!-- ============ リザルト ============ -->
+    <div id="result">
+      <div class="rank" id="rank">S</div>
+      <div class="rlabel">RESULT</div>
+      <div class="rscore" id="rscore">0</div>
+      <div class="rsub" id="rsub"></div>
+      <div class="grid">
+        <div class="stat perfect"><span>PERFECT</span><b id="sPerfect">0</b></div>
+        <div class="stat great"><span>GREAT</span><b id="sGreat">0</b></div>
+        <div class="stat good"><span>GOOD</span><b id="sGood">0</b></div>
+        <div class="stat miss"><span>MISS</span><b id="sMiss">0</b></div>
+      </div>
+      <div class="best" id="bestLine"></div>
+      <div class="btns">
+        <button class="btn" id="retryBtn">RETRY</button>
+        <button class="btn primary" id="backBtn">SELECT</button>
+      </div>
+    </div>
+
+    <!-- ============ ポーズ ============ -->
+    <div id="pause">
+      <h2>PAUSE</h2>
+      <button class="btn primary" id="resumeBtn">RESUME</button>
+      <button class="btn" id="quitBtn">SELECT に戻る</button>
+      <div class="vol">OFFSET は SELECT 画面で調整できます</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   RHYTHM BEAT!!  —  audio-driven rhythm game
+   読み込んだ音源からオンセット/ビートを解析して譜面を自動生成します
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const AUTO = /(\?|&)auto=1/.test(location.search);
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const rand = (a,b) => a + Math.random()*(b-a);
+
+let AC=null, master=null, musicBus=null, sfxBus=null, comp=null;
+function initAudio(){
+  if(AC) return;
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  comp = AC.createDynamicsCompressor();
+  comp.threshold.value=-12; comp.knee.value=20; comp.ratio.value=6; comp.attack.value=0.003; comp.release.value=0.25;
+  master = AC.createGain(); master.gain.value=0.9;
+  musicBus = AC.createGain(); musicBus.gain.value=1.0;
+  sfxBus = AC.createGain(); sfxBus.gain.value=0.34;
+  musicBus.connect(comp); sfxBus.connect(comp); comp.connect(master); master.connect(AC.destination);
+}
+function noiseHit(bus, t, vol=0.3, dur=0.08, hp=1400){
+  const len=Math.max(1,Math.floor(AC.sampleRate*dur));
+  const buf=AC.createBuffer(1,len,AC.sampleRate); const d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const f=AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp;
+  const g=AC.createGain(); g.gain.value=vol;
+  src.connect(f); f.connect(g); g.connect(bus); src.start(t);
+}
+function tone(bus, o){
+  const t0=o.t, a=0.004, d=o.d, vol=o.vol??0.2, type=o.type??'triangle';
+  const osc=AC.createOscillator(), g=AC.createGain();
+  osc.type=type; osc.frequency.setValueAtTime(o.f,t0);
+  if(o.f2!=null) osc.frequency.exponentialRampToValueAtTime(Math.max(20,o.f2), t0+d);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol,t0+a);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+d+0.02);
+  osc.connect(g); g.connect(bus);
+  osc.start(t0); osc.stop(t0+d+0.06);
+}
+function sfxTap(){ if(!AC||!sfxBus) return; noiseHit(sfxBus, AC.currentTime, 0.06, 0.03, 2600); }
+function sfxHit(j){
+  if(!AC||!sfxBus) return;
+  const t=AC.currentTime;
+  const f = {perfect:1560, great:1120, good:820}[j];
+  tone(sfxBus,{t,f,d:0.07,vol:0.12,type:'triangle'});
+  tone(sfxBus,{t,f:f*1.5,d:0.05,vol:0.05,type:'sine'});
+}
+function sfxMiss(){ if(!AC||!sfxBus) return; tone(sfxBus,{t:AC.currentTime,f:150,f2:70,d:0.14,vol:0.12,type:'sawtooth'}); }
+
+/* =========================================================
+   音源解析：デコード → BPM → ビートグリッド → オンセット
+   ========================================================= */
+async function decodeFile(file, onStep){
+  initAudio();
+  onStep && onStep('音源をデコード中…', file.name);
+  const buf = await file.arrayBuffer();
+  return await AC.decodeAudioData(buf.slice(0));
+}
+
+function offlineBuffer(buffer, sr=11025){
+  const off = new OfflineAudioContext(1, Math.ceil(buffer.duration*sr), sr);
+  const src = off.createBufferSource(); src.buffer = buffer;
+  const lp = off.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=4800;
+  src.connect(lp); lp.connect(off.destination); src.start(0);
+  return off.startRendering();
+}
+
+async function analyzeBuffer(buffer, onStep){
+  onStep && onStep('波形を解析中…','低域・中域・高域に分解しています');
+  const sr = 22050;
+  const off = new OfflineAudioContext(1, Math.ceil(buffer.duration*sr), sr);
+  const src = off.createBufferSource(); src.buffer = buffer;
+  src.connect(off.destination); src.start(0);
+  const rendered = await off.startRendering();
+  const data = rendered.getChannelData(0);
+  const N = data.length;
+
+  // --- 3バンド分割（1次フィルタ）: 低域=キック/ベース, 中域=旋律, 高域=スネア/ハイハット ---
+  const low = new Float32Array(N), mid = new Float32Array(N), high = new Float32Array(N);
+  const aLow = 1 - Math.exp(-2*Math.PI*200/sr);
+  const aMid = 1 - Math.exp(-2*Math.PI*2200/sr);
+  let l1=0, l2=0;
+  for(let i=0;i<N;i++){
+    const x = data[i];
+    l1 += aLow*(x-l1);
+    l2 += aMid*(x-l2);
+    low[i]=l1; mid[i]=l2-l1; high[i]=x-l2;
+  }
+  const hop = Math.floor(sr*0.01), win = Math.floor(sr*0.02);
+  const frames = Math.max(1, Math.floor((N-win)/hop));
+  const energ = { low:new Float32Array(frames), mid:new Float32Array(frames), high:new Float32Array(frames) };
+  for(let f=0; f<frames; f++){
+    const s0=f*hop;
+    let el=0, em=0, eh=0;
+    for(let i=s0;i<s0+win;i++){ const a=low[i], b=mid[i], c=high[i]; el+=a*a; em+=b*b; eh+=c*c; }
+    energ.low[f]=Math.sqrt(el/win); energ.mid[f]=Math.sqrt(em/win); energ.high[f]=Math.sqrt(eh/win);
+  }
+
+  // --- バンドごとにオンセット検出 ---
+  onStep && onStep('オンセットを検出中…','音の立ち上がりからノーツの候補を作ります');
+  const onsetsAll = [];
+  const fluxByBand = {};
+  const bands = ['low','mid','high'];
+  const bias = { low:1.30, mid:1.05, high:0.85 };
+  for(const band of bands){
+    const E = energ[band];
+    const flux = new Float32Array(frames);
+    for(let f=1;f<frames;f++) flux[f] = Math.max(0, E[f]-E[f-1]);
+    fluxByBand[band]=flux;
+    const W = 12;
+    for(let f=2; f<frames-2; f++){
+      let mean=0, cnt=0;
+      for(let k=-W;k<=W;k++){ const g=f+k; if(g>=0 && g<frames){ mean+=flux[g]; cnt++; } }
+      mean /= cnt;
+      const v = flux[f];
+      if(v > mean*1.45 && v > 8e-5 && v >= flux[f-1] && v >= flux[f+1]){
+        onsetsAll.push({t: f*hop/sr + (win/sr)/2, band, strength: v*bias[band]});
+      }
+    }
+  }
+  onsetsAll.sort((a,b)=>a.t-b.t);
+
+  // --- 近接オンセットの統合 ---
+  const merged = [];
+  for(const o of onsetsAll){
+    const last = merged[merged.length-1];
+    if(last && o.t - last.t < 0.085){
+      if(o.strength > last.strength){ merged[merged.length-1] = o; }
+    } else merged.push(o);
+  }
+
+  // --- BPM推定 ---
+  onStep && onStep('BPMを推定中…','テンポにノーツをぴったり合わせます');
+  const bpm = estimateBPM(merged, buffer.duration);
+  const spb = 60/bpm;
+
+  // --- 位相合わせ ---
+  let phase = 0;
+  {
+    const strong = merged.slice(0, 80).sort((x,y)=>y.strength-x.strength)[0];
+    if(strong){ phase = strong.t - Math.round(strong.t/spb)*spb; }
+    let bestPhase = phase, bestScore = -1;
+    for(let p=-0.18; p<=0.1801; p+=0.005){
+      const ph = phase + p;
+      let sc = 0;
+      for(const o of merged){
+        const rel = (o.t - ph)/spb;
+        const err = Math.abs(rel - Math.round(rel))*spb;
+        const tol = Math.min(0.075, spb*0.15);
+        if(err < tol) sc += Math.min(1, o.strength*60)*(1 - err/tol);
+      }
+      if(sc > bestScore){ bestScore = sc; bestPhase = ph; }
+    }
+    phase = bestPhase;
+    phase = ((phase % spb) + spb) % spb;
+  }
+
+  // --- グリッドに吸着（16分単位） ---
+  const snapped = [];
+  for(const o of merged){
+    const rel = (o.t - phase)/spb;
+    const sub = Math.round(rel*4)/4;
+    const err = Math.abs(rel - sub)*spb;
+    const tol = Math.min(0.075, spb*0.16);
+    if(err <= tol && sub >= 0){
+      snapped.push({ t: phase + sub*spb, beat: sub, strength: o.strength, band: o.band,
+                     kind: (sub%1===0) ? 'beat' : (Math.abs(sub%0.5)<1e-6 ? 'off8' : '16th') });
+    }
+  }
+  snapped.sort((a,b)=>a.t-b.t);
+  // 同一時刻の統合（強さは合算、低域の帯を優先）
+  const notes0 = [];
+  for(const o of snapped){
+    const last = notes0[notes0.length-1];
+    if(last && Math.abs(o.t-last.t) < 0.025){
+      last.strength += o.strength*0.5;
+      if(o.band==='low') last.band='low';
+    } else notes0.push({...o});
+  }
+
+  // --- 強度しきい値（難易度＝密度） ---
+  const strengths = notes0.map(n=>n.strength).sort((a,b)=>a-b);
+  const q = k => strengths[Math.floor(clamp(k,0,1)*(strengths.length-1))] ?? 0;
+  const thr = Math.max(q(0.14), 6e-5);
+  let picked = notes0.filter(n => n.strength >= thr);
+
+  // --- 押せる密度に制限 ---
+  const minGap = Math.max(0.055, spb*0.115);
+  const compact = [];
+  for(const n of picked){
+    const last = compact[compact.length-1];
+    if(last && n.t - last.t < minGap){
+      if(n.strength > last.strength) compact[compact.length-1] = n;
+      continue;
+    }
+    compact.push(n);
+  }
+  picked = compact;
+
+  // --- レーン割当（キック=左、スネア=右、旋律=中央） ---
+  const notesWithLane = assignLanes(picked);
+  const finalNotes = buildLongs(notesWithLane, spb);
+
+  // --- 難易度 ---
+  let npsMax = 0;
+  for(let i=0;i<finalNotes.length;i++){
+    const t0 = finalNotes[i].t; let c=0;
+    for(let j=i;j<finalNotes.length && finalNotes[j].t < t0+1; j++) c++;
+    npsMax = Math.max(npsMax, c);
+  }
+  const level = clamp(Math.round(2 + npsMax*1.7), 2, 34);
+
+  return { notes:finalNotes, bpm, phase, level, duration:buffer.duration, npsMax };
+}
+
+function estimateBPM(onsets, duration){
+  if(onsets.length < 6) return 120;
+  const times = onsets.map(o=>o.t);
+  const str   = onsets.map(o=>o.strength);
+  const norm = (()=>{ const mx=Math.max(...str,1e-6); return str.map(v=>v/mx); })();
+
+  // 1) ペア差分ヒストグラムで候補ラグを抽出
+  const step = 0.004, bins = new Map();
+  for(let i=0;i<times.length;i++){
+    for(let j=i+1;j<Math.min(times.length, i+40);j++){
+      const d = times[j]-times[i];
+      if(d < 0.20) continue;
+      if(d > 2.2) break;
+      const k = Math.round(d/step);
+      bins.set(k, (bins.get(k)||0) + 1);
+    }
+  }
+  const sorted = [...bins.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12).map(([k])=>k*step);
+  if(!sorted.length) return 120;
+
+  // 2) 候補を倍音・分数に展開し、オンセットとの一致度で評価
+  const cand = new Set();
+  for(const p of sorted){
+    for(const mul of [0.5, 2/3, 1, 1.5, 2]){
+      let bpm = 60/(p*mul);
+      while(bpm < 70) bpm *= 2;
+      while(bpm > 200) bpm /= 2;
+      cand.add(Math.round(bpm*10)/10);
+    }
+  }
+  let best = {bpm:120, score:-1};
+  for(const bpm of cand){
+    const spb = 60/bpm;
+    // 位相を全探索（10ms 刻み）
+    for(let ph=-0.16; ph<=0.16; ph+=0.01){
+      let sc = 0;
+      for(let i=0;i<times.length && i<3000;i++){
+        const rel = (times[i] - ph)/spb;
+        const err = Math.abs(rel - Math.round(rel))*spb;
+        const tol = Math.min(0.07, spb*0.13);
+        if(err <= tol) sc += norm[i]*(1 - err/tol);
+      }
+      // テンポの好み（110〜180 BPM を優先）
+      const pref = (bpm>=110 && bpm<=180) ? 1.10 : (bpm>=90 && bpm<=200 ? 1.0 : 0.85);
+      const total = sc*pref;
+      if(total > best.score) best = {bpm, score:total, phase:ph};
+    }
+  }
+  return best.bpm;
+}
+
+function assignLanes(list){
+  const PREF = { low:[0,1,2,3], mid:[1,2,0,3], high:[3,2,1,0] };
+  const out = [];
+  const history = [];         // {t, lane}
+  const recentCount = (li, t, span) => {
+    let c=0;
+    for(let i=history.length-1;i>=0;i--){ const h=history[i]; if(t-h.t > span) break; if(h.lane===li) c++; }
+    return c;
+  };
+  for(const n of list){
+    const pref = PREF[n.band] || PREF.mid;
+    let bestLane = pref[0], bestScore = 1e9;
+    for(let li=0; li<4; li++){
+      const prefIdx = pref.indexOf(li);
+      let sc = prefIdx*0.9;
+      sc += recentCount(li, n.t, 1.6) * 1.7;                 // 同じレーンの連発を避ける
+      const last = [...history].reverse().find(h=>h.lane===li);
+      if(last && n.t - last.t < 0.10) sc += 9;               // 物理的に押せない連打
+      if(sc < bestScore){ bestScore = sc; bestLane = li; }
+    }
+    history.push({t:n.t, lane:bestLane});
+    out.push({ t:n.t, lane:bestLane, band:n.band, strength:n.strength, kind:n.kind });
+  }
+  return out;
+}
+
+function buildLongs(list, spb){
+  const out = [];
+  for(let i=0;i<list.length;i++){
+    const n = list[i];
+    let dur = 0;
+    // 旋律の伸ばし音っぽいところ（次が遠い）はホールドに
+    const nx = list.find(m => m.t > n.t + 0.001);
+    if(n.band === 'mid' && (!nx || nx.t - n.t > spb*1.5)){
+      dur = Math.min(spb*0.9, 1.1);
+    }
+    out.push({ t:n.t, lane:n.lane, dur, judged:false, holding:false, released:false, hit:false });
+  }
+  return out;
+}
+
+/* =========================================================
+   ゲーム本体
+   ========================================================= */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W=0,H=0,DPR=1;
+let field = {x:0,w:0,top:0,bottom:0,laneW:0};
+const LANE_COLORS = ['#ff5c8a','#59e0ff','#7cf79a','#ffd166'];
+
+const state = {
+  screen:'lobby',
+  song:null, chart:null,
+  t0:0, now:0, running:false, paused:false,
+  speed:6.0, offset:0,
+  score:0, combo:0, maxCombo:0,
+  counts:{perfect:0,great:0,good:0,miss:0},
+  life:80,
+  lanePressUntil:[0,0,0,0],
+  laneFlash:[-9,-9,-9,-9],
+  lastJudge:{text:'',t:-9,lane:0,color:'#fff'},
+  particles:[],
+  endHandled:false,
+  srcNode:null,
+};
+
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem('rb2_'+k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem('rb2_'+k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem('rb2_'+k); }catch(e){} }
+};
+
+/* ---------- IndexedDB（音源そのものは保存しない：譜面とメタのみ） ---------- */
+const idb = {
+  db:null,
+  open(){
+    return new Promise(res=>{
+      if(this.db) return res(this.db);
+      const rq = indexedDB.open('rhythmbeat', 1);
+      rq.onupgradeneeded = e => { const db = e.target.result; if(!db.objectStoreNames.contains('songs')) db.createObjectStore('songs',{keyPath:'id'}); };
+      rq.onsuccess = e => { this.db = e.target.result; res(this.db); };
+      rq.onerror = ()=>res(null);
+    });
+  },
+  async put(obj){
+    const db = await this.open(); if(!db) return;
+    return new Promise(res=>{
+      const tx = db.transaction('songs','readwrite');
+      tx.objectStore('songs').put(obj);
+      tx.oncomplete=()=>res(true); tx.onerror=()=>res(false);
+    });
+  },
+  async all(){
+    const db = await this.open(); if(!db) return [];
+    return new Promise(res=>{
+      const tx = db.transaction('songs','readonly');
+      const rq = tx.objectStore('songs').getAll();
+      rq.onsuccess = ()=>res(rq.result||[]); rq.onerror=()=>res([]);
+    });
+  },
+  async del(id){
+    const db = await this.open(); if(!db) return;
+    return new Promise(res=>{
+      const tx = db.transaction('songs','readwrite');
+      tx.objectStore('songs').delete(id);
+      tx.oncomplete=()=>res(true); tx.onerror=()=>res(false);
+    });
+  }
+};
+
+const __EMBEDDED_CHART = {"title":"別班儀礼曲","chartBpm":120,"bars":32,"beatsTotal":128,"durationAtChartBpm":64,"firstNoteBeat":0,"lastNoteBeat":127.75,"noteFormat":"[beat, lane(0-3), longBeats?]","sections":[{"name":"序奏","fromBar":1,"toBar":4,"desc":"行進の足音。少なめに置いて掴ませる"},{"name":"A","fromBar":5,"toBar":12,"desc":"主題。行進曲の基本リズム"},{"name":"B","fromBar":13,"toBar":20,"desc":"対照区。動きを増やす"},{"name":"A'","fromBar":21,"toBar":28,"desc":"主題再現。装飾を足す"},{"name":"結尾","fromBar":29,"toBar":32,"desc":"クライマックス→最後の一撃"}],"difficultyOrder":["5級","4級","3級","2級","1級","初段","2段","3段","4段","5段","6段","7段","8段","9段","10段","師範"],"sync":{"firstNoteBeat":0,"how":"音源を読み込むと最初のオンセット時刻を解析し、その時刻に「最初の1音(firstNoteBeat)」を合わせます。テンポは音源から検出したBPMで譜面を伸縮（拍の相対位置は保持）。"},"difficulties":[{"name":"5級","level":3,"noteCount":32,"avgNps":0.5,"lanes":[8,13,8,3],"n":[[0,1],[4,1],[8,1],[12,1],[16,1],[20,0],[24,1],[28,2],[32,1],[36,0],[40,2],[44,0],[48,1],[52,2],[56,0],[60,1],[64,2],[68,0],[72,1],[76,2],[80,0],[84,1],[88,2],[92,3],[96,0],[100,1],[104,2],[108,3],[112,1],[116,0],[120,2],[124,3]]},{"name":"4級","level":5,"noteCount":45,"avgNps":0.7,"lanes":[12,16,11,6],"n":[[0,1],[4,1],[8,1],[10,1],[12,1],[14,0],[16,1],[18,2],[20,1],[22,0],[24,2],[28,0],[30,1],[32,2],[36,0],[38,1],[40,2],[44,0],[46,2],[48,1],[52,0],[56,1],[60,2],[62,3],[64,0],[68,1],[72,2],[76,3],[78,1],[80,0],[82,2],[84,3],[88,0],[90,1],[92,2],[96,3],[100,0],[102,1],[104,2],[106,3],[108,1],[112,0],[116,2],[120,3],[124,0]]},{"name":"3級","level":7,"noteCount":75,"avgNps":1.17,"lanes":[20,23,19,13],"n":[[0,1],[2,1],[4,1],[6,1],[8,1],[10,0],[12,1],[14,2],[16,1],[18,0],[19,2],[20,0],[21,0],[22,1],[24,2],[26,1],[28,2],[30,0],[31,1],[32,2],[34,2],[36,0],[37,0],[38,1],[40,3],[42,1],[44,2],[46,3],[48,1],[50,2],[52,0],[54,3],[56,0],[58,2],[60,1],[62,3],[64,0],[66,1],[68,2],[70,3],[72,1],[74,0],[76,2],[78,3],[80,0],[82,1],[84,2],[86,3],[88,0],[90,2],[92,1],[94,3],[96,0],[98,1],[100,2],[101,0],[102,3],[104,1],[106,2],[108,3],[110,0],[112,1],[114,2],[116,3],[117,1],[118,0],[119,2],[120,3],[121,1],[122,0],[123,3],[124,2],[125,0],[126,0],[127,2]]},{"name":"2級","level":9,"noteCount":129,"avgNps":2.02,"lanes":[33,37,32,27],"n":[[0,1],[2,1],[4,1],[6,1],[8,1],[9,0],[10,1],[11,2],[12,1],[13,0],[14,2],[15,0],[16,1],[17,0],[18,2],[19,1],[20,2],[21,0],[22,1],[23,2],[24,0],[25,1],[25.5,2],[26,3],[28,0],[29,0],[30,1],[31,2],[32,3],[32.75,2],[34,3],[36,1],[37,0],[38,1],[39,2],[40,3],[40.5,0],[41.5,1],[42,2],[42.5,3],[43.5,3],[44,1],[44.75,2],[46,2],[48,0],[50,3],[52,0],[52.5,0],[53,1],[54,2],[55,3],[56,1],[57.5,3],[58,2],[58.75,3],[60,0],[61,0],[62,1],[63,1],[64,2],[65.5,0],[66,1],[66.5,2],[67.5,3],[68,1],[70,2],[72,0],[72.5,0],[73.5,3],[74,1],[75,3],[75.5,3],[76,2],[77,0],[78,2],[79,1],[80,0],[81,0],[82,1],[83,2],[84,3],[84.5,0],[85,1],[86,2],[86.5,3],[87,3],[88,1],[89,0],[90,2],[91,1],[92,2],[93.5,3],[94,3],[95.5,2],[96,0],[97,1],[98,0],[98.5,2],[99,3],[100,1],[101,0],[102,1],[103,2],[104,3],[106,2],[108,0],[108.5,0],[109,1],[110,3],[110.5,2],[111,3],[112,1],[112.5,0],[113,1],[114,2],[115,3],[115.5,3],[116,0],[117,2],[118,0],[119,1],[120,2],[121,3],[122,0],[123,1],[124,1],[125,2],[126,0],[127,3]]},{"name":"1級","level":11,"noteCount":211,"avgNps":3.3,"lanes":[54,58,52,47],"n":[[0,1],[1,3],[2,1],[4,1],[5,3],[6,1],[8,1],[8.5,0],[9,0],[9.5,2],[10,1],[10.5,1],[11,2],[11.5,2],[12,0],[12.5,1],[13,0],[13.5,2],[14,1],[14.5,0],[15,1],[15.5,2],[16,0],[16.5,1],[17,0],[17.5,2],[18,1],[18.5,2],[19,1],[20,0],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.5,3],[24,0],[24.5,0],[25,1],[25.5,2],[26,3],[26.5,2],[27,3],[27.5,3],[28,1],[28.5,0],[29,0],[29.5,2],[30,1],[31,2],[31.5,3],[32,1],[32.75,2],[33.5,3],[34,2],[34.75,3],[35.5,2],[36,0],[37,0],[37.5,3],[38,1],[39,1],[39.5,2],[40,0],[40.5,0],[41,1],[41.5,1],[42,3],[42.5,3],[43,3],[43.5,3],[44,1],[44.75,2],[45.5,3],[46,2],[46.75,3],[47.5,2],[48,0],[48.75,2],[49.5,3],[50,2],[50.75,3],[51.5,2],[52,0],[52.5,0],[53,1],[53.5,1],[54,0],[54.5,2],[55,3],[55.5,3],[56,1],[56.75,2],[57.5,3],[58,2],[58.75,3],[59.5,2],[60,0],[60.5,1],[61,0],[61.5,2],[62,1],[63,0],[63.5,2],[64,1],[64.5,0],[65,1],[65.5,0],[66,1],[66.5,3],[67,3],[67.5,3],[68,0],[68.75,2],[69.5,3],[70,2],[70.75,3],[71.5,2],[72,1],[72.5,0],[73,1],[73.5,0],[74,1],[74.5,2],[75,3],[75.5,3],[76,0],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,0],[79,1],[79.5,2],[80,0],[80.5,1],[81,0],[81.5,3],[82,1],[82.5,0],[83,1],[83.5,2],[84,0],[84.5,0],[85,1],[85.5,2],[86,1],[86.5,3],[87,3],[87.5,3],[88,0],[89,0],[89.5,2],[90,1],[90.5,1],[91,2],[91.5,2],[92,0],[92.75,3],[93.5,3],[94,2],[94.75,3],[95.5,2],[96,1],[96.5,0],[97,1],[97.5,0],[98,1],[98.5,2],[99,3],[99.5,3],[100,0],[100.5,1],[101,0],[102,1],[102.5,2],[103,0],[104,1],[104.75,2],[105.5,3],[106,2],[106.75,3],[107.5,2],[108,0],[108.5,0],[109,1],[109.5,1],[110,3],[110.5,3],[111,3],[111.5,3],[112,0],[112.5,0],[113,1],[113.5,2],[114,1],[114.5,2],[115,3],[115.5,3],[116,0],[117,1],[118,0],[119,2],[120,1],[121,2],[122,0],[123,1],[124,2],[125,0],[126,0],[127,1]]},{"name":"初段","level":13,"noteCount":234,"avgNps":3.66,"lanes":[60,63,58,53],"n":[[0,1],[1,3],[2,1],[3,2],[4,1],[5,3],[6,1],[7,2],[8,1],[8.5,0],[9,0],[9.5,2],[10,1],[10.5,1],[11,0],[11.5,2],[12,1],[12.5,0],[13,0],[13.5,2],[14,1],[14.5,1],[15,0],[15.5,2],[16,1],[16.5,0],[17,0],[17.5,2],[18,1],[18.5,1],[19,2],[19.5,3],[20,0],[20.5,1],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.5,3],[24,1],[24.5,0],[25,2],[25.5,3],[26,0],[26.5,2],[27,3],[27.5,3],[28,1],[28.5,0],[29,0],[29.5,2],[30,1],[30.5,1],[31,2],[31.5,3],[32,0],[32.75,2],[33.5,3],[34,2],[34.75,3],[35.5,2],[36,1],[36.5,0],[37,0],[37.5,3],[38,1],[38.5,1],[39,1],[39.5,3],[40,0],[40.5,0],[41,2],[41.5,2],[42,1],[42.5,3],[43,3],[43.5,3],[44,0],[44.75,2],[45.5,3],[46,2],[46.75,3],[47.5,2],[48,1],[48.75,2],[49.5,3],[50,2],[50.75,3],[51.5,2],[52,0],[52.5,0],[53,1],[53.5,1],[54,0],[54.5,2],[55,3],[55.5,3],[56,1],[56.75,2],[57.5,3],[58,2],[58.75,3],[59.5,2],[60,0],[60.5,1],[61,0],[61.5,2],[62,1],[62.5,0],[63,1],[63.5,3],[64,0],[64.5,0],[65,1],[65.5,1],[66,0],[66.5,2],[67,3],[67.5,3],[68,1],[68.75,2],[69.5,3],[70,2],[70.75,3],[71.5,2],[72,0],[72.5,0],[73,1],[73.5,1],[74,0],[74.5,3],[75,3],[75.5,3],[76,1],[76.5,0],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.5,2],[80,1],[80.5,0],[81,0],[81.5,2],[82,1],[82.5,1],[83,0],[83.5,2],[84,1],[84.5,0],[85,3],[85.5,1],[86,2],[86.5,3],[87,3],[87.5,3],[88,0],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,2],[91,3],[91.5,2],[92,0],[92.75,2],[93.5,3],[94,2],[94.75,3],[95.5,2],[96,1],[96.5,0],[97,1],[97.5,0],[98,1],[98.5,3],[99,3],[99.5,3],[100,0],[100.5,1],[101,0],[101.5,2],[102,1],[102.5,0],[103,1],[103.5,2],[104,0],[104.75,3],[105.5,3],[106,2],[106.75,3],[107.5,2],[108,1],[108.5,0],[109,1],[109.5,0],[110,1],[110.5,2],[111,3],[111.5,3],[112,0],[112.5,0],[113,1],[113.5,2],[114,1],[114.5,2],[115,3],[115.5,3],[116,0],[116.5,3],[117,1],[117.5,2],[118,0],[118.5,1],[119,2],[119.5,0],[120,1],[120.5,3],[121,2],[121.5,2],[122,0],[122.5,1],[123,1],[123.5,0],[124,3],[124.5,3],[125,2],[125.5,2],[126,0],[126.5,1],[127,0],[127.5,0]]},{"name":"2段","level":15,"noteCount":258,"avgNps":4.03,"lanes":[66,69,64,59],"n":[[0,1],[1,3],[2,1],[3,2],[4,1],[5,3],[6,1],[7,2],[8,1],[8.5,0],[9,0],[9.5,2],[10,1],[10.5,1],[11,0],[11.5,2],[12,1],[12.5,0],[13,0],[13.5,2],[14,1],[14.5,1],[15,0],[15.5,2],[16,1],[16.5,0],[17,0],[17.5,2],[18,1],[18.5,1],[19,2],[19.5,3],[20,0],[20.5,1],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.5,3],[24,1],[24.5,0],[25,2],[25.25,3],[25.5,0],[26,1],[26.5,2],[27,3],[27.5,3],[28,0],[28.5,2],[29,0],[29.5,2],[30,1],[30.5,1],[31,3],[31.5,2],[32,0],[32.5,0],[32.75,3],[33.5,3],[34,2],[34.75,3],[35.5,2],[36,1],[36.5,1],[37,0],[37.5,3],[38,1],[38.5,1],[39,0],[39.5,2],[40,0],[40.5,0],[41,2],[41.25,3],[41.5,1],[42,1],[42.5,2],[43,3],[43.25,2],[43.5,3],[44,0],[44.75,2],[45.5,3],[46,2],[46.5,0],[46.75,3],[47.5,3],[48,1],[48.5,0],[48.75,2],[49.5,3],[50,2],[50.75,3],[51.5,2],[52,1],[52.5,0],[53,1],[53.5,1],[54,0],[54.5,2],[55,3],[55.25,2],[55.5,3],[56,1],[56.75,2],[57.5,3],[58,2],[58.75,3],[59.25,0],[59.5,2],[60,1],[60.5,0],[61,0],[61.5,3],[62,1],[62.5,1],[63,0],[63.5,2],[64,1],[64.25,3],[64.5,0],[65,1],[65.5,0],[66,1],[66.25,3],[66.5,2],[67,3],[67.5,3],[68,0],[68.5,0],[68.75,2],[69.25,1],[69.5,3],[70,2],[70.5,0],[70.75,3],[71.5,2],[72,1],[72.25,3],[72.5,0],[73,1],[73.5,1],[74,0],[74.5,2],[75,3],[75.25,2],[75.5,3],[76,1],[76.5,0],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.5,2],[80,1],[80.5,0],[81,0],[81.5,2],[82,1],[82.5,1],[83,3],[83.5,3],[84,0],[84.5,0],[85,1],[85.25,2],[85.5,2],[86,3],[86.5,2],[87,3],[87.25,2],[87.5,3],[88,1],[88.5,0],[89,0],[89.5,2],[90,1],[90.5,1],[91,0],[91.5,3],[92,1],[92.75,2],[93.5,3],[94,3],[94.5,0],[94.75,3],[95.5,2],[96,1],[96.5,0],[97,1],[97.25,2],[97.5,0],[98,1],[98.5,2],[99,3],[99.25,2],[99.5,3],[100,0],[100.5,1],[101,0],[101.5,2],[102,1],[102.5,0],[103,1],[103.5,3],[104,0],[104.5,0],[104.75,2],[105.5,3],[106,2],[106.75,3],[107.5,2],[108,1],[108.25,3],[108.5,0],[109,1],[109.5,1],[110,1],[110.5,2],[111,3],[111.5,3],[112,0],[112.5,0],[113,1],[113.25,2],[113.5,1],[114,3],[114.5,2],[115,3],[115.25,2],[115.5,3],[116,0],[116.5,3],[117,0],[117.5,2],[118,0],[118.5,1],[119,1],[119.5,0],[120,1],[120.5,3],[121,2],[121.5,2],[122,0],[122.5,1],[123,0],[123.5,0],[124,1],[124.5,3],[125,2],[125.5,2],[126,0],[126.5,3],[127,1],[127.5,0]]},{"name":"3段","level":17,"noteCount":286,"avgNps":4.47,"lanes":[76,75,70,65],"n":[[0,0],[0,1],[1,3],[2,1],[3,2],[4,0],[4,1],[5,3],[6,1],[7,2],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,1],[11,1],[11.5,2],[12,0],[12,1],[12.5,2],[13,0],[13.5,2],[14,1],[14.5,0],[15,1],[15.5,2],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.5,2],[20,0],[20,1],[20.5,3],[21,0],[21.5,2],[22,1],[22.5,3],[23,0],[23.5,2],[24,0],[24,1],[24.5,0],[25,3],[25.5,2],[26,1],[26,3],[26.5,2],[27,3],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,1],[30.5,2],[31,3],[31.5,2],[32,1],[32,3],[32.75,3],[33.25,0],[33.5,3],[34,1],[34,2],[34.75,3],[35.5,2],[36,0],[36,1],[36.5,0],[37,0],[37.5,2],[38,1],[38.5,0],[39,1],[39.5,2],[40,0],[40,3],[40.5,0],[41,1],[41.5,2],[42,2],[42,3],[42.5,3],[43,3],[43.5,3],[44,1],[44,3],[44.75,2],[45.5,3],[46,0],[46,2],[46.5,0],[46.75,3],[47.5,2],[48,1],[48,3],[48.5,0],[48.75,2],[49.5,3],[50,1],[50,2],[50.75,3],[51.5,2],[52,0],[52,1],[52.5,0],[53,1],[53.5,1],[54,0],[54,2],[54.5,2],[55,3],[55.5,3],[56,1],[56,3],[56.75,2],[57.25,0],[57.5,3],[58,1],[58,2],[58.75,3],[59.5,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.5,2],[64,0],[64,1],[64.5,0],[65,1],[65.5,1],[66,0],[66,2],[66.5,3],[67,3],[67.5,3],[68,1],[68,3],[68.75,2],[69.5,3],[70,0],[70,2],[70.75,3],[71.5,2],[72,0],[72,1],[72.5,0],[73,1],[73.5,1],[74,0],[74,2],[74.5,2],[75,3],[75.5,3],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,0],[79,1],[79.5,2],[80,0],[80,1],[80.5,2],[81,0],[81.5,3],[82,1],[82.5,2],[83,3],[83.5,2],[84,0],[84,1],[84.5,0],[85,3],[85.5,1],[86,2],[86,3],[86.5,2],[87,3],[87.5,3],[88,0],[88,1],[88.5,0],[89,0],[89.5,2],[90,1],[90.5,1],[91,2],[91.5,3],[92,0],[92,3],[92.75,2],[93.5,3],[94,1],[94,2],[94.75,3],[95.5,2],[96,0],[96,1],[96.5,0],[97,1],[97.5,1],[98,2],[98,3],[98.5,2],[99,3],[99.5,3],[100,0],[100,1],[100.5,0],[101,0],[101.5,2],[102,1],[102.5,1],[103,3],[103.5,2],[104,0],[104,3],[104.75,2],[105.5,3],[106,0],[106,2],[106.75,3],[107.5,2],[108,0],[108,1],[108.5,0],[109,1],[109.5,1],[110,0],[110,2],[110.5,3],[111,3],[111.5,3],[112,1],[112,2,1],[112.5,0],[113,1],[113.5,0],[114,1],[114,2],[114.5,2],[115,3],[115.5,3],[116,0],[116,1],[117,0],[117,2],[118,0],[118,1],[118.5,1],[119,0],[119,3],[120,0],[120,2],[121,1],[121,2],[122,0],[123,0],[123,3],[123.5,0],[124,0],[124,1],[125,2],[125,3],[125.5,2],[126,0],[126,1],[127,0],[127,3],[127.5,0]]},{"name":"4段","level":19,"noteCount":327,"avgNps":5.11,"lanes":[85,86,80,76],"n":[[0,0],[0,1],[1,3],[2,1],[3,2],[4,0],[4,1],[5,3],[6,1],[7,2],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,1],[11,1],[11.5,2],[12,0],[12,1],[12.5,2],[13,0],[13.5,2],[14,1],[14.5,0],[15,1],[15.5,2],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.5,2],[20,0],[20,1],[20.5,3],[21,0],[21.5,2],[22,1],[22.5,3],[23,0],[23.5,2],[24,0],[24,1],[24.5,0],[25,3],[25.25,2],[25.5,1],[26,2],[26,3],[26.5,3],[27,3],[27.25,2],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,1],[30.5,1],[31,0],[31.5,2],[32,2],[32,3],[32.5,0],[32.75,3],[33.25,1],[33.5,3],[34,0],[34,2],[34.5,0],[34.75,3],[35.25,1],[35.5,2],[36,0],[36,1],[36.5,1],[37,0],[37.5,2],[38,3],[38.5,1],[39,2],[39.5,3],[40,0],[40,1],[40.5,0],[41,2],[41.25,3],[41.5,1],[42,2],[42,3],[42.5,2],[43,3],[43.25,2],[43.5,3],[44,0],[44,3],[44.75,2],[45.25,1],[45.5,3],[46,0],[46,2],[46.5,0],[46.75,3],[47.25,1],[47.5,2],[48,1],[48,3],[48.5,0],[48.75,2],[49.25,1],[49.5,3],[50,0],[50,2],[50.5,0],[50.75,3],[51.5,2],[52,0],[52,1],[52.5,0],[53,1],[53.5,1],[54,1],[54,2],[54.5,3],[55,3],[55.25,2],[55.5,3],[56,0],[56,3],[56.75,2],[57.25,1],[57.5,3],[58,0],[58,2],[58.5,0],[58.75,3],[59.25,1],[59.5,2],[60,0],[60,1],[60.5,1],[61,0],[61.5,2],[62,1],[62.5,0],[63,1],[63.5,2],[64,0],[64,1],[64.25,3],[64.5,0],[65,1],[65.5,2],[66,2],[66,3],[66.25,3],[66.5,3],[67,3],[67.5,3],[68,0],[68,3],[68.5,0],[68.75,2],[69.25,1],[69.5,3],[70,1],[70,2],[70.5,0],[70.75,3],[71.5,2],[72,0],[72,1],[72.25,3],[72.5,0],[73,1],[73.5,1],[74,2],[74,3],[74.5,2],[75,3],[75.25,2],[75.5,3],[76,0],[76,1],[76.5,0],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.5,2],[80,0],[80,1],[80.5,1],[81,0],[81.5,2],[82,1],[82.5,2],[83,0],[83.5,2],[84,0],[84,1],[84.5,0],[85,3],[85.25,2],[85.5,1],[86,2],[86,3],[86.5,3],[87,3],[87.25,2],[87.5,3],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,1],[91,3],[91.5,2],[92,0],[92,3],[92.5,0],[92.75,2],[93.25,1],[93.5,3],[94,0],[94,2],[94.5,0],[94.75,3],[95.5,2],[96,0],[96,1],[96.5,0],[97,1],[97.25,2],[97.5,1],[98,2],[98,3],[98.5,3],[99,3],[99.25,2],[99.5,3],[100,0],[100,1],[100.5,1],[101,0],[101.5,2],[102,1],[102.5,3],[103,0],[103.5,2],[104,1],[104,3],[104.5,0],[104.75,2],[105.25,1],[105.5,3],[106,1],[106,2],[106.75,3],[107.5,2],[108,0],[108,1],[108.25,3],[108.5,0],[109,1],[109.5,0],[110,2],[110,3],[110.5,2],[111,3],[111.5,3],[112,1],[112,2,1],[112.5,0],[113,1],[113.25,2],[113.5,0],[114,0],[114,2],[114.5,3],[115,3],[115.5,3],[116,0],[116,1],[116.5,3],[117,1],[117,2],[117.5,2],[118,0],[118,1],[118.5,0],[119,0],[119,1],[119.5,0],[120,0],[120,1],[120.5,3],[121,2],[121,3],[121.5,2],[122,0],[122,1],[122.5,1],[123,0],[123,2],[123.5,0],[124,0],[124,3],[124.5,3],[125,1],[125,2],[125.5,2],[126,0],[126,1],[126.5,1],[127,0],[127,3],[127.5,0]]},{"name":"5段","level":21,"noteCount":331,"avgNps":5.17,"lanes":[86,87,81,77],"n":[[0,0],[0,1],[1,3],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[5,3],[5.5,1],[6,1],[6.5,2],[7,2],[8,0],[8,1],[8.5,0],[9,0],[9.5,2],[10,1],[10.5,1],[11,2],[11.5,2],[12,0],[12,1],[12.5,0],[13,0],[13.5,2],[14,1],[14.5,1],[15,2],[15.5,3],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.5,2],[20,0],[20,1],[20.5,3],[21,0],[21.5,2],[22,1],[22.5,3],[23,0],[23.5,2],[24,0],[24,1],[24.5,0],[25,3],[25.25,2],[25.5,1],[26,2],[26,3],[26.5,3],[27,3],[27.25,2],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,1],[30.5,1],[31,3],[31.5,2],[32,0],[32,3],[32.5,0],[32.75,2],[33.25,1],[33.5,3],[34,0],[34,2],[34.5,0],[34.75,3],[35.25,1],[35.5,2],[36,0],[36,1],[36.5,1],[37,0],[37.5,2],[38,3],[38.5,1],[39,2],[39.5,3],[40,0],[40,1],[40.5,0],[41,2],[41.25,3],[41.5,1],[42,2],[42,3],[42.5,2],[43,3],[43.25,2],[43.5,3],[44,0],[44,3],[44.75,2],[45.25,1],[45.5,3],[46,0],[46,2],[46.5,0],[46.75,3],[47.25,1],[47.5,2],[48,1],[48,3],[48.5,0],[48.75,2],[49.25,1],[49.5,3],[50,0],[50,2],[50.5,0],[50.75,3],[51.5,2],[52,0],[52,1],[52.5,0],[53,1],[53.5,1],[54,1],[54,2],[54.5,3],[55,3],[55.25,2],[55.5,3],[56,0],[56,3],[56.75,2],[57.25,1],[57.5,3],[58,0],[58,2],[58.5,0],[58.75,3],[59.25,1],[59.5,2],[60,0],[60,1],[60.5,1],[61,0],[61.5,2],[62,1],[62.5,0],[63,1],[63.5,2],[64,0],[64,1],[64.25,3],[64.5,0],[65,1],[65.5,2],[66,2],[66,3],[66.25,3],[66.5,2],[67,3],[67.5,3],[68,0],[68,3],[68.5,0],[68.75,2],[69.25,1],[69.5,3],[70,1],[70,2],[70.5,0],[70.75,3],[71.5,2],[72,0],[72,1],[72.25,3],[72.5,0],[73,1],[73.5,1],[74,0],[74,2],[74.5,2],[75,3],[75.25,2],[75.5,3],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,0],[79,1],[79.5,2],[80,0],[80,1],[80.5,3],[81,0],[81.5,2],[82,1],[82.5,3],[83,0],[83.5,2],[84,0],[84,1],[84.5,0],[85,3],[85.25,2],[85.5,1],[86,2],[86,3],[86.5,3],[87,3],[87.25,2],[87.5,3],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,1],[91,3],[91.5,2],[92,0],[92,3],[92.5,0],[92.75,2],[93.25,1],[93.5,3],[94,0],[94,2],[94.5,0],[94.75,3],[95.5,2],[96,0],[96,1],[96.5,0],[97,1],[97.25,2],[97.5,1],[98,2],[98,3],[98.5,3],[99,3],[99.25,2],[99.5,3],[100,0],[100,1],[100.5,1],[101,0],[101.5,2],[102,1],[102.5,3],[103,0],[103.5,2],[104,1],[104,3],[104.5,0],[104.75,2],[105.25,1],[105.5,3],[106,1],[106,2],[106.75,3],[107.5,2],[108,0],[108,1],[108.25,3],[108.5,0],[109,1],[109.5,0],[110,2],[110,3],[110.5,2],[111,3],[111.5,3],[112,1],[112,2,1],[112.5,0],[113,0],[113.25,2],[113.5,1],[114,0],[114,2],[114.5,3],[115,3],[115.5,3],[116,0],[116,1],[116.5,3],[117,1],[117,2],[117.5,2],[118,0],[118,1],[118.5,0],[119,0],[119,1],[119.5,0],[120,0],[120,1],[120.5,3],[121,2],[121,3],[121.5,2],[122,0],[122,1],[122.5,1],[123,0],[123,2],[123.5,0],[124,0],[124,1],[124.5,3],[125,2],[125,3],[125.5,2],[126,0],[126,1],[126.5,1],[127,0],[127,3],[127.5,0]]},{"name":"6段","level":23,"noteCount":374,"avgNps":5.84,"lanes":[95,98,92,89],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,2],[11,0],[11.5,2],[12,0],[12,1],[12.5,1],[13,0],[13.5,2],[14,3],[14.5,1],[15,2],[15.5,3],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.5,2],[20,0],[20,1],[20.5,3],[21,0],[21.5,2],[22,1],[22.5,3],[23,0],[23.5,2],[24,0],[24,1],[24.25,3],[24.5,0],[25,1],[25.25,2],[25.5,3],[26,1],[26,2],[26.25,3],[26.5,2],[27,3],[27.25,3],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,0],[30.5,2],[31,1],[31.5,2],[32,0],[32,3],[32.5,0],[32.75,2],[33,3],[33.25,1],[33.5,3],[34,1],[34,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[36,0],[36,1],[36.5,0],[37,0],[37.5,2],[38,1],[38.5,1],[39,2],[39.5,3],[40,0],[40,1],[40.25,3],[40.5,0],[41,2],[41.25,2],[41.5,1],[42,2],[42,3],[42.25,3],[42.5,2],[43,3],[43.25,2],[43.5,3],[44,0],[44,3],[44.5,0],[44.75,2],[45.25,1],[45.5,3],[46,1],[46,2],[46.25,2],[46.5,0],[46.75,3],[47.25,1],[47.5,2],[48,0],[48,3],[48.5,0],[48.75,3],[49.25,1],[49.5,3],[49.75,3],[50,1],[50,2],[50.5,0],[50.75,3],[51.25,1],[51.5,2],[52,0],[52,1],[52.25,3],[52.5,0],[53,1],[53.25,2],[53.5,0],[54,1],[54,2],[54.25,3],[54.5,2],[55,3],[55.25,2],[55.5,3],[56,0],[56,3],[56.5,0],[56.75,2],[57.25,1],[57.5,3],[58,1],[58,2],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.5,2],[64,0],[64,1],[64.25,3],[64.5,0],[65,1],[65.25,2],[65.5,1],[66,0],[66,2],[66.25,3],[66.5,2],[67,3],[67.25,2],[67.5,3],[68,1],[68,3],[68.5,0],[68.75,2],[69.25,1],[69.5,3],[70,0],[70,2],[70.5,0],[70.75,3],[71.25,1],[71.5,2],[72,0],[72,1],[72.25,3],[72.5,0],[73,1],[73.25,2],[73.5,1],[74,0],[74,2],[74.25,3],[74.5,2],[75,3],[75.25,2],[75.5,3],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.5,2],[80,0],[80,1],[80.5,1],[81,0],[81.5,3],[82,1],[82.5,0],[83,0],[83.5,2],[84,0],[84,1],[84.25,3],[84.5,0],[85,1],[85.25,2],[85.5,3],[86,1],[86,2],[86.25,3],[86.5,2],[87,3],[87.25,2],[87.5,3],[88,0],[88,1],[88.5,0],[89,0],[89.5,2],[90,1],[90.5,3],[91,1],[91.5,2],[92,2],[92,3],[92.25,3],[92.5,0],[92.75,2],[93.25,1],[93.5,3],[94,0],[94,2],[94.5,0],[94.75,3],[95.25,1],[95.5,2],[96,0],[96,1],[96.25,3],[96.5,0],[97,1],[97.25,2],[97.5,1],[98,1],[98,3],[98.25,3],[98.5,2],[99,3],[99.25,2],[99.5,3],[100,0],[100,1],[100.5,0],[101,0],[101.5,2],[102,1],[102.5,0],[103,1],[103.5,2],[104,0],[104,3],[104.5,0],[104.75,2],[105.25,1],[105.5,3],[105.75,3],[106,1],[106,2],[106.5,0],[106.75,3],[107.25,1],[107.5,2],[108,0],[108,1],[108.25,3],[108.5,0],[109,1],[109.25,2],[109.5,3],[110,0],[110,2],[110.25,3],[110.5,2],[111,3],[111.25,2],[111.5,3],[112,1],[112,2,1],[112.25,3],[112.5,0],[113,1],[113.25,2],[113.5,1],[114,0],[114,2],[114.25,3],[114.5,2],[115,3],[115.25,2],[115.5,3],[116,0],[116,1],[116.5,3],[117,1],[117,2],[117.5,2],[118,0],[118,1],[118.5,0],[119,0],[119,1],[119.25,3],[119.5,0],[120,0],[120,1],[120.5,3],[121,1],[121,2],[121.5,2],[122,0],[122,1],[122.5,0],[122.75,3],[123,0],[123,1],[123.5,0],[124,0],[124,1],[124.5,3],[124.75,2],[125,1],[125,2],[125.5,3],[126,0],[126,1],[126.5,1],[127,0],[127,3],[127.25,3],[127.5,0]]},{"name":"7段","level":25,"noteCount":377,"avgNps":5.89,"lanes":[96,99,93,89],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,2],[11,0],[11.5,2],[11.75,3],[12,0],[12,1],[12.5,1],[13,0],[13.5,2],[14,1],[14.5,2],[15,3],[15.5,2],[16,0],[16,1],[16.5,3],[17,0],[17.5,2],[18,1],[18.5,3],[19,0],[19.25,1],[19.5,2],[20,0],[20,3],[20.5,2],[21,0],[21.5,3],[22,1],[22.5,1],[23,2],[23.5,3],[24,0],[24,1],[24.25,3],[24.5,0],[25,2],[25.25,2],[25.5,1],[26,2],[26,3],[26.25,3],[26.5,3],[27,3],[27.25,2],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,0],[30.5,1],[31,0],[31.5,2],[32,1],[32,3],[32.5,0],[32.75,2],[33,2],[33.25,1],[33.5,3],[34,0],[34,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[36,0],[36,1],[36.5,1],[37,0],[37.5,2],[38,1],[38.5,3],[39,0],[39.5,2],[40,0],[40,1],[40.25,3],[40.5,0],[41,1],[41.25,2],[41.5,3],[42,1],[42,2],[42.25,3],[42.5,2],[43,3],[43.25,2],[43.5,3],[44,0],[44,3],[44.5,0],[44.75,2],[45.25,1],[45.5,3],[46,1],[46,2],[46.25,2],[46.5,0],[46.75,3],[47.25,1],[47.5,2],[48,0],[48,3],[48.5,0],[48.75,3],[49.25,1],[49.5,3],[49.75,3],[50,1],[50,2],[50.5,0],[50.75,3],[51.25,1],[51.5,2],[52,0],[52,1],[52.25,3],[52.5,0],[53,1],[53.25,2],[53.5,0],[54,1],[54,2],[54.25,3],[54.5,2],[55,3],[55.25,2],[55.5,3],[56,0],[56,3],[56.5,0],[56.75,2],[57.25,1],[57.5,3],[58,1],[58,2],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.5,2],[64,0],[64,1],[64.25,3],[64.5,0],[65,1],[65.25,2],[65.5,1],[66,0],[66,2],[66.25,3],[66.5,2],[67,3],[67.25,2],[67.5,3],[68,1],[68,3],[68.5,0],[68.75,2],[69.25,1],[69.5,3],[70,0],[70,2],[70.5,0],[70.75,3],[71.25,1],[71.5,2],[72,0],[72,1],[72.25,3],[72.5,0],[73,1],[73.25,2],[73.5,1],[74,0],[74,2],[74.25,3],[74.5,2],[75,3],[75.25,2],[75.5,3],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.25,1],[79.5,2],[80,0],[80,1],[80.5,3],[81,0],[81.5,2],[82,0],[82.5,1],[83,3],[83.5,2],[84,0],[84,1],[84.25,3],[84.5,0],[85,1],[85.25,2],[85.5,3],[86,0],[86,2],[86.25,3],[86.5,2],[87,3],[87.25,2],[87.5,3],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,3],[91,0],[91.5,2],[92,1],[92,3],[92.25,3],[92.5,0],[92.75,2],[93.25,1],[93.5,3],[94,1],[94,2],[94.5,0],[94.75,3],[95.25,1],[95.5,2],[96,0],[96,1],[96.25,3],[96.5,0],[97,1],[97.25,2],[97.5,0],[98,1],[98,2],[98.25,3],[98.5,2],[99,3],[99.25,2],[99.5,3],[100,0],[100,1],[100.5,0],[101,0],[101.5,2],[102,1],[102.5,0],[103,1],[103.5,3],[104,0],[104,3],[104.5,0],[104.75,2],[105.25,1],[105.5,3],[105.75,3],[106,1],[106,2],[106.5,0],[106.75,3],[107.25,1],[107.5,2],[108,0],[108,1],[108.25,3],[108.5,0],[109,2],[109.25,2],[109.5,1],[110,1],[110,2],[110.25,3],[110.5,2],[111,3],[111.25,2],[111.5,3],[112,0],[112,2,1],[112.25,3],[112.5,0],[113,1],[113.25,2],[113.5,1],[114,0],[114,3],[114.25,3],[114.5,2],[115,3],[115.25,2],[115.5,3],[116,0],[116,1],[116.5,3],[117,1],[117,2],[117.5,2],[118,0],[118,1],[118.5,0],[119,0],[119,1],[119.25,3],[119.5,0],[120,0],[120,1],[120.5,3],[121,1],[121,2],[121.5,2],[122,0],[122,1],[122.5,0],[122.75,2],[123,0],[123,1],[123.5,0],[124,0],[124,3],[124.5,3],[124.75,2],[125,1],[125,2],[125.5,3],[126,0],[126,1],[126.5,1],[127,0],[127,1],[127.25,3],[127.5,0]]},{"name":"8段","level":27,"noteCount":415,"avgNps":6.48,"lanes":[104,108,103,100],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,2],[11,0],[11.25,1],[11.5,2],[11.75,3],[12,0],[12,1],[12.5,2],[13,0],[13.5,2],[14,1],[14.5,3],[15,0],[15.25,1],[15.5,2],[15.75,3],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.25,0],[19.5,2],[19.75,3],[20,0],[20,1],[20.5,1],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.5,3],[24,0],[24,1],[24.25,3],[24.5,0],[24.75,0],[25,2],[25.25,2],[25.5,1],[26,2],[26,3],[26.25,3],[26.5,2],[26.75,0],[27,3],[27.25,2],[27.5,3],[28,0],[28,1],[28.5,1],[29,0],[29.5,2],[30,1],[30.5,1],[31,3],[31.5,2],[32,0],[32,3],[32.5,0],[32.75,2],[33,3],[33.25,1],[33.5,3],[33.75,3],[34,1],[34,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[35.75,2],[36,0],[36,1],[36.5,0],[37,0],[37.5,2],[38,1],[38.5,1],[39,0],[39.25,1],[39.5,2],[40,0],[40,3],[40.25,3],[40.5,0],[41,1],[41.25,2],[41.5,2],[41.75,3],[42,1],[42,2],[42.25,3],[42.5,2],[43,3],[43.25,2],[43.5,3],[43.75,0],[44,1],[44,3],[44.5,0],[44.75,2],[45.25,1],[45.5,3],[46,0],[46,2],[46.25,3],[46.5,0],[46.75,3],[47,3],[47.25,1],[47.5,2],[48,1],[48,3],[48.25,3],[48.5,0],[48.75,2],[49.25,1],[49.5,3],[49.75,3],[50,0],[50,2],[50.5,0],[50.75,3],[51,3],[51.25,1],[51.5,2],[52,0],[52,1],[52.25,3],[52.5,0],[53,1],[53.25,2],[53.5,1],[54,0],[54,2],[54.25,3],[54.5,2],[54.75,0],[55,3],[55.25,2],[55.5,3],[56,1],[56,3],[56.5,0],[56.75,2],[57.25,1],[57.5,3],[57.75,3],[58,1],[58,2],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[59.75,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.5,2],[64,0],[64,1],[64.25,3],[64.5,0],[64.75,0],[65,1],[65.25,2],[65.5,1],[66,1],[66,2],[66.25,3],[66.5,2],[67,3],[67.25,2],[67.5,3],[67.75,0],[68,1],[68,3],[68.5,0],[68.75,2],[69,2],[69.25,1],[69.5,3],[69.75,3],[70,0],[70,2],[70.5,0],[70.75,3],[71,3],[71.25,1],[71.5,2],[72,0],[72,1],[72.25,3],[72.5,0],[73,1],[73.25,2],[73.5,1],[74,1],[74,2],[74.25,3],[74.5,2],[74.75,0],[75,3],[75.25,2],[75.5,3],[76,0],[76,1],[76.5,0],[77,0],[77.5,2],[78,1],[78.5,1],[79,0],[79.25,1],[79.5,2],[79.75,3],[80,0],[80,1],[80.5,0],[81,0],[81.5,2],[82,1],[82.5,1],[83,0],[83.5,2],[84,0],[84,1],[84.25,3],[84.5,0],[84.75,0],[85,1],[85.25,2],[85.5,1],[86,2],[86,3],[86.25,3],[86.5,2],[87,3],[87.25,2],[87.5,3],[87.75,1],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,0],[91,2],[91.5,2],[92,0],[92,3],[92.25,3],[92.5,0],[92.75,2],[93.25,1],[93.5,3],[93.75,3],[94,1],[94,2],[94.5,0],[94.75,3],[95.25,1],[95.5,2],[96,0],[96,1],[96.25,3],[96.5,0],[96.75,0],[97,1],[97.25,2],[97.5,1],[98,2],[98,3],[98.25,3],[98.5,2],[98.75,0],[99,3],[99.25,2],[99.5,3],[100,0],[100,1],[100.5,1],[101,0],[101.5,2],[102,1],[102.5,1],[103,0],[103.5,2],[104,1],[104,3],[104.25,3],[104.5,0],[104.75,2],[105.25,1],[105.5,3],[105.75,3],[106,0],[106,2],[106.5,0],[106.75,3],[107,3],[107.25,1],[107.5,2],[108,0],[108,1],[108.25,3],[108.5,0],[109,2],[109.25,2],[109.5,1],[109.75,0],[110,1],[110,2],[110.25,3],[110.5,2],[111,3],[111.25,2],[111.5,3],[112,0],[112,2,1],[112.25,3],[112.5,0],[113,1],[113.25,2],[113.5,1],[113.75,0],[114,1],[114,2],[114.25,3],[114.5,2],[115,3],[115.25,2],[115.5,3],[116,0],[116,1],[116.5,3],[116.75,2],[117,1],[117,2],[117.5,2],[118,0],[118,1],[118.5,0],[119,0],[119,1],[119.25,3],[119.5,0],[120,0],[120,1],[120.5,3],[120.75,2],[121,1],[121,2],[121.5,2],[122,0],[122,1],[122.25,3],[122.5,0],[122.75,2],[123,0],[123,1],[123.5,0],[124,0],[124,1],[124.25,3],[124.5,3],[124.75,2],[125,1],[125,2],[125.5,3],[126,0],[126,1],[126.25,3],[126.5,1],[127,0],[127,1],[127.25,3],[127.5,0]]},{"name":"9段","level":29,"noteCount":479,"avgNps":7.48,"lanes":[119,122,121,117],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,2],[11,0],[11.25,1],[11.5,2],[11.75,3],[12,0],[12,1],[12.5,2],[13,0],[13.5,2],[14,1],[14.5,3],[15,0],[15.25,1],[15.5,2],[15.75,3],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.25,0],[19.5,2],[19.75,3],[20,0],[20,1],[20.5,1],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.25,3],[23.5,2],[23.75,3],[24,0],[24,1],[24.25,3],[24.5,0],[24.75,0],[25,1],[25.25,2],[25.5,1],[25.75,3],[26,2],[26,3],[26.25,3],[26.5,2],[26.75,0],[27,3],[27.25,2],[27.5,3],[27.75,1],[28,0],[28,1],[28.5,0],[29,0],[29.5,2],[30,1],[30.5,1],[31,2],[31.25,0],[31.5,2],[31.75,3],[32,1],[32,3],[32.25,3],[32.5,0],[32.75,2],[33,2],[33.25,1],[33.5,3],[33.75,3],[34,0],[34,2],[34.25,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[35.75,2],[36,0],[36,1],[36.5,1],[37,0],[37.5,2],[38,1],[38.5,0],[39,1],[39.25,0],[39.5,3],[39.75,3],[40,0],[40,1],[40.25,3],[40.5,0],[40.75,0],[41,2],[41.25,2],[41.5,1],[41.75,1],[42,1],[42,2],[42.25,3],[42.5,2],[42.75,0],[43,3],[43.25,3],[43.5,3],[43.75,1],[44,0],[44,3],[44.25,3],[44.5,0],[44.75,2],[45,2],[45.25,1],[45.5,3],[45.75,3],[46,1],[46,2],[46.25,2],[46.5,0],[46.75,3],[47,3],[47.25,1],[47.5,2],[47.75,2],[48,0],[48,3],[48.25,3],[48.5,0],[48.75,2],[49,2],[49.25,1],[49.5,3],[49.75,3],[50,1],[50,2],[50.25,2],[50.5,0],[50.75,3],[51,3],[51.25,1],[51.5,2],[51.75,2],[52,0],[52,1],[52.25,3],[52.5,0],[52.75,0],[53,1],[53.25,2],[53.5,1],[53.75,0],[54,1],[54,2],[54.25,3],[54.5,2],[54.75,0],[55,3],[55.25,2],[55.5,3],[55.75,1],[56,0],[56,3],[56.25,3],[56.5,0],[56.75,2],[57,2],[57.25,1],[57.5,3],[57.75,3],[58,1],[58,2],[58.25,2],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[59.75,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.25,1],[63.5,2],[63.75,3],[64,0],[64,1],[64.25,3],[64.5,0],[64.75,0],[65,1],[65.25,2],[65.5,1],[65.75,1],[66,0],[66,2],[66.25,3],[66.5,2],[66.75,0],[67,3],[67.25,2],[67.5,3],[67.75,1],[68,1],[68,3],[68.25,3],[68.5,0],[68.75,2],[69,2],[69.25,0],[69.5,3],[69.75,3],[70,1],[70,2],[70.25,2],[70.5,0],[70.75,3],[71,3],[71.25,1],[71.5,2],[71.75,2],[72,0],[72,1],[72.25,3],[72.5,0],[72.75,0],[73,1],[73.25,2],[73.5,1],[73.75,0],[74,1],[74,2],[74.25,3],[74.5,2],[74.75,0],[75,3],[75.25,2],[75.5,3],[75.75,1],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,0],[79,1],[79.25,0],[79.5,2],[79.75,3],[80,0],[80,1],[80.5,1],[81,0],[81.5,2],[82,0],[82.5,1],[83,0],[83.25,1],[83.5,3],[83.75,3],[84,0],[84,1],[84.25,3],[84.5,0],[84.75,0],[85,1],[85.25,2],[85.5,1],[85.75,0],[86,1],[86,2],[86.25,3],[86.5,2],[86.75,0],[87,3],[87.25,2],[87.5,3],[87.75,1],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,3],[91,0],[91.25,2],[91.5,2],[91.75,3],[92,1],[92,3],[92.25,3],[92.5,0],[92.75,2],[93,2],[93.25,1],[93.5,3],[93.75,3],[94,0],[94,2],[94.25,2],[94.5,0],[94.75,3],[95,3],[95.25,1],[95.5,2],[95.75,2],[96,0],[96,1],[96.25,3],[96.5,0],[96.75,0],[97,1],[97.25,2],[97.5,1],[97.75,0],[98,1],[98,2],[98.25,3],[98.5,2],[98.75,0],[99,3],[99.25,2],[99.5,3],[99.75,1],[100,0],[100,1],[100.5,0],[101,0],[101.5,2],[102,1],[102.5,1],[103,1],[103.25,3],[103.5,2],[103.75,3],[104,0],[104,3],[104.25,3],[104.5,0],[104.75,2],[105,2],[105.25,1],[105.5,3],[105.75,3],[106,1],[106,2],[106.25,2],[106.5,0],[106.75,3],[107,3],[107.25,0],[107.5,2],[107.75,2],[108,0],[108,1],[108.25,3],[108.5,0],[108.75,0],[109,1],[109.25,2],[109.5,1],[109.75,1],[110,0],[110,2],[110.25,3],[110.5,2],[110.75,0],[111,3],[111.25,2],[111.5,3],[111.75,1],[112,1],[112,2,1],[112.25,3],[112.5,0],[112.75,0],[113,1],[113.25,2],[113.5,1],[113.75,0],[114,1],[114,3],[114.25,3],[114.5,2],[114.75,0],[115,3],[115.25,2],[115.5,3],[116,0],[116,1],[116.25,3],[116.5,3],[116.75,2],[117,1],[117,2],[117.5,2],[117.75,2],[118,0],[118,1],[118.5,0],[118.75,3],[119,0],[119,1],[119.25,3],[119.5,0],[120,0],[120,1],[120.25,3],[120.5,3],[120.75,2],[121,1],[121,2],[121.5,2],[121.75,2],[122,0],[122,1],[122.25,3],[122.5,1],[122.75,2],[123,0],[123,1],[123.5,0],[123.75,3],[124,0],[124,1],[124.25,3],[124.5,3],[124.75,2],[125,1],[125,2],[125.5,2],[125.75,3],[126,0],[126,1],[126.25,3],[126.5,0],[127,0],[127,1],[127.25,3],[127.5,0],[127.75,2]]},{"name":"10段","level":31,"noteCount":487,"avgNps":7.61,"lanes":[119,123,125,120],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.5,1],[9,0],[9.5,2],[10,1],[10.5,2],[11,0],[11.25,1],[11.5,2],[11.75,3],[12,0],[12,1],[12.5,2],[13,0],[13.5,2],[14,1],[14.5,3],[15,0],[15.25,1],[15.5,2],[15.75,3],[16,0],[16,1],[16.5,2],[17,0],[17.5,3],[18,1],[18.5,2],[19,3],[19.25,0],[19.5,2],[19.75,3],[20,0],[20,1],[20.5,1],[21,0],[21.5,2],[22,3],[22.5,1],[23,2],[23.25,3],[23.5,2],[23.75,3],[24,0],[24,1],[24.25,3],[24.5,0],[24.75,0],[25,1],[25.25,2],[25.5,1],[25.75,3],[26,2],[26,3],[26.25,3],[26.5,2],[26.75,0],[27,3],[27.25,2],[27.5,3],[27.75,1],[28,0],[28,1],[28.5,0],[29,0],[29.5,2],[30,1],[30.5,1],[31,2],[31.25,0],[31.5,2],[31.75,3],[32,1],[32,3],[32.25,3],[32.5,0],[32.75,2],[33,2],[33.25,1],[33.5,3],[33.75,3],[34,0],[34,2],[34.25,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[35.75,2],[36,0],[36,1],[36.5,1],[37,0],[37.5,2],[38,1],[38.5,0],[39,1],[39.25,0],[39.5,3],[39.75,3],[40,0],[40,1],[40.25,3],[40.5,0],[40.75,0],[41,2],[41.25,2],[41.5,1],[41.75,1],[42,1],[42,2],[42.25,3],[42.5,2],[42.75,0],[43,3],[43.25,3],[43.5,3],[43.75,1],[44,0],[44,3],[44.25,3],[44.5,0],[44.75,2],[45,2],[45.25,1],[45.5,3],[45.75,3],[46,1],[46,2],[46.25,2],[46.5,0],[46.75,3],[47,3],[47.25,1],[47.5,2],[47.75,2],[48,0],[48,3],[48.25,3],[48.5,0],[48.75,2],[49,2],[49.25,1],[49.5,3],[49.75,3],[50,1],[50,2],[50.25,2],[50.5,0],[50.75,3],[51,3],[51.25,1],[51.5,2],[51.75,2],[52,0],[52,1],[52.25,3],[52.5,0],[52.75,0],[53,1],[53.25,2],[53.5,1],[53.75,0],[54,1],[54,2],[54.25,3],[54.5,2],[54.75,0],[55,3],[55.25,2],[55.5,3],[55.75,1],[56,0],[56,3],[56.25,3],[56.5,0],[56.75,2],[57,2],[57.25,1],[57.5,3],[57.75,3],[58,1],[58,2],[58.25,2],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[59.75,2],[60,0],[60,1],[60.5,0],[61,0],[61.5,2],[62,1],[62.5,1],[63,0],[63.25,1],[63.5,2],[63.75,3],[64,0],[64,1],[64.25,3],[64.5,0],[64.75,0],[65,1],[65.25,2],[65.5,1],[65.75,1],[66,0],[66,2],[66.25,3],[66.5,2],[66.75,0],[67,3],[67.25,2],[67.5,3],[67.75,1],[68,1],[68,3],[68.25,3],[68.5,0],[68.75,2],[69,2],[69.25,0],[69.5,3],[69.75,3],[70,1],[70,2],[70.25,2],[70.5,0],[70.75,3],[71,3],[71.25,1],[71.5,2],[71.75,2],[72,0],[72,1],[72.25,3],[72.5,0],[72.75,0],[73,1],[73.25,2],[73.5,1],[73.75,0],[74,1],[74,2],[74.25,3],[74.5,2],[74.75,0],[75,3],[75.25,2],[75.5,3],[75.75,1],[76,0],[76,1],[76.5,1],[77,0],[77.5,2],[78,1],[78.5,0],[79,1],[79.25,0],[79.5,2],[79.75,3],[80,0],[80,1],[80.5,1],[81,0],[81.5,2],[82,0],[82.5,1],[83,0],[83.25,1],[83.5,3],[83.75,3],[84,0],[84,1],[84.25,3],[84.5,0],[84.75,0],[85,1],[85.25,2],[85.5,1],[85.75,0],[86,1],[86,2],[86.25,3],[86.5,2],[86.75,0],[87,3],[87.25,2],[87.5,3],[87.75,1],[88,0],[88,1],[88.5,1],[89,0],[89.5,2],[90,1],[90.5,3],[91,0],[91.25,2],[91.5,2],[91.75,3],[92,1],[92,3],[92.25,3],[92.5,0],[92.75,2],[93,2],[93.25,1],[93.5,3],[93.75,3],[94,0],[94,2],[94.25,2],[94.5,0],[94.75,3],[95,3],[95.25,1],[95.5,2],[95.75,2],[96,0],[96,1],[96.25,3],[96.5,0],[96.75,0],[97,1],[97.25,2],[97.5,1],[97.75,0],[98,1],[98,2],[98.25,3],[98.5,2],[98.75,0],[99,3],[99.25,2],[99.5,3],[99.75,1],[100,0],[100,1],[100.5,0],[101,0],[101.5,2],[102,1],[102.5,1],[103,1],[103.25,3],[103.5,2],[103.75,3],[104,0],[104,3],[104.25,3],[104.5,0],[104.75,2],[105,2],[105.25,1],[105.5,3],[105.75,3],[106,1],[106,2],[106.25,2],[106.5,0],[106.75,3],[107,3],[107.25,0],[107.5,2],[107.75,2],[108,0],[108,1],[108.25,3],[108.5,0],[108.75,0],[109,1],[109.25,2],[109.5,1],[109.75,1],[110,0],[110,2],[110.25,3],[110.5,2],[110.75,0],[111,3],[111.25,2],[111.5,3],[111.75,1],[112,1],[112,2,1],[112.25,3],[112.5,0],[112.75,0],[113,1],[113.25,2],[113.5,1],[113.75,0],[114,1],[114,3],[114.25,3],[114.5,2],[114.75,0],[115,3],[115.25,2],[115.5,3],[115.75,1],[116,0],[116,1],[116.25,3],[116.5,3],[116.75,2],[117,0],[117,2],[117.25,3],[117.5,2],[117.75,2],[118,0],[118,1],[118.25,3],[118.5,1],[118.75,2],[119,0],[119,1],[119.25,3],[119.5,0],[119.75,2],[120,0],[120,1],[120.25,3],[120.5,3],[120.75,2],[121,1],[121,2],[121.25,3],[121.5,2],[121.75,2],[122,0],[122,1],[122.25,3],[122.5,1],[122.75,2],[123,0],[123,1],[123.25,3],[123.5,0],[123.75,2],[124,0],[124,1],[124.25,3],[124.5,3],[124.75,2],[125,1],[125,2],[125.25,3],[125.5,2],[125.75,3],[126,0],[126,1],[126.25,3],[126.5,0],[126.75,2],[127,0],[127,1],[127.25,3],[127.5,0],[127.75,2]]},{"name":"師範","level":33,"noteCount":553,"avgNps":8.64,"lanes":[134,137,141,141],"n":[[0,0],[0,1],[0.5,1],[1,3],[1.5,1],[2,1],[2.5,1],[3,2],[3.5,1],[4,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,1],[6.5,2],[7,2],[7.5,0],[8,0],[8,1],[8.25,3],[8.5,1],[8.75,2],[9,0],[9.25,3],[9.5,2],[9.75,2],[10,1],[10.25,3],[10.5,0],[10.75,2],[11,1],[11.25,1],[11.5,2],[11.75,3],[12,0],[12,1],[12.25,3],[12.5,0],[12.75,2],[13,0],[13.25,3],[13.5,2],[13.75,2],[14,1],[14.25,3],[14.5,1],[14.75,2],[15,0],[15.25,0],[15.5,2],[15.75,3],[16,0],[16,1],[16.25,3],[16.5,1],[16.75,2],[17,0],[17.25,3],[17.5,2],[17.75,2],[18,1],[18.25,3],[18.5,0],[18.75,2],[19,1],[19.25,0],[19.5,2],[19.75,3],[20,0],[20,1],[20.25,3],[20.5,1],[20.75,2],[21,0],[21.25,3],[21.5,2],[21.75,2],[22,1],[22.25,3],[22.5,0],[22.75,2],[23,1],[23.25,0],[23.5,3],[23.75,3],[24,0],[24,1],[24.25,3],[24.5,0],[24.75,0],[25,1],[25.25,2],[25.5,1],[25.75,1],[26,0],[26,2],[26.25,3],[26.5,2],[26.75,0],[27,3],[27.25,2],[27.5,3],[27.75,1],[28,0],[28,1],[28.25,3],[28.5,1],[28.75,2],[29,0],[29.25,3],[29.5,2],[29.75,2],[30,1],[30.25,3],[30.5,0],[30.75,2],[31,1],[31.25,0],[31.5,2],[31.75,3],[32,1],[32,3],[32.25,3],[32.5,0],[32.75,2],[33,2],[33.25,1],[33.5,3],[33.75,3],[34,0],[34,2],[34.25,2],[34.5,0],[34.75,3],[35,3],[35.25,1],[35.5,2],[35.75,2],[36,0],[36,1],[36.25,3],[36.5,1],[36.75,2],[37,0],[37.25,3],[37.5,2],[37.75,2],[38,1],[38.25,3],[38.5,0],[38.75,3],[39,1],[39.25,0],[39.5,2],[39.75,3],[40,0],[40,1],[40.25,3],[40.5,0],[40.75,0],[41,1],[41.25,2],[41.5,1],[41.75,1],[42,0],[42,2],[42.25,3],[42.5,2],[42.75,0],[43,3],[43.25,2],[43.5,3],[43.75,1],[44,1],[44,3],[44.25,3],[44.5,0],[44.75,2],[45,2],[45.25,1],[45.5,3],[45.75,3],[46,0],[46,2],[46.25,2],[46.5,0],[46.75,3],[47,3],[47.25,1],[47.5,2],[47.75,2],[48,1],[48,3],[48.25,3],[48.5,0],[48.75,2],[49,2],[49.25,1],[49.5,3],[49.75,3],[50,0],[50,2],[50.25,1],[50.5,0],[50.75,3],[51,3],[51.25,1],[51.5,2],[51.75,2],[52,0],[52,1],[52.25,3],[52.5,0],[52.75,0],[53,1],[53.25,2],[53.5,1],[53.75,0],[54,1],[54,2],[54.25,3],[54.5,2],[54.75,0],[55,3],[55.25,2],[55.5,3],[55.75,1],[56,0],[56,3],[56.25,3],[56.5,0],[56.75,2],[57,2],[57.25,1],[57.5,3],[57.75,3],[58,1],[58,2],[58.25,0],[58.5,0],[58.75,3],[59,3],[59.25,1],[59.5,2],[59.75,1],[60,0],[60,1],[60.25,3],[60.5,1],[60.75,2],[61,0],[61.25,3],[61.5,2],[61.75,2],[62,0],[62.25,3],[62.5,1],[62.75,2],[63,0],[63.25,1],[63.5,2],[63.75,3],[64,0],[64,1],[64.25,3],[64.5,0],[64.75,0],[65,1],[65.25,2],[65.5,1],[65.75,0],[66,1],[66,2],[66.25,3],[66.5,2],[66.75,0],[67,3],[67.25,2],[67.5,3],[67.75,1],[68,0],[68,3],[68.25,3],[68.5,0],[68.75,2],[69,2],[69.25,1],[69.5,3],[69.75,3],[70,1],[70,2],[70.25,0],[70.5,0],[70.75,3],[71,3],[71.25,1],[71.5,2],[71.75,1],[72,0],[72,1],[72.25,3],[72.5,0],[72.75,0],[73,1],[73.25,2],[73.5,1],[73.75,0],[74,1],[74,2],[74.25,3],[74.5,2],[74.75,0],[75,3],[75.25,2],[75.5,3],[75.75,1],[76,0],[76,1],[76.25,3],[76.5,0],[76.75,2],[77,0],[77.25,3],[77.5,2],[77.75,2],[78,1],[78.25,3],[78.5,1],[78.75,2],[79,0],[79.25,1],[79.5,2],[79.75,3],[80,0],[80,1],[80.25,3],[80.5,1],[80.75,2],[81,0],[81.25,3],[81.5,2],[81.75,2],[82,1],[82.25,3],[82.5,0],[82.75,2],[83,1],[83.25,0],[83.5,2],[83.75,3],[84,0],[84,1],[84.25,3],[84.5,0],[84.75,0],[85,1],[85.25,2],[85.5,1],[85.75,0],[86,1],[86,2],[86.25,3],[86.5,2],[86.75,0],[87,3],[87.25,2],[87.5,3],[87.75,1],[88,0],[88,1],[88.25,3],[88.5,0],[88.75,2],[89,0],[89.25,3],[89.5,2],[89.75,2],[90,1],[90.25,3],[90.5,1],[90.75,2],[91,0],[91.25,1],[91.5,2],[91.75,3],[92,1],[92,3],[92.25,3],[92.5,0],[92.75,2],[93,0],[93.25,1],[93.5,3],[93.75,3],[94,1],[94,2],[94.25,0],[94.5,0],[94.75,3],[95,3],[95.25,1],[95.5,2],[95.75,2],[96,0],[96,1],[96.25,3],[96.5,0],[96.75,0],[97,1],[97.25,2],[97.5,1],[97.75,0],[98,1],[98,2],[98.25,3],[98.5,2],[98.75,0],[99,3],[99.25,2],[99.5,3],[99.75,1],[100,0],[100,1],[100.25,3],[100.5,0],[100.75,2],[101,0],[101.25,3],[101.5,2],[101.75,1],[102,1],[102.25,3],[102.5,0],[102.75,2],[103,1],[103.25,0],[103.5,2],[103.75,3],[104,1],[104,3],[104.25,3],[104.5,0],[104.75,2],[105,2],[105.25,1],[105.5,3],[105.75,3],[106,0],[106,2],[106.25,2],[106.5,0],[106.75,3],[107,3],[107.25,1],[107.5,2],[107.75,1],[108,0],[108,1],[108.25,3],[108.5,0],[108.75,0],[109,1],[109.25,2],[109.5,1],[109.75,1],[110,0],[110,2],[110.25,3],[110.5,2],[110.75,0],[111,3],[111.25,2],[111.5,3],[111.75,1],[112,1],[112,2,1],[112.25,3],[112.5,0],[112.75,0],[113,1],[113.25,2],[113.5,1],[113.75,0],[114,0],[114,2],[114.25,3],[114.5,2],[114.75,0],[115,3],[115.25,1],[115.5,3],[115.75,1],[116,0],[116,1],[116.25,3],[116.5,3],[116.75,2],[117,0],[117,2],[117.25,3],[117.5,2],[117.75,1],[118,0],[118,1],[118.25,3],[118.5,0],[118.75,2],[119,0],[119,1],[119.25,3],[119.5,0],[119.75,2],[120,0],[120,1],[120.25,3],[120.5,3],[120.75,2],[121,1],[121,2],[121.25,3],[121.5,2],[121.75,1],[122,0],[122,1],[122.25,3],[122.5,0],[122.75,2],[123,0],[123,1],[123.25,3],[123.5,0],[123.75,2],[124,0],[124,1],[124.25,3],[124.5,3],[124.75,2],[125,1],[125,2],[125.25,3],[125.5,2],[125.75,1],[126,0],[126,1],[126.25,3],[126.5,0],[126.75,2],[127,0],[127,1],[127.25,3],[127.5,0],[127.75,2]]}]};
+
+/* ---------- 譜面データ（charts/*.json があれば優先して読み込む） ---------- */
+let CHART_BETSUBAN = __EMBEDDED_CHART;
+async function loadChartJson(){
+  try{
+    const res = await fetch('charts/betsuban_chart.json', {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const j = await res.json();
+    if(j && j.difficulties && j.difficulties.length){
+      CHART_BETSUBAN = {
+        ...j,
+        difficulties: j.difficulties.map(d=>({
+          name:d.name, level:d.level, noteCount:d.noteCount ?? d.n?.length ?? 0,
+          avgNps:d.avgNps, lanes:d.lanes, n:d.n,
+        })),
+      };
+      BEAT_SONG.bpm = CHART_BETSUBAN.chartBpm;
+      return 'json';
+    }
+  }catch(e){ /* ファイル直開き(file://)などでは失敗するので埋め込みを使う */ }
+  return 'embedded';
+}
+
+/* =========================================================
+   譜面先行モード（別班儀礼曲）
+   譜面は「拍(beat)」基準で保持。あとから音源を読み込むと
+   最初の1音を解析してその時刻に譜面の1音目を合わせる。
+   ========================================================= */
+const LEAD_IN_SILENT = 2.6;
+const BEAT_SONG = {
+  id:'betsuban_chart',
+  title:'別班儀礼曲',
+  isBeat:true,
+  colors:['#c9a227','#f3d97a','#3a2b00'],
+  bpm: CHART_BETSUBAN.chartBpm,
+  difficulty: '初段',
+  audioName: null,
+};
+function tierOf(name){
+  return CHART_BETSUBAN.difficulties.find(d=>d.name===name) || CHART_BETSUBAN.difficulties[0];
+}
+
+/* ---------- レイアウト ---------- */
+function layout(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  const r = $('#stage').getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = Math.floor(W*DPR); cv.height = Math.floor(H*DPR);
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const fieldW = Math.min(W*0.94, 620);
+  field = { x:(W-fieldW)/2, w:fieldW, top: Math.max(116, H*0.135), bottom: H-16, laneW: fieldW/4 };
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', ()=>setTimeout(layout,120));
+
+const JUDGE_LINE = () => field.bottom - 92;
+const noteSpeedPx = () => 90 + state.speed*62;
+
+/* ---------- ロビー ---------- */
+let TAB = 'CHARTS';
+function buildLobby(){
+  const tabBar = $('#tabs');
+  const tabs = [['CHARTS','譜面先行'],['LIBRARY','マイ楽曲'],['PRESET','サンプル']];
+  tabBar.innerHTML='';
+  tabs.forEach(([t,label])=>{
+    const el=document.createElement('div');
+    el.className='tab'+(t===TAB?' on':'');
+    el.textContent = label;
+    el.dataset.tab=t;
+    el.onclick=()=>{ TAB=t; [...tabBar.children].forEach(c=>c.classList.remove('on')); el.classList.add('on'); renderCards(); };
+    tabBar.appendChild(el);
+  });
+  $('#spdVal').textContent = state.speed.toFixed(1);
+  $('#ofsVal').textContent = state.offset+'ms';
+  document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{
+    state.speed = clamp(state.speed + Number(b.dataset.speed)*0.5, 1, 11);
+    $('#spdVal').textContent = state.speed.toFixed(1); store.set('speed',state.speed);
+  });
+  document.querySelectorAll('[data-off]').forEach(b=>b.onclick=()=>{
+    state.offset = clamp(state.offset + Number(b.dataset.off), -300, 300);
+    $('#ofsVal').textContent = state.offset+'ms'; store.set('offset',state.offset);
+  });
+  state.speed = clamp(store.get('speed',6), 1, 11);
+  state.offset = clamp(store.get('offset',0), -300, 300);
+  $('#spdVal').textContent = state.speed.toFixed(1);
+  $('#ofsVal').textContent = state.offset+'ms';
+}
+
+function cardEl(song, idx){
+  const best = store.get(song.id, null);
+  const card = document.createElement('div');
+  card.className='card';
+  const c = song.colors || ['#7b61ff','#a78bfa','#2b1b6b'];
+  card.style.background = `linear-gradient(135deg, ${c[2]} 0%, ${c[0]} 62%, #0a0a16 100%)`;
+  card.innerHTML = `
+    <div class="glow" style="background:radial-gradient(circle,${c[1]},transparent 70%)"></div>
+    <div class="inner">
+      <div class="tag">${song.kind==='preset'?'PRESET / 解析デモ':'MY SONG'}</div>
+      <h3>${escapeHtml(song.title)}</h3>
+      <div class="sub">${escapeHtml(song.sub||'')}</div>
+      <div class="meta">
+        <div class="pill">BPM ${song.bpm}</div>
+        <div class="pill">Lv.${song.level}</div>
+        <div class="pill">${song.noteCount} notes</div>
+        <div class="pill">${fmtTime(song.duration)}</div>
+        ${best?.fc?`<div class="pill fc">${best.fc}</div>`:''}
+      </div>
+    </div>
+    <div class="arrow">▶</div>
+    ${song.kind==='preset'?'':`<button class="del" data-del="${song.id}">×</button>`}`;
+  card.onclick = (e)=>{
+    if(e.target.classList.contains('del')) return;
+    startGame(song);
+  };
+  const del = card.querySelector('.del');
+  if(del) del.onclick = async (e)=>{
+    e.stopPropagation();
+    if(!confirm(`「${song.title}」を削除しますか？`)) return;
+    await idb.del(song.id);
+    SONG_LIB = SONG_LIB.filter(s=>s.id!==song.id);
+    renderCards();
+  };
+  return card;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtTime(sec){ const m=Math.floor(sec/60), s=Math.floor(sec%60); return `${m}:${String(s).padStart(2,'0')}`; }
+
+let SONG_LIB = [];
+let PRESET_CACHE = null;
+
+async function renderCards(){
+  const host = $('#cards'); host.innerHTML='';
+  updateSyncNote();
+  if(TAB==='CHARTS'){ host.appendChild(beatChartCard()); return; }
+  if(TAB==='PRESET'){
+    if(!PRESET_CACHE){
+      host.innerHTML = `<div class="note" style="padding:24px 8px">サンプル譜面を生成しています…</div>`;
+      showSpin('サンプル譜面を生成中…','音源を合成して解析しています');
+      PRESET_CACHE = await buildPresets();
+      hideSpin();
+    }
+    PRESET_CACHE.forEach(s=>host.appendChild(cardEl(s)));
+    if(!PRESET_CACHE.length) host.innerHTML = `<div class="note">サンプルがありません</div>`;
+    return;
+  }
+  SONG_LIB = (await idb.all()).filter(s=>s.kind!=='preset').sort((a,b)=>b.created-a.created);
+  if(!SONG_LIB.length){
+    host.innerHTML = `<div class="note" style="padding:20px 8px;line-height:1.9">
+      まだ音源がありません。<br>上の点線エリアから音源を読み込んでください。<br>
+      <span style="color:#8ef4ff">※ 解析結果（譜面）だけを保存します。音源ファイル自体は保存されません。</span></div>`;
+    return;
+  }
+  SONG_LIB.forEach(s=>host.appendChild(cardEl(s)));
+}
+
+/* ---------- 譜面先行カード（別班儀礼曲） ---------- */
+function beatChartCard(){
+  const t = tierOf(BEAT_SONG.difficulty);
+  const best = store.get('beat_'+BEAT_SONG.difficulty, null);
+  const card = document.createElement('div');
+  card.className='card';
+  card.style.background = 'linear-gradient(135deg,#3a2b00 0%,#c9a227 60%,#0a0a16 100%)';
+  card.innerHTML = `
+    <div class="glow" style="background:radial-gradient(circle,#f3d97a,transparent 70%)"></div>
+    <div class="inner">
+      <div class="tag">${BEAT_SONG.audioName ? 'SYNC READY / 音源同期済み' : 'CHART ONLY / 譜面先行'}</div>
+      <h3>別班儀礼曲</h3>
+      <div class="sub">${BEAT_SONG.audioName
+          ? escapeHtml(BEAT_SONG.audioName)+' と同期してプレイ'
+          : '譜面を作成済み。音源を読み込むと最初の1音を解析して同期します'}</div>
+      <div class="meta">
+        <div class="pill">譜面BPM ${CHART_BETSUBAN.chartBpm}</div>
+        <div class="pill">${CHART_BETSUBAN.bars}小節</div>
+        <div class="pill">${t.noteCount} notes</div>
+        <div class="pill">Lv.${t.level} / ${t.name}</div>
+        ${best?.fc?`<div class="pill fc">${best.fc}</div>`:''}
+      </div>
+      <div class="optrow" style="justify-content:flex-start;margin:10px 0 0">
+        <div class="opt" style="font-size:10.5px">1音目オフセット
+          <button data-anchor="-20">−</button><b id="anchorVal">0ms</b><button data-anchor="20">+</button>
+        </div>
+        <div class="opt" style="font-size:10.5px">テンポ
+          <b id="bpmVal">${CHART_BETSUBAN.chartBpm}</b>
+          <button id="bpmEdit">手動</button>
+        </div>
+      </div>
+      <div class="diffwrap">
+        ${CHART_BETSUBAN.difficultyOrder.map(name=>{
+          const d = tierOf(name);
+          const cls = name==='師範' ? 'sensei' : (name.includes('段') ? 'dan' : 'kyu');
+          return `<div class="diffchip ${cls}${name===BEAT_SONG.difficulty?' on':''}" data-diff="${name}">${name} <span style="opacity:.7">Lv.${d.level}</span></div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="arrow">▶</div>`;
+  const anchorVal = card.querySelector('#anchorVal');
+  if(anchorVal){
+    const cur = BEAT_SYNC ? (BEAT_SYNC.manualOffset||0) : (BEAT_SONG.manualOffset||0);
+    anchorVal.textContent = cur + 'ms';
+    card.querySelectorAll('[data-anchor]').forEach(btn=>{
+      btn.onclick = (e)=>{
+        e.stopPropagation();
+        e.preventDefault();
+        const delta = Number(btn.dataset.anchor);
+        if(BEAT_SYNC){
+          BEAT_SYNC.manualOffset = clamp((BEAT_SYNC.manualOffset||0) + delta, -2000, 2000);
+          store.set('anchorOffset', BEAT_SYNC.manualOffset);
+          anchorVal.textContent = BEAT_SYNC.manualOffset + 'ms';
+        } else {
+          BEAT_SONG.manualOffset = clamp((BEAT_SONG.manualOffset||0) + delta, -2000, 2000);
+          store.set('anchorOffset', BEAT_SONG.manualOffset);
+          anchorVal.textContent = BEAT_SONG.manualOffset + 'ms';
+        }
+      };
+    });
+  }
+  const bpmVal = card.querySelector('#bpmVal');
+  if(bpmVal){
+    bpmVal.textContent = BEAT_SYNC ? BEAT_SYNC.bpm : CHART_BETSUBAN.chartBpm;
+    const be = card.querySelector('#bpmEdit');
+    if(be) be.onclick = (e)=>{
+      e.stopPropagation(); e.preventDefault();
+      const cur = BEAT_SYNC ? BEAT_SYNC.bpm : CHART_BETSUBAN.chartBpm;
+      const v = prompt('テンポ（BPM）を手動指定します。\n音源に合わせて譜面が伸縮します。', cur);
+      if(v===null) return;
+      const num = Number(v);
+      if(!isFinite(num) || num < 40 || num > 300){ alert('40〜300 の範囲で入力してください'); return; }
+      if(BEAT_SYNC){ BEAT_SYNC.bpm = num; store.set('chartBpmOverride', num); }
+      else { BEAT_SONG.bpmOverride = num; }
+      bpmVal.textContent = num;
+      renderCards();
+    };
+  }
+  card.querySelectorAll('.diffchip').forEach(chip=>{
+    chip.onclick = (e)=>{
+      e.stopPropagation();
+      BEAT_SONG.difficulty = chip.dataset.diff;
+      renderCards();
+    };
+  });
+  card.onclick = ()=>startBeatChart();
+  return card;
+}
+
+function updateSyncNote(){
+  const el = $('#syncNote');
+  if(!el) return;
+  if(BEAT_SONG.audioName){
+    el.innerHTML = `<span style="color:#8ef4ff">♪ 音源同期中：${escapeHtml(BEAT_SONG.audioName)}</span>
+      （最初の1音 ${BEAT_SYNC?BEAT_SYNC.firstOnset.toFixed(2):'-'}秒 / 検出BPM ${BEAT_SYNC?BEAT_SYNC.bpm:'-'} / 微調整 ${BEAT_SYNC?(BEAT_SYNC.manualOffset||0):0}ms）
+      <button id="unsyncBtn" style="margin-left:8px;padding:3px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.4);color:#fff;font-size:10px;font-weight:800;cursor:pointer">同期解除</button><br>
+      難易度を選んでプレイしてください。`;
+    const u = $('#unsyncBtn');
+    if(u) u.onclick = (e)=>{
+      e.stopPropagation();
+      BEAT_SYNC = null; BEAT_SONG.audioName = null;
+      renderCards();
+    };
+  } else {
+    el.innerHTML = `譜面先行：別班儀礼曲の譜面は作成済みです。<br>
+      <span style="color:#8ef4ff">音源を持っている場合は上のエリアから読み込むと、最初の1音を解析して自動同期します。</span>`;
+  }
+}
+
+/* =========================================================
+   最初の1音の解析（譜面先行モード用）
+   音源の冒頭の無音を飛ばし、最初に音が立ち上がる時刻を返す
+   ========================================================= */
+async function analyzeFirstNote(buffer, onStep){
+  onStep && onStep('最初の1音を解析中…', buffer.name || '音源の立ち上がりを検出');
+  const sr = 22050;
+  const off = new OfflineAudioContext(1, Math.ceil(buffer.duration*sr), sr);
+  const src = off.createBufferSource(); src.buffer = buffer; src.connect(off.destination); src.start(0);
+  const data = (await off.startRendering()).getChannelData(0);
+
+  const hop = Math.floor(sr*0.005), win = Math.floor(sr*0.02);
+  const frames = Math.max(1, Math.floor((data.length-win)/hop));
+  const env = new Float32Array(frames);
+  for(let f=0; f<frames; f++){
+    const s0=f*hop; let e=0;
+    for(let i=s0;i<s0+win;i++){ const v=data[i]; e+=v*v; }
+    env[f]=Math.sqrt(e/win);
+  }
+  let peak=0; for(let f=0;f<frames;f++) if(env[f]>peak) peak=env[f];
+  // 冒頭のノイズフロア
+  let floor=0, nf=0;
+  for(let f=0; f<Math.min(frames, 400); f++){ floor+=env[f]; nf++; }
+  floor = nf? floor/nf : 0;
+  const thr = Math.max(floor*3.2, peak*0.07, 0.0015);
+
+  let firstFrame = -1;
+  for(let f=2; f<frames-2; f++){
+    if(env[f] >= thr && env[f] > env[f-1]*1.35 && env[f+1] >= env[f]*0.6){
+      firstFrame = f; break;
+    }
+  }
+  if(firstFrame < 0){
+    for(let f=0; f<frames; f++){ if(env[f] >= thr){ firstFrame=f; break; } }
+  }
+  if(firstFrame < 0) firstFrame = 0;
+  const firstOnset = (firstFrame*hop + win/2)/sr;
+
+  // テンポも一緒に推定（譜面を伸縮させるため）
+  onStep && onStep('テンポを推定中…','譜面の伸縮に使用します');
+  let bpm = CHART_BETSUBAN.chartBpm;
+  try{
+    const res = await analyzeBuffer(buffer, onStep);
+    if(res && res.bpm) bpm = res.bpm;
+  }catch(e){ /* 失敗しても譜面BPMで続行 */ }
+
+  return { firstOnset, bpm, duration: buffer.duration };
+}
+
+/* 音源同期の状態 */
+let BEAT_SYNC = null;   // {firstOnset, bpm, audioName, bufferId}
+
+/* 拍 → 実時間 変換 */
+function beatToTime(beat, mode){
+  if(mode === 'audio' && BEAT_SYNC){
+    const spb = 60 / BEAT_SYNC.bpm;
+    const anchor = BEAT_SYNC.firstOnset + (BEAT_SYNC.manualOffset||0)/1000;   // ms → 秒
+    return anchor + (beat - CHART_BETSUBAN.firstNoteBeat) * spb;
+  }
+  const spb = 60 / CHART_BETSUBAN.chartBpm;
+  return LEAD_IN_SILENT + beat * spb;
+}
+
+/* 譜面先行モードの開始 */
+async function startBeatChart(){
+  initAudio();
+  if(AC.state==='suspended') await AC.resume();
+  const tier = tierOf(BEAT_SONG.difficulty);
+  const mode = BEAT_SYNC ? 'audio' : 'silent';
+
+  // 音源同期時は音源の長さで打ち切り
+  let notes = tier.n.map(([b,l,d])=>({ t:beatToTime(b, mode), lane:l, dur:(d?d*(60/(BEAT_SYNC?BEAT_SYNC.bpm:CHART_BETSUBAN.chartBpm)):0) }));
+  let duration;
+  if(mode==='audio'){
+    duration = Math.min(BEAT_SYNC.duration, Math.max(...notes.map(n=>n.t+n.dur)) + 2.5);
+    notes = notes.filter(n=> n.t >= 0.02 && n.t <= BEAT_SYNC.duration - 0.05);
+  } else {
+    duration = Math.max(...notes.map(n=>n.t+n.dur)) + 2.2;
+  }
+  if(!notes.length){
+    alert('この音源は短すぎるため譜面が入りきりません。'); return;
+  }
+
+  const song = {
+    id:'beat_'+tier.name,
+    title:'別班儀礼曲',
+    sub:`${tier.name} / Lv.${tier.level}${mode==='audio'?' / 音源同期':' / メトロノーム'}`, 
+    bpm: mode==='audio' ? Math.round(BEAT_SYNC.bpm*10)/10 : CHART_BETSUBAN.chartBpm,
+    level: tier.level,
+    colors: BEAT_SONG.colors,
+    noteCount: notes.length,
+    duration,
+    notes: notes.map(n=>({t:n.t, lane:n.lane, dur:n.dur})),
+    isBeatMode:true,
+  };
+  state.beatMode = mode;
+  startSongInternal(song, mode==='audio' ? BUFFERS[BEAT_SYNC.bufferId] : null);
+}
+
+/* メトロノーム／伴奏のスケジュール（音源なしで譜面だけ遊ぶとき用） */
+function scheduleGuideTrack(){
+  const beatLen = 60/CHART_BETSUBAN.chartBpm;
+  const total = CHART_BETSUBAN.beatsTotal;
+  const t0 = state.t0 + LEAD_IN_SILENT;   // 譜面の0拍位置
+  for(let b=0; b<total; b++){
+    const at = t0 + b*beatLen;
+    const isBar = b%4===0;
+    if(isBar){
+      tone(musicBus,{t:at, f:110, f2:48, d:0.22, vol:0.16, type:'sine'});
+      noiseHit(musicBus, at, 0.05, 0.05, 380);
+    } else {
+      noiseHit(musicBus, at, 0.035, 0.03, 3200);
+    }
+    // 8分の刻み（薄く）
+    noiseHit(musicBus, at + beatLen*0.5, 0.014, 0.02, 6500);
+    // 行進曲っぽい低音（2拍ごと）
+    if(b%2===0) tone(musicBus,{t:at, f:220*Math.pow(2,((b%8<4?0:3))/12), d:beatLen*0.7, vol:0.05, type:'triangle'});
+  }
+}
+
+/* ---------- 音源を読み込んで解析 ---------- */
+function showSpin(t, s){ $('#spin').classList.add('on'); $('#spinTxt').textContent=t; $('#spinSub').textContent=s||''; }
+function hideSpin(){ $('#spin').classList.remove('on'); }
+
+/* 譜面先行曲：音源を読み込んで「最初の1音」を解析 → 同期 */
+async function syncBeatSong(file){
+  initAudio();
+  if(AC.state==='suspended') await AC.resume();
+  try{
+    showSpin('音源を読み込み中…', file.name);
+    const buffer = await decodeFile(file, showSpin);
+    const res = await analyzeFirstNote(buffer, showSpin);
+    const id = 'sync_'+Date.now();
+    BUFFERS[id] = buffer;
+    BEAT_SYNC = {
+      firstOnset: res.firstOnset,
+      bpm: res.bpm,
+      duration: res.duration,
+      audioName: file.name,
+      bufferId: id,
+      manualOffset: clamp(store.get('anchorOffset',0), -2000, 2000),
+      bpm: (()=>{ const o = store.get('chartBpmOverride', null); return (o && isFinite(o)) ? Number(o) : res.bpm; })(),
+    };
+    BEAT_SONG.audioName = file.name;
+    hideSpin();
+    TAB = 'CHARTS';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='CHARTS'));
+    renderCards();
+    // 解析結果を控えめに通知
+    const firstTier = tierOf(BEAT_SONG.difficulty);
+    const msg = `最初の1音: ${res.firstOnset.toFixed(2)}秒
+検出BPM: ${res.bpm}
+譜面BPM ${CHART_BETSUBAN.chartBpm} に合わせて伸縮します。
+
+${firstTier.name} (Lv.${firstTier.level}) で開始しますか？`;
+    if(confirm(msg)) startBeatChart();
+  }catch(err){
+    hideSpin();
+    console.error(err);
+    alert(`「${file.name}」を解析できませんでした。\n対応形式（MP3/WAV/M4A/OGG）か確認してください。`);
+  }
+}
+
+async function handleFiles(files){
+  initAudio();
+  if(AC.state==='suspended') await AC.resume();
+  const first = files[0];
+  if(!first) return;
+  // 「譜面先行」タブで読み込んだ場合は、別班儀礼曲の譜面に同期する
+  if(TAB==='CHARTS'){
+    return syncBeatSong(first);
+  }
+  for(const file of files){
+    if(!/^audio\//.test(file.type) && !/\.(mp3|wav|ogg|m4a|flac|aac|opus)$/i.test(file.name)) continue;
+    try{
+      showSpin('音源を読み込み中…', file.name);
+      const buffer = await decodeFile(file, showSpin);
+      showSpin('譜面を生成中…', `${buffer.duration.toFixed(1)}秒の音源`);
+      await new Promise(r=>setTimeout(r,30));
+      const res = await analyzeBuffer(buffer, showSpin);
+      const id = 'u_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      const title = file.name.replace(/\.[^.]+$/,'');
+      // メモリ上に音源本体を保持（このセッション中だけ遊べる）
+      BUFFERS[id] = buffer;
+      const rec = {
+        id, title, sub:file.name.replace(/\.[^.]+$/,'') + ' から自動生成',
+        kind:'user', bpm:res.bpm, level:res.level, noteCount:res.notes.length,
+        duration:buffer.duration, notes:res.notes, phase:res.phase,
+        colors:pickColors(id), created:Date.now(),
+      };
+      await idb.put(rec);
+      SONG_LIB.push(rec);
+    }catch(err){
+      console.error(err);
+      alert(`「${file.name}」の解析に失敗しました。\n対応形式（MP3/WAV/M4A/OGG）か確認してください。\n${err && err.message || ''}`);
+    }
+  }
+  hideSpin();
+  TAB='LIBRARY';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='LIBRARY'));
+  renderCards();
+}
+
+function pickColors(seed){
+  const hues = [[123,97,255],[255,92,138],[89,224,255],[124,247,154],[255,209,102],[255,120,90]];
+  let h=0; for(let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))>>>0;
+  const a = hues[h%hues.length];
+  return [rgb(a), rgb(a.map(v=>clamp(v+40,0,255))), rgb(a.map(v=>Math.round(v*0.22)))];
+}
+function rgb(a){ return '#'+a.map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join(''); }
+
+const BUFFERS = {};   // id -> AudioBuffer（セッション中のみ）
+
+/* ---------- ファイル入力 ---------- */
+const dropEl = $('#drop'), fileIn = $('#fileIn');
+fileIn.addEventListener('change', e=>{ if(e.target.files?.length) handleFiles([...e.target.files]); e.target.value=''; });
+['dragenter','dragover'].forEach(ev=>dropEl.addEventListener(ev, e=>{ e.preventDefault(); dropEl.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev=>dropEl.addEventListener(ev, e=>{ e.preventDefault(); dragElReset(); }));
+function dragElReset(){ dropEl.classList.remove('drag'); }
+document.addEventListener('dragover', e=>e.preventDefault());
+document.addEventListener('drop', e=>{
+  e.preventDefault(); dragElReset();
+  if(e.dataTransfer?.files?.length) handleFiles([...e.dataTransfer.files]);
+});
+
+/* =========================================================
+   テスト用サンプル（音源なしでも遊べるよう、その場で音を合成して解析に通す）
+   ========================================================= */
+async function buildPresets(){
+  const out = [];
+  const defs = [
+    {id:'preset_a', title:'テスト用サンプル A（行進曲っぽい何か）', bpm:126, bars:24, scale:[0,2,3,5,7,8,10], root:50, hue:0},
+    {id:'preset_b', title:'テスト用サンプル B（ダンスっぽい何か）', bpm:150, bars:24, scale:[0,2,3,5,7,9,10], root:45, hue:1},
+  ];
+  for(const d of defs){
+    const buffer = await synthDemo(d);
+    try{
+      const res = await analyzeBuffer(buffer, showSpin);
+      out.push({id:d.id, title:d.title, sub:'自動生成されたテスト譜面（実在の曲ではありません）', kind:'preset',
+        bpm:res.bpm, level:res.level, noteCount:res.notes.length, duration:buffer.duration,
+        notes:res.notes, phase:res.phase, colors:pickColors(d.id), created:Date.now()+d.hue});
+      BUFFERS[d.id] = buffer;
+    }catch(e){ console.warn(e); }
+  }
+  return out;
+}
+
+async function synthDemo(d){
+  const sr = 22050;
+  const spb = 60/d.bpm;
+  const dur = d.bars*4*spb + 1;
+  const off = new OfflineAudioContext(2, Math.ceil(dur*sr), sr);
+  const bus = off.createGain(); bus.gain.value=0.8; bus.connect(off.destination);
+  const mtof = m => 440*Math.pow(2,(m-69)/12);
+  const S = d.scale;
+  const deg = (n,oct=0)=>{ const L=S.length; const o=Math.floor(n/L), k=((n%L)+L)%L; return d.root + 12*(o+oct) + S[k]; };
+  const prog = [0,0,5,3, 0,0,6,4];
+  const note = (t,f,dur,vol,type='square')=>{
+    const o=off.createOscillator(), g=off.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+dur+0.05);
+  };
+  const kick=(t,v=1)=>{
+    const o=off.createOscillator(), g=off.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+0.2);
+  };
+  const snare=(t,v=0.5)=>{
+    const len=Math.floor(sr*0.12), b=off.createBuffer(1,len,sr), dd=b.getChannelData(0);
+    for(let i=0;i<len;i++) dd[i]=(Math.random()*2-1)*(1-i/len);
+    const s=off.createBufferSource(); s.buffer=b;
+    const f=off.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1800;
+    const g=off.createGain(); g.gain.value=v; s.connect(f); f.connect(g); g.connect(bus); s.start(t);
+  };
+  for(let bar=0; bar<d.bars; bar++){
+    const t0 = bar*4*spb;
+    const ch = prog[bar%prog.length];
+    for(let b=0;b<4;b++){
+      kick(t0+b*spb, 0.9);
+      if(b%2===1) snare(t0+b*spb, 0.45);
+      // メロディ（8分）
+      for(let e=0;e<2;e++){
+        const t = t0+b*spb+e*spb*0.5;
+        const degv = ch + [0,2,4,2, 0,2,4,6][(bar*8+b*2+e)%8];
+        note(t, mtof(deg(degv,1)), spb*0.42, 0.13, 'square');
+      }
+      // ベース
+      note(t0+b*spb, mtof(deg(ch-7,-1)+12), spb*0.4, 0.16, 'sawtooth');
+    }
+  }
+  return await off.startRendering();
+}
+
+/* ---------- 波形からジャケット生成 ---------- */
+function drawJacket(cvEl, song, buffer){
+  const s = 160;
+  cvEl.width = s; cvEl.height = s;
+  const c = cvEl.getContext('2d');
+  const col = song.colors || ['#7b61ff','#a78bfa','#2b1b6b'];
+  const g = c.createLinearGradient(0,0,s,s);
+  g.addColorStop(0,col[2]); g.addColorStop(.6,col[0]); g.addColorStop(1,'#05060d');
+  c.fillStyle=g; c.fillRect(0,0,s,s);
+  if(buffer){
+    // 波形
+    const d = buffer.getChannelData(0);
+    const stepN = Math.floor(d.length/s);
+    c.strokeStyle='rgba(255,255,255,.85)'; c.lineWidth=2; c.beginPath();
+    for(let i=0;i<s;i++){
+      let peak=0;
+      for(let k=0;k<stepN;k+=Math.max(1,Math.floor(stepN/64))){ const v=Math.abs(d[i*stepN+k]||0); if(v>peak)peak=v; }
+      const y = s/2 + clamp(peak,-1,1)*s*0.42;
+      i? c.lineTo(i, s-y) : c.moveTo(i, s-y);
+    }
+    c.stroke();
+    c.globalAlpha=.35; c.strokeStyle=col[1]; c.beginPath();
+    for(let i=0;i<s;i++){
+      let peak=0;
+      for(let k=0;k<stepN;k+=Math.max(1,Math.floor(stepN/64))){ const v=Math.abs(d[i*stepN+k]||0); if(v>peak)peak=v; }
+      const y = s/2 - clamp(peak,-1,1)*s*0.42;
+      i? c.lineTo(i, y) : c.moveTo(i, y);
+    }
+    c.stroke(); c.globalAlpha=1;
+  }
+  c.fillStyle='rgba(0,0,0,.42)'; c.fillRect(0,s*0.66,s,s*0.34);
+  c.fillStyle='#fff'; c.textAlign='center'; c.textBaseline='middle';
+  const title = (song.title||'').slice(0,14);
+  c.font=`900 ${title.length>9?13:16}px system-ui,sans-serif`;
+  c.fillText(title, s/2, s*0.8);
+  c.font='700 9px system-ui,sans-serif'; c.fillStyle=col[1];
+  c.fillText('BPM '+song.bpm, s/2, s*0.905);
+}
+
+/* ---------- 開始 ---------- */
+async function startGame(song){
+  initAudio();
+  if(AC.state==='suspended') await AC.resume();
+  let buffer = BUFFERS[song.id];
+  if(!buffer){
+    const ok = confirm('この曲の音源ファイルはブラウザ再読み込みで消えています。\n音源を選び直しますか？');
+    if(ok) fileIn.click();
+    return;
+  }
+  startSongInternal(song, buffer);
+}
+
+function startSongInternal(song, buffer){
+  state.song = song;
+  state.chart = {
+    notes: song.notes.map(n=>({t:n.t, lane:n.lane, dur:n.dur||0, judged:false, holding:false, released:false, hit:false})),
+    duration: song.duration,
+    bpm: song.bpm,
+  };
+  state.score = 0; state.combo = 0; state.maxCombo = 0;
+  state.counts = {perfect:0,great:0,good:0,miss:0};
+  state.life = 80; state.endHandled=false; state.paused=false;
+  state.lanePressUntil=[0,0,0,0]; state.laneFlash=[-9,-9,-9,-9]; state.particles=[];
+  state.lastJudge={text:'',t:-9,lane:0,color:'#fff'};
+  state.screen='play';
+
+  $('#lobby').classList.add('hide');
+  $('#result').classList.remove('on');
+  $('#play').classList.add('on');
+  $('#hudTitle').textContent = song.title;
+  $('#hudLevel').textContent = `LEVEL ${song.level}  /  BPM ${song.bpm}${song.isBeatMode ? (state.beatMode==='audio' ? '  /  音源同期' : '  /  ガイド音') : ''}`;
+  $('#hudScore').textContent = '0';
+  drawJacket($('#jacket'), song, buffer);
+  layout();
+
+  if(state.srcNode){ try{ state.srcNode.stop(); }catch(e){} state.srcNode=null; }
+  const lead = 2.0;
+  const startAt = AC.currentTime + lead;
+  state.t0 = startAt;
+  if(buffer){
+    const src = AC.createBufferSource();
+    src.buffer = buffer; src.connect(musicBus);
+    src.start(startAt);
+    state.srcNode = src;
+  } else {
+    // 音源なし：ガイド（メトロノーム＋行進の伴奏）を鳴らす
+    scheduleGuideTrack();
+  }
+  state.running = true;
+  countIn(lead);
+}
+
+function countIn(lead){
+  const el = $('#center'); el.classList.add('on');
+  const big = el.querySelector('.big');
+  const seq = ['3','2','1','GO!'];
+  seq.forEach((txt,i)=>{
+    setTimeout(()=>{ big.textContent=txt; big.style.animation='none'; void big.offsetWidth; big.style.animation=''; }, (lead-1.4)*1000 + i*450);
+  });
+  setTimeout(()=>el.classList.remove('on'), (lead-1.4)*1000 + 4*450 + 120);
+}
+
+/* ---------- 入力 ---------- */
+const KEYMAP = { 'd':0,'f':1,'j':2,'k':3 };
+window.addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  if(e.key==='Escape'){ if(state.screen==='play') togglePause(); return; }
+  const lane = KEYMAP[e.key.toLowerCase()];
+  if(lane!==undefined){ e.preventDefault(); pressLane(lane); }
+});
+window.addEventListener('keyup', e=>{
+  const lane = KEYMAP[e.key.toLowerCase()];
+  if(lane!==undefined){ e.preventDefault(); releaseLane(lane); }
+});
+
+const activePointers = new Map();
+function laneFromX(x){
+  const r = cv.getBoundingClientRect();
+  const local = x - r.left;
+  if(local >= field.x - 12 && local <= field.x + field.w + 12) return clamp(Math.floor((local-field.x)/field.laneW),0,3);
+  return clamp(Math.floor(local / (r.width/4)), 0, 3);
+}
+cv.addEventListener('pointerdown', e=>{
+  if(state.screen!=='play' || state.paused) return;
+  e.preventDefault();
+  const lane = laneFromX(e.clientX);
+  activePointers.set(e.pointerId, lane);
+  pressLane(lane);
+});
+cv.addEventListener('pointerup', e=>{
+  const lane = activePointers.get(e.pointerId);
+  if(lane!==undefined){ releaseLane(lane); activePointers.delete(e.pointerId); }
+});
+cv.addEventListener('pointercancel', e=>{
+  const lane = activePointers.get(e.pointerId);
+  if(lane!==undefined){ releaseLane(lane); activePointers.delete(e.pointerId); }
+});
+
+function pressLane(lane){
+  if(!state.running || state.paused) return;
+  state.lanePressUntil[lane] = state.now + 0.14;
+  state.laneFlash[lane] = state.now;
+  sfxTap();
+  const notes = state.chart.notes;
+  let best=null, bestD=1e9;
+  for(let i=0;i<notes.length;i++){
+    const n = notes[i];
+    if(n.lane!==lane || n.judged) continue;
+    const d = Math.abs(n.t - state.now);
+    if(d < bestD){ bestD=d; best=n; }
+    if(n.t > state.now + 0.35) break;
+  }
+  if(best && bestD <= 0.20){
+    let judge = bestD<=0.055 ? 'perfect' : bestD<=0.105 ? 'great' : 'good';
+    best.judged=true; best.hit=true;
+    registerHit(judge, lane);
+  }
+}
+function releaseLane(lane){
+  for(const n of state.chart.notes){
+    if(n.lane!==lane || !n.holding) continue;
+    n.holding=false; n.released=true;
+  }
+}
+
+function spawnParticles(lane){
+  const n = 9;
+  const cx = field.x + lane*field.laneW + field.laneW/2;
+  const cy = JUDGE_LINE();
+  const col = LANE_COLORS[lane];
+  for(let i=0;i<n;i++){
+    const ang = -Math.PI/2 + rand(-1.15,1.15);
+    const sp = rand(110, 340);
+    state.particles.push({x:cx+rand(-14,14), y:cy+rand(-6,6), vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, life:1, size:rand(2.2,5.2), col});
+  }
+}
+function updateParticles(dt){
+  const arr = state.particles;
+  for(let i=arr.length-1;i>=0;i--){
+    const q=arr[i];
+    q.x += q.vx*dt; q.y += q.vy*dt; q.vy += 620*dt; q.vx*=0.985; q.life -= dt*2.1;
+    if(q.life<=0) arr.splice(i,1);
+  }
+}
+function drawParticles(){
+  for(const q of state.particles){
+    ctx.globalAlpha = Math.max(0,q.life)*0.95;
+    ctx.fillStyle=q.col; ctx.shadowColor=q.col; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(q.x,q.y,q.size*Math.max(.25,q.life),0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+}
+
+function registerHit(judge, lane){
+  const add = {perfect:1000, great:700, good:400}[judge];
+  state.score += Math.round(add * (1 + Math.min(state.combo,100)*0.006));
+  state.combo++; state.maxCombo = Math.max(state.maxCombo, state.combo);
+  state.counts[judge]++;
+  state.life = Math.min(100, state.life + ({perfect:1.4,great:1.1,good:0.7}[judge]));
+  refreshLife(); refreshCombo();
+  const color = {perfect:'#9ef7ff', great:'#a8ffb1', good:'#ffe08a'}[judge];
+  state.lastJudge = {text:judge.toUpperCase(), t:state.now, lane, color};
+  spawnParticles(lane);
+  $('#hudScore').textContent = state.score;
+  sfxHit(judge);
+}
+function registerMiss(n){
+  n.judged=true; n.hit=false;
+  state.combo=0; state.counts.miss++;
+  state.life = Math.max(0, state.life - 5.5);
+  refreshLife(); refreshCombo();
+  state.lastJudge = {text:'MISS', t:state.now, lane:n.lane, color:'#ff8fa0'};
+  $('#hudScore').textContent = state.score;
+  sfxMiss();
+}
+function refreshCombo(){
+  const c=$('#combo');
+  c.querySelector('.n').textContent = state.combo;
+  c.style.opacity = state.combo>2 ? 1 : 0;
+}
+function refreshLife(){
+  const bar=$('#lifebar i');
+  bar.style.width = state.life+'%';
+  bar.style.background = state.life<30 ? 'linear-gradient(90deg,#ff4d6d,#ff9aa8)'
+                                       : 'linear-gradient(90deg,#3ef2c0,#7ef9ff,#a78bfa)';
+}
+
+/* ---------- ループ ---------- */
+let lastFrameT=0;
+function loop(frameT){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (frameT-lastFrameT)/1000 || 0.016);
+  lastFrameT = frameT;
+
+  if(state.screen==='play' && state.running && !state.paused && AC){
+    state.now = AC.currentTime - state.t0 - state.offset/1000;
+    const chart = state.chart;
+    const judgeTime = 0.085;
+    for(const n of chart.notes){
+      if(n.judged) continue;
+      if(n.t + n.dur + judgeTime < state.now) registerMiss(n);
+      else if(n.t > state.now + 3.5) break;
+    }
+    if(AUTO){
+      for(const n of chart.notes){
+        if(n.judged) continue;
+        if(n.t > state.now) break;
+        state.lanePressUntil[n.lane]=state.now+0.1; state.laneFlash[n.lane]=state.now;
+        n.judged=true; n.hit=true;
+        state.score += Math.round(1000*(1+Math.min(state.combo,100)*0.006));
+        state.combo++; state.maxCombo=Math.max(state.maxCombo,state.combo); state.counts.perfect++;
+        state.life=Math.min(100,state.life+1.4);
+        state.lastJudge={text:'PERFECT',t:state.now,lane:n.lane,color:'#9ef7ff'};
+        spawnParticles(n.lane);
+        $('#hudScore').textContent=state.score;
+        refreshCombo(); refreshLife();
+      }
+    }
+    if(state.life<=0 && !state.endHandled){ endHandled(); return; }
+    if(state.now > chart.duration + 0.6 && !state.endHandled) endHandled();
+  }
+  if(state.screen==='play' && !state.paused) updateParticles(dt);
+  draw(dt);
+}
+requestAnimationFrame(loop);
+
+/* ---------- 描画 ---------- */
+function draw(dt){
+  ctx.clearRect(0,0,W,H);
+  if(state.screen!=='play'){ drawIdleBG(); return; }
+  const song = state.song;
+  const yLine = JUDGE_LINE();
+  const spd = noteSpeedPx();
+  const col = song.colors || ['#7b61ff','#a78bfa','#2b1b6b'];
+
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0, col[2]); bg.addColorStop(0.55,'#07070f'); bg.addColorStop(1,'#0b0718');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  const pulse = 0.5+0.5*Math.sin(state.now*Math.PI*pulseFreq());
+  const rad = ctx.createRadialGradient(W/2, H*0.18, 0, W/2, H*0.18, W*0.9);
+  rad.addColorStop(0, hexA(col[0], 0.16+0.10*pulse));
+  rad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=rad; ctx.fillRect(0,0,W,H);
+
+  const fc = field;
+  const fg = ctx.createLinearGradient(0, fc.top, 0, H);
+  fg.addColorStop(0,'rgba(255,255,255,0.015)');
+  fg.addColorStop(1,'rgba(255,255,255,0.07)');
+  ctx.fillStyle=fg; ctx.fillRect(fc.x, fc.top-10, fc.w, H-fc.top+10);
+
+  for(let i=0;i<4;i++){
+    const x = fc.x + i*fc.laneW;
+    const press = Math.max(0, 1-(state.now - state.lanePressUntil[i] + 0.14)/0.14);
+    const flash = Math.max(0, 1-(state.now - state.laneFlash[i])*4);
+    const glowI = Math.max(press*0.5, flash*0.85);
+    if(glowI>0.001){
+      const beamH = Math.min(250, yLine-fc.top);
+      const lg = ctx.createLinearGradient(0, yLine-beamH, 0, yLine);
+      lg.addColorStop(0,'rgba(0,0,0,0)');
+      lg.addColorStop(1, hexA(LANE_COLORS[i], 0.16*glowI));
+      ctx.fillStyle=lg; ctx.fillRect(x+1, yLine-beamH, fc.laneW-2, beamH);
+      const padW=fc.laneW-10, padH=30;
+      const pg = ctx.createLinearGradient(0, yLine-padH, 0, yLine+padH*0.7);
+      pg.addColorStop(0, hexA(LANE_COLORS[i], 0.05*glowI));
+      pg.addColorStop(0.6, hexA(LANE_COLORS[i], 0.55*glowI));
+      pg.addColorStop(1, hexA('#ffffff', 0.20*glowI));
+      ctx.fillStyle=pg; roundRect(ctx, x+5, yLine-padH, padW, padH*1.7, 14); ctx.fill();
+    }
+    ctx.strokeStyle='rgba(255,255,255,.11)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x+0.5, fc.top); ctx.lineTo(x+0.5, H); ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(255,255,255,.11)';
+  ctx.beginPath(); ctx.moveTo(fc.x+fc.w-0.5, fc.top); ctx.lineTo(fc.x+fc.w-0.5, H); ctx.stroke();
+
+  // ノーツ
+  const visible = 3.6;
+  const notes = state.chart.notes;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(fc.x-1, fc.top, fc.w+2, H-fc.top); ctx.clip();
+  const pad = 5, h = Math.min(30, fc.laneW*0.28);
+  for(let i=0;i<notes.length;i++){
+    const n = notes[i];
+    const dtToHit = n.t - state.now;
+    if(dtToHit > visible) break;
+    if(n.judged) continue;
+    const y = yLine - dtToHit*spd;
+    const x = fc.x + n.lane*fc.laneW;
+    drawNoteHead(ctx, x+fc.laneW/2, y, fc.laneW-pad*2, h, LANE_COLORS[n.lane]);
+  }
+  ctx.restore();
+
+  drawParticles();
+
+  // 進行度
+  {
+    const p = clamp(state.now/(state.chart.duration||1),0,1);
+    const bw=fc.w, bx=fc.x, by=fc.top-22;
+    ctx.fillStyle='rgba(255,255,255,.12)'; roundRect(ctx,bx,by,bw,4,2); ctx.fill();
+    const pg = ctx.createLinearGradient(bx,0,bx+bw,0);
+    pg.addColorStop(0,'#7ef9ff'); pg.addColorStop(1,'#c9a4ff');
+    ctx.fillStyle=pg; roundRect(ctx,bx,by,Math.max(3,bw*p),4,2); ctx.fill();
+  }
+
+  // 判定線
+  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(fc.x, yLine-1.5, fc.w, 3);
+  const jl = ctx.createLinearGradient(0,yLine-2,0,yLine+16);
+  jl.addColorStop(0,'rgba(255,255,255,.95)'); jl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=jl; ctx.fillRect(fc.x, yLine-1.5, fc.w, 18);
+  for(let i=0;i<4;i++){
+    const x=fc.x+i*fc.laneW;
+    ctx.fillStyle=hexA(LANE_COLORS[i], .9);
+    ctx.fillRect(x+4, yLine-2.5, fc.laneW-8, 5);
+  }
+
+  // 判定テキスト
+  const lj = state.lastJudge, age = state.now - lj.t;
+  if(age>=0 && age<0.55){
+    ctx.save();
+    ctx.globalAlpha = 1-age/0.55;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    const scale = 1 + Math.max(0, 0.25-age)*1.6;
+    ctx.translate(W/2, yLine-58); ctx.scale(scale,scale);
+    ctx.font='900 26px system-ui,sans-serif';
+    ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,.65)';
+    ctx.strokeText(lj.text,0,0);
+    ctx.fillStyle=lj.color; ctx.shadowColor=lj.color; ctx.shadowBlur=18;
+    ctx.fillText(lj.text,0,0);
+    ctx.restore();
+  }
+}
+function pulseFreq(){ return (state.chart?.bpm || 120)/60/2; }
+
+function drawNoteHead(c, cx, cy, w, h, col){
+  c.save();
+  c.shadowColor=col; c.shadowBlur=16;
+  const g=c.createLinearGradient(0,cy-h/2,0,cy+h/2);
+  g.addColorStop(0,'#ffffff'); g.addColorStop(0.35,col); g.addColorStop(1,shade(col,-25));
+  c.fillStyle=g;
+  roundRect(c, cx-w/2, cy-h/2, w, h, h/2); c.fill();
+  c.shadowBlur=0;
+  c.strokeStyle='rgba(255,255,255,.85)'; c.lineWidth=1.6;
+  roundRect(c, cx-w/2, cy-h/2, w, h, h/2); c.stroke();
+  c.fillStyle='rgba(255,255,255,.7)';
+  roundRect(c, cx-w/2+6, cy-h/2+2.5, w-12, h*0.26, h*0.13); c.fill();
+  c.restore();
+}
+function roundRect(c,x,y,w,h,r){
+  r=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);
+  c.beginPath(); c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+function shade(hex, amt){
+  const n=parseInt(hex.slice(1),16);
+  return `rgb(${clamp((n>>16)+amt,0,255)},${clamp(((n>>8)&0xff)+amt,0,255)},${clamp((n&0xff)+amt,0,255)})`;
+}
+function hexA(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16},${(n>>8)&0xff},${n&0xff},${a})`;
+}
+
+let idleT=0;
+function drawIdleBG(){
+  idleT += 0.016;
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0a0b1c'); g.addColorStop(1,'#120720');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<26;i++){
+    const x=(i*97 % W)+Math.sin(idleT*0.5+i)*20;
+    const y=((i*53 + idleT*38) % (H+80))-40;
+    ctx.fillStyle=hexA(LANE_COLORS[i%4],.10);
+    roundRect(ctx,x,y,46,12,6); ctx.fill();
+  }
+}
+
+/* ---------- 終了処理 ---------- */
+function endHandled(){
+  state.endHandled = true;
+  state.running = false;
+  if(state.srcNode){ try{ state.srcNode.stop(); }catch(e){} state.srcNode=null; }
+  const c = state.counts;
+  const total = c.perfect+c.great+c.good+c.miss || 1;
+  const rate = (c.perfect + c.great*0.7 + c.good*0.4)/total;
+  const failed = state.life<=0;
+  let rank;
+  if(failed) rank='F';
+  else if(rate>=0.97) rank='S+';
+  else if(rate>=0.92) rank='S';
+  else if(rate>=0.85) rank='A';
+  else if(rate>=0.75) rank='B';
+  else rank='C';
+  $('#rank').textContent = rank;
+  $('#rscore').textContent = state.score.toLocaleString();
+  $('#rsub').textContent = `${state.song.title}  /  Lv.${state.song.level}  /  MAX COMBO ${state.maxCombo}`;
+  $('#sPerfect').textContent=c.perfect; $('#sGreat').textContent=c.great;
+  $('#sGood').textContent=c.good; $('#sMiss').textContent=c.miss;
+
+  const prev = store.get(state.song.id, null);
+  let bestLine='';
+  if(!prev || state.score > prev.score){
+    const fc = c.miss===0 ? (c.good===0 && c.great===0 ? 'ALL PERFECT' : 'FULL COMBO') : (prev?.fc || '');
+    store.set(state.song.id, {score:Math.max(state.score, prev?.score||0), fc, rank});
+    bestLine='NEW RECORD!!';
+  } else bestLine = `BEST ${prev.score.toLocaleString()} (${prev.rank||'-'})`;
+  $('#bestLine').textContent = bestLine;
+  $('#result').classList.add('on');
+  state.screen='result';
+  renderCards();
+}
+
+/* ---------- ポーズ ---------- */
+function togglePause(){
+  if(state.screen!=='play' || !state.running) return;
+  state.paused = !state.paused;
+  $('#pause').classList.toggle('on', state.paused);
+  if(AC){ state.paused ? AC.suspend() : AC.resume(); }
+}
+$('#pauseBtn').onclick = togglePause;
+$('#resumeBtn').onclick = togglePause;
+$('#quitBtn').onclick = ()=>{
+  state.paused=false; state.running=false;
+  $('#pause').classList.remove('on');
+  if(AC) AC.resume();
+  if(state.srcNode){ try{ state.srcNode.stop(); }catch(e){} state.srcNode=null; }
+  showLobby();
+};
+$('#retryBtn').onclick = ()=>startGame(state.song);
+$('#backBtn').onclick = ()=>showLobby();
+
+function showLobby(){
+  $('#lobby').classList.remove('hide');
+  $('#result').classList.remove('on');
+  $('#play').classList.remove('on');
+  $('#pause').classList.remove('on');
+  $('#center').classList.remove('on');
+  state.screen='lobby'; state.running=false;
+  renderCards(); layout();
+}
+
+/* ---------- 起動 ---------- */
+layout();
+loadChartJson().then(src=>{ window.__CHART_SOURCE = src; renderCards(); });
+buildLobby();
+refreshLife();
+refreshCombo();
+drawIdleBG();
+$('#combo').style.opacity = 0;
+renderCards();
+</script>
+</body>
+</html>
