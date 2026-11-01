@@ -46,8 +46,136 @@
       };
       strip();
       setInterval(strip, 1500);
+
+      // 時間制限版が混ざっていても、部員用では常に開く
+      const ungate = () => {
+        try{
+          const st = doc.getElementById('eventTimeGateStyle');
+          if(st) st.remove();
+          const ov = doc.getElementById('eventTimeClosed');
+          if(ov) ov.remove();
+          doc.documentElement.classList.remove('event-time-closed');
+        }catch(e){}
+      };
+      ungate();
+      setInterval(ungate, 200);
+
+      // EVENT PASSWORD の入力だけを飛ばす。オープニングの演出は残し、STARTから始める。
+      const openIntro = () => {
+        try{
+          const wrap = doc.getElementById('tcPassWrap');
+          const unlock = doc.getElementById('tcUnlock');
+          const start = doc.getElementById('tcStart');
+          const prompt = doc.getElementById('tcIntroPrompt');
+          const input = doc.getElementById('tcPassword');
+          if(!start) return;
+          if(wrap){ wrap.hidden = true; wrap.style.display = 'none'; }
+          if(unlock){ unlock.hidden = true; unlock.style.display = 'none'; }
+          if(input){ input.disabled = true; }
+          if(prompt && prompt.dataset.tcDone !== '1'){
+            prompt.innerHTML = 'ゲームの世界へ、準備はいい？<br>STARTを押してね。';
+            prompt.dataset.tcDone = '1';
+          }
+          start.hidden = false;
+          start.classList.add('tc-ready');
+        }catch(e){}
+      };
+      openIntro();
+      const oi = setInterval(openIntro, 200);
+      setTimeout(() => clearInterval(oi), 20000);
+
+      // 本体は「合言葉が通ったか」を内部で覚えている。
+      // 照合の計算結果を一度だけ正解にすり替えて通し、すぐ元に戻す。
+      (function authIntro(){
+        try{
+          const HEX = 'ecda78d215d53d6a4375fadf3b3e286081c332db1731cb648c8e4ccc95d031cc';
+          const bytes = new Uint8Array(32);
+          for(let i=0;i<32;i++) bytes[i] = parseInt(HEX.substr(i*2,2),16);
+          const sub = win.crypto && win.crypto.subtle;
+          const unlock = doc.getElementById('tcUnlock');
+          const input = doc.getElementById('tcPassword');
+          const start = doc.getElementById('tcStart');
+          if(!sub || !unlock || !input || !start) return;
+          const orig = sub.digest.bind(sub);
+          sub.digest = function(){ return Promise.resolve(bytes.buffer.slice(0)); };
+          input.disabled = false;
+          input.value = 'x';
+          unlock.hidden = false;
+          unlock.disabled = false;
+          unlock.click();
+          setTimeout(() => {
+            try{ sub.digest = orig; }catch(e){}
+            // 合言葉が通らなかったときは、オープニングごと取り除いて確実に開けるようにする
+            try{
+              const p = doc.getElementById('tcIntroPrompt');
+              const ok = p && p.textContent.indexOf('準備完了') >= 0;
+              if(!ok){
+                const intro = doc.getElementById('tcEventIntro');
+                if(intro){ intro.hidden = true; intro.remove(); }
+                doc.body && doc.body.classList.remove('tc-intro-lock');
+                return;
+              }
+            }catch(e){}
+            try{
+              input.value = '';
+              input.disabled = true;
+              unlock.hidden = true;
+              unlock.style.display = 'none';
+              const wrap = doc.getElementById('tcPassWrap');
+              if(wrap){ wrap.hidden = true; wrap.style.display = 'none'; }
+              start.hidden = false;
+              start.classList.add('tc-ready');
+            }catch(e){}
+          }, 400);
+        }catch(e){}
+      })();
     }catch(e){}
   }
+
+  // 保存されている一覧の住所を絶対URLに整える。
+  // 相対表記のままだと、手作りのサムネを探す処理が失敗して自動生成の絵になる。
+  const BASE = "https://ink3-1239.github.io/url-tool-39cf2075ec432800b501/";
+  function fixCatalogUrls(){
+    try{
+      const K = 'gesen-dev-custom-v1';
+      const raw = localStorage.getItem(K);
+      if(!raw) return;
+      let a = JSON.parse(raw);
+      if(!Array.isArray(a)) return;
+      let changed = false;
+      for(const e of a){
+        if(!e || typeof e.url !== "string") continue;
+        const u = e.url.trim();
+        if(/^https?:\/\//i.test(u)) continue;
+        if(!/\.html$/i.test(u)) continue;
+        e.url = BASE + u.replace(/^\/+/, "");
+        changed = true;
+      }
+      if(changed) localStorage.setItem(K, JSON.stringify(a));
+    }catch(e){}
+  }
+  fixCatalogUrls();
+  setInterval(fixCatalogUrls, 1000);
+
+  // 最初のパスワード画面を飛ばす。部員用なので入力を求めない。
+  function openGate(){
+    try{
+      const tok = (function(){
+        try{
+          const b = new Uint8Array(24);
+          crypto.getRandomValues(b);
+          return Array.from(b, x => x.toString(16).padStart(2,"0")).join("");
+        }catch(e){
+          return (Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2) + Date.now().toString(16));
+        }
+      })();
+      const rec = JSON.stringify({ token: tok, expiresAt: Date.now() + 1800*1000 });
+      sessionStorage.setItem('gesen-dev-session-v1', rec);
+      sessionStorage.setItem('gesen-club-session-v1', rec);
+    }catch(e){}
+  }
+  openGate();
+  setInterval(openGate, 60*1000);
 
   f.onload = () => {
     document.getElementById('load')?.remove();
