@@ -23,6 +23,13 @@
     /* フラッシュ効果 */
     .flash-red { animation: flashRed 0.2s ease-in-out; }
     @keyframes flashRed { 0%, 100% { background-color: #121212; } 50% { background-color: #500; } }
+    .flash-gold { animation: flashGold 1s ease-in-out; }
+    @keyframes flashGold { 0%, 100% { background-color: #121212; } 40% { background-color: #3a2e00; } }
+    .flash-gold-panel { animation: flashGoldPanel 1s ease-in-out; }
+    @keyframes flashGoldPanel {
+      0%, 100% { border-color: #333; box-shadow: none; }
+      40% { border-color: #ffd34d; box-shadow: 0 0 18px 4px rgba(255,211,77,.85), inset 0 0 18px rgba(255,211,77,.35); background-color: #2a2200; }
+    }
     .flash-red-panel { animation: flashRedPanel 0.2s ease-in-out; }
     @keyframes flashRedPanel { 0%, 100% { border-color: #333; } 50% { border-color: #f00; background-color: #300; } }
 
@@ -441,6 +448,15 @@
       </div>
       <button class="btn" style="margin-top:12px;width:100%" onclick="rankStart()">この部門でスタート</button>
       <button class="btn" style="margin-top:6px;width:100%;background:#2a2d3d;color:#9fb0c0" onclick="rankSaveNameOnly()">名前だけ登録・変更</button>
+      <button class="btn" style="margin-top:6px;width:100%;background:#2a2d3d;color:#9fb0c0" onclick="takeToggle()">データを引き継ぐ</button>
+      <div id="takePanel" style="display:none;margin-top:8px;padding:10px;border:1px solid #444;border-radius:8px;background:#15171f">
+        <div class="cat-note" style="margin:0 0 6px">この端末の番号</div>
+        <div id="takeMine" style="font-size:1.6rem;letter-spacing:.3em;color:#ffd34d;text-align:center">----</div>
+        <div class="cat-note" style="margin:8px 0 4px">ほかの端末の4桁を入れると、その記録を引き継ぎます。</div>
+        <input id="takePin" maxlength="4" inputmode="numeric" placeholder="0000" style="width:100%;text-align:center;letter-spacing:.3em;font-size:1.2rem">
+        <button class="btn" style="margin-top:6px;width:100%" onclick="takeClaim()">この番号で引き継ぐ</button>
+        <div id="takeMsg" class="cat-note" style="margin-top:6px"></div>
+      </div>
       <div id="rankMsg"></div>
       <div class="cat-note">1つの端末につき1つのニックネームです。名前を変えると、ランキングに載っている自分の名前もすべて変わります。</div>
     </div>
@@ -895,6 +911,62 @@
           RANK_CAT_INFO[cat].label + 'に登録しました' + (pos >= 0 ? '（' + (pos + 1) + '位）' : '');
       }
     }
+    async function rankApi(payload) {
+      const r = await fetch(RANK_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await r.json();
+    }
+    function takeMsg(t) { document.getElementById('takeMsg').textContent = t; }
+    async function takeToggle() {
+      const p = document.getElementById('takePanel');
+      const show = (p.style.display === 'none');
+      p.style.display = show ? 'block' : 'none';
+      if (!show) return;
+      takeMsg('');
+      document.getElementById('takeMine').textContent = '----';
+      try {
+        const j = await rankApi({ action: 'pin', id: rankDeviceId });
+        if (j.ok) {
+          document.getElementById('takeMine').textContent = j.pin;
+          localStorage.setItem('arcade_pin', j.pin);
+        } else {
+          takeMsg('番号を取れませんでした（' + (j.error || 'error') + '）');
+        }
+      } catch (e) {
+        takeMsg('サーバーに接続できませんでした。');
+      }
+    }
+    async function takeClaim() {
+      const pin = document.getElementById('takePin').value.trim();
+      if (!/^[0-9]{4}$/.test(pin)) { takeMsg('4桁の数字を入れてください。'); return; }
+      if (pin === localStorage.getItem('arcade_pin')) { takeMsg('これはこの端末自身の番号です。'); return; }
+      takeMsg('照合しています…');
+      try {
+        const j = await rankApi({ action: 'claim', pin: pin, id: rankDeviceId });
+        if (!j.ok) {
+          takeMsg(j.error === 'nopin' ? 'その番号は見つかりませんでした。' : '引き継げませんでした（' + (j.error || 'error') + '）');
+          return;
+        }
+        rankDeviceId = j.id;
+        localStorage.setItem('arcade_device_id', j.id);
+        localStorage.setItem('arcade_pin', pin);
+        if (j.nick) {
+          rankNick = j.nick;
+          localStorage.setItem('arcade_nick', j.nick);
+          document.getElementById('rankNick').value = j.nick;
+        }
+        ['nomiss', 'short', 'pro', 'beginner'].forEach((c) => {
+          if (j.best && j.best[c]) localStorage.setItem('arcade_best_' + c, j.best[c]);
+        });
+        document.getElementById('takeMine').textContent = pin;
+        takeMsg('引き継ぎました。' + (j.nick ? '名前: ' + j.nick : ''));
+        rankFetch();
+      } catch (e) {
+        takeMsg('サーバーに接続できませんでした。');
+      }
+    }
     let rankAutoTimer = null;
     function rankAutoStart() {
       clearInterval(rankAutoTimer);
@@ -999,12 +1071,13 @@
     }
 
     function loadHiScore() {
-      let key = getStorageKey();
-      currentHiScore = parseInt(localStorage.getItem(key)) || 0;
-      document.getElementById('hiSc').innerText = currentHiScore;
+      // HI-SCORE はこの1回の挑戦の中だけの最高点。毎回0から数え直す。
+      currentHiScore = 0;
+      document.getElementById('hiSc').innerText = 0;
     }
 
     function startGame() {
+      if (gameActive) return;
       const dev = document.getElementById('deviceSelect').value;
       const speedMode = document.getElementById('speedSelect').value;
       selectedLifeConfig = document.getElementById('lifeSelect').value;
@@ -1067,6 +1140,8 @@
       pX = (bC.width - pW) / 2; bX = bC.width / 2; bY = bC.height - 30; bDX = 1.5; bDY = -1.5;
       obs = []; dY = 60; dDY = 0; isGnd = true; fCount = 0;
 
+      bestFlashed = false;
+      bestWatchPrev = rankEntryCat ? (parseInt(localStorage.getItem('arcade_best_' + rankEntryCat)) || 0) : 0;
       gameActive = true;
       isPaused = false;
       document.getElementById('pauseOv').style.display = 'none';
@@ -1149,13 +1224,26 @@
       let total = mSc + bSc + dSc;
       document.getElementById('totalSc').innerText = total;
       if (tutorialMode) return;
+      if (!bestFlashed && rankEntryCat && bestWatchPrev > 0 && total > bestWatchPrev) {
+        bestFlashed = true;
+        triggerBestFlash();
+      }
       if (total > currentHiScore) {
         currentHiScore = total;
-        localStorage.setItem(getStorageKey(), currentHiScore);
         document.getElementById('hiSc').innerText = currentHiScore;
       }
     }
 
+    let bestFlashed = false, bestWatchPrev = 0;
+    function triggerBestFlash() {
+      const cab = document.getElementById('cabinet');
+      if (cab) {
+        cab.classList.add('flash-gold-panel');
+        setTimeout(() => cab.classList.remove('flash-gold-panel'), 1000);
+      }
+      document.body.classList.add('flash-gold');
+      setTimeout(() => document.body.classList.remove('flash-gold'), 1000);
+    }
     function triggerFailFlash(panelId) {
       const panel = document.getElementById(panelId);
       panel.classList.add('flash-red-panel');
@@ -1230,8 +1318,8 @@
       }
     }
 
-    function drawM() {
-      if (!gameActive) return;
+    function drawM(g) {
+      if (!gameActive || g !== loopGen) return;
 
       mCtx.fillStyle = '#000';
       mCtx.fillRect(0, 0, mC.width, mC.height);
@@ -1272,7 +1360,7 @@
         }
       }
 
-      requestAnimationFrame(drawM);
+      requestAnimationFrame(() => drawM(g));
     }
 
     // --- ブロック崩し ---
@@ -1307,8 +1395,8 @@
 
     let mL = false, mR = false;
 
-    function drawB() {
-      if(!gameActive) return;
+    function drawB(g) {
+      if(!gameActive || g !== loopGen) return;
 
       bCtx.fillStyle = '#000';
       bCtx.fillRect(0, 0, bC.width, bC.height);
@@ -1392,7 +1480,7 @@
       }
       bX += bDX * speedFactor; 
       bY += bDY * speedFactor;
-      requestAnimationFrame(drawB);
+      requestAnimationFrame(() => drawB(g));
     }
 
     // --- 恐竜ゲーム ---
@@ -1422,8 +1510,8 @@
       fCount = 0;
     }
 
-    function drawD() {
-      if(!gameActive) return;
+    function drawD(g) {
+      if(!gameActive || g !== loopGen) return;
 
       dCtx.fillStyle = '#000';
       dCtx.fillRect(0, 0, dC.width, dC.height);
@@ -1470,14 +1558,17 @@
         }
       }
       fCount += speedFactor;
-      requestAnimationFrame(drawD);
+      requestAnimationFrame(() => drawD(g));
     }
 
     // --- ゲームループ制御 ---
+    let loopGen = 0;
     function initGameLoops() {
-      drawM();
-      drawB();
-      drawD();
+      loopGen++;
+      const g = loopGen;
+      drawM(g);
+      drawB(g);
+      drawD(g);
     }
 
     window.addEventListener('keydown', (e) => {
@@ -1517,5 +1608,5 @@
     document.getElementById('dJumpBtn').onclick = dJump;
     dC.addEventListener('touchstart', (e) => { e.preventDefault(); dJump(); });
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53777e6289795ad',t:'MTc5MzUwMDEzMA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53777e6289795ad',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
