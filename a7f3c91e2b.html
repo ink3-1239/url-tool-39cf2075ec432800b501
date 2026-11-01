@@ -157,6 +157,35 @@
   fixCatalogUrls();
   setInterval(fixCatalogUrls, 1000);
 
+  // テスターの中では保存領域が別枠になり、一覧の控えが空になる。
+  // 足りない分だけ公式の一覧から取り寄せて置く。既存の項目には触らない。
+  const CATALOG_URL = "https://raw.githubusercontent.com/ink3-1239/game-portal-data/main/catalog.json";
+  async function seedCatalog(){
+    try{
+      const K = 'gesen-dev-custom-v1';
+      let have = [];
+      try{ have = JSON.parse(localStorage.getItem(K) || '[]'); }catch(e){ have = []; }
+      if(!Array.isArray(have)) have = [];
+      const r = await fetch(CATALOG_URL, { cache: 'no-store' });
+      if(!r.ok) return;
+      const j = await r.json();
+      const list = Array.isArray(j.customs) ? j.customs : [];
+      if(!list.length) return;
+      const ids = new Set(have.map(e => e && e.id));
+      const titles = new Set(have.map(e => e && e.title));
+      let added = 0;
+      for(const e of list){
+        if(!e || !e.url) continue;
+        if(ids.has(e.id) || titles.has(e.title)) continue;
+        const c = Object.assign({}, e);
+        if(!/^https?:\/\//i.test(c.url)) c.url = BASE + String(c.url).replace(/^\/+/, "");
+        have.push(c);
+        added++;
+      }
+      if(added) localStorage.setItem(K, JSON.stringify(have));
+    }catch(e){}
+  }
+
   // 最初のパスワード画面を飛ばす。部員用なので入力を求めない。
   function openGate(){
     try{
@@ -181,5 +210,5 @@
     document.getElementById('load')?.remove();
     install(f.contentWindow);
   };
-  f.src = t;
+  Promise.race([seedCatalog(), new Promise(r => setTimeout(r, 2500))]).then(() => { fixCatalogUrls(); f.src = t; });
 })();</script></body></html>
