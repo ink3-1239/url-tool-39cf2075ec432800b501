@@ -809,6 +809,7 @@
         const j = await r.json();
         if (!j.ok) throw new Error('ng');
         rankBoard = j.board;
+        rankSyncMine();
         st.textContent = 'オンライン更新: ' + new Date().toLocaleTimeString('ja-JP');
         rankRender();
       } catch (e) {
@@ -917,6 +918,22 @@
         body: JSON.stringify(payload)
       });
       return await r.json();
+    }
+    const RANK_ALL_CATS = ['nomiss', 'short', 'pro', 'beginner'];
+    // サーバー上の自分の記録を取り、端末の自己ベストをそれに合わせる。
+    // 管理ツールで消された部門は、端末側の自己ベストも消す。
+    async function rankSyncMine() {
+      try {
+        const j = await rankApi({ action: 'mine', id: rankDeviceId });
+        if (!j.ok) return null;
+        RANK_ALL_CATS.forEach((c) => {
+          if (j.mine && j.mine[c] !== undefined) localStorage.setItem('arcade_best_' + c, j.mine[c]);
+          else localStorage.removeItem('arcade_best_' + c);
+        });
+        return j.mine || {};
+      } catch (e) {
+        return null;
+      }
     }
     function takeMsg(t) { document.getElementById('takeMsg').textContent = t; }
     async function takeToggle() {
@@ -1141,7 +1158,18 @@
       obs = []; dY = 60; dDY = 0; isGnd = true; fCount = 0;
 
       bestFlashed = false;
-      bestWatchPrev = rankEntryCat ? (parseInt(localStorage.getItem('arcade_best_' + rankEntryCat)) || 0) : 0;
+      bestWatchHas = false;
+      bestWatchPrev = 0;
+      if (rankEntryCat) {
+        const stored = localStorage.getItem('arcade_best_' + rankEntryCat);
+        if (stored !== null) { bestWatchHas = true; bestWatchPrev = parseInt(stored) || 0; }
+        const watchCat = rankEntryCat;
+        rankSyncMine().then((m) => {
+          if (!m) return;
+          if (m[watchCat] !== undefined) { bestWatchHas = true; bestWatchPrev = parseInt(m[watchCat]) || 0; }
+          else { bestWatchHas = false; bestWatchPrev = 0; }
+        });
+      }
       gameActive = true;
       isPaused = false;
       document.getElementById('pauseOv').style.display = 'none';
@@ -1224,7 +1252,8 @@
       let total = mSc + bSc + dSc;
       document.getElementById('totalSc').innerText = total;
       if (tutorialMode) return;
-      if (!bestFlashed && rankEntryCat && bestWatchPrev > 0 && total > bestWatchPrev) {
+      // その部門に自分の記録がすでにあり、それを超えた瞬間だけ光る（初回の登録では光らない）
+      if (!bestFlashed && rankEntryCat && bestWatchHas && total > bestWatchPrev) {
         bestFlashed = true;
         triggerBestFlash();
       }
@@ -1234,7 +1263,7 @@
       }
     }
 
-    let bestFlashed = false, bestWatchPrev = 0;
+    let bestFlashed = false, bestWatchPrev = 0, bestWatchHas = false;
     function triggerBestFlash() {
       const cab = document.getElementById('cabinet');
       if (cab) {
@@ -1608,5 +1637,5 @@
     document.getElementById('dJumpBtn').onclick = dJump;
     dC.addEventListener('touchstart', (e) => { e.preventDefault(); dJump(); });
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53777e6289795ad',t:'MTc5MzUwMDEzMA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53777e6289795ad',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
