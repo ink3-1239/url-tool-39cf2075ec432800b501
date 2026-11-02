@@ -26,16 +26,20 @@
       }
       const open0 = win.open;
       win.open = function(u){
-        const x = norm(u);
-        if(x){ win.location.href = x; return win; }
+        let x = norm(u);
+        if(x){
+          if(/^staff-roll\.html(\?|$)/i.test(x)) x += (x.indexOf('?')>=0?'&':'?') + 'fresh=' + Date.now();
+          win.location.href = x; return win;
+        }
         try{ return open0.apply(win, arguments); }catch(e){ return null; }
       };
       doc.addEventListener("click", function(e){
         let el = e.target;
         while(el && el.tagName !== "A") el = el.parentNode;
         if(!el || !el.getAttribute) return;
-        const x = norm(el.getAttribute("href"));
+        let x = norm(el.getAttribute("href"));
         if(!x) return;
+        if(/^staff-roll\.html(\?|$)/i.test(x)) x += (x.indexOf('?')>=0?'&':'?') + 'fresh=' + Date.now();
         e.preventDefault();
         e.stopPropagation();
         win.location.href = x;
@@ -46,6 +50,30 @@
       };
       strip();
       setInterval(strip, 1500);
+
+      // スタッフロールだけ、案内所から開くときに古い控えを掴まないようにする。
+      // ほかのゲームの住所には何も足さない。
+      const srSeen = new Set();
+      const bustStaffRoll = () => {
+        try{
+          const list = doc.querySelectorAll('iframe');
+          for(let i=0;i<list.length;i++){
+            const el = list[i];
+            const src = el.getAttribute('src') || el.src || "";
+            if(!src) continue;
+            if(!/staff-roll\.html(\?|#|$)/i.test(src)) continue;
+            if(/[?&]fresh=/.test(src)) continue;
+            if(srSeen.has(src)) continue;
+            srSeen.add(src);
+            const sep = src.indexOf('?') >= 0 ? '&' : '?';
+            const next = src + sep + 'fresh=' + Date.now();
+            srSeen.add(next);
+            el.setAttribute('src', next);
+          }
+        }catch(e){}
+      };
+      bustStaffRoll();
+      setInterval(bustStaffRoll, 250);
 
       // 時間制限版が混ざっていても、部員用では常に開く
       const ungate = () => {
