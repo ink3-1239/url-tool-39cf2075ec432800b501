@@ -50,7 +50,11 @@
   th{color:#8b94a6;font-size:.7rem;font-weight:normal}
   .del{background:#5a1d22;color:#ffb9bd;border:0;border-radius:6px;padding:4px 9px;font-size:.73rem;cursor:pointer}
   .sw{display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:8px}
-  .sw input{width:auto}
+  .sw input{width:auto;accent-color:#00ffff;width:18px;height:18px;cursor:pointer}
+  .bigsw{width:100%;text-align:left;padding:12px 14px;font-size:.9rem;font-weight:bold;border-radius:10px;background:#272c3c;color:#8b94a6;border:2px solid #39405a;cursor:pointer}
+  .bigsw.on{background:#13412f;color:#49e39b;border-color:#49e39b}
+  .swstate{margin-left:6px;font-weight:bold;font-size:.78rem;padding:2px 8px;border-radius:999px;background:#272c3c;color:#8b94a6}
+  .swstate.on{background:#13412f;color:#49e39b}
   .rule{border-left:3px solid #00ffff;padding:6px 0 6px 10px;margin-bottom:10px;font-size:.82rem;line-height:1.6;color:#cfe3ef}
   .rule b{color:#ffd76a}
   #recDot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#555}
@@ -109,11 +113,15 @@
     <div class="wrap">
       <div class="card">
         <h2>返信ボット</h2>
-        <label class="sw"><input type="checkbox" id="bOn"> ボットを動かす</label>
-        <label class="sw"><input type="checkbox" id="bDry" checked> 練習モード（実際には投稿せず、画面に出すだけ）</label>
+        <div class="row"><button type="button" id="bOnBtn" class="bigsw">ボット：停止中（押すと動き出す）</button><input type="checkbox" id="bOn" style="display:none"></div>
+        <div class="row"><button type="button" id="bDryBtn" class="bigsw">練習モード：ON（投稿せず画面に出すだけ）</button><input type="checkbox" id="bDry" checked style="display:none"></div>
         <div class="row">
           <input id="bName" placeholder="ボットの名前" value="インクボット" style="flex:1 1 200px">
         </div>
+        <div class="row"><button type="button" id="aiBtn" class="bigsw">AI返信：OFF（決まり文句で返す）</button><input type="checkbox" id="aiOn" style="display:none"></div>
+        <div class="row"><button type="button" id="aiSearchBtn" class="bigsw">検索：OFF（AIの知識だけで答える）</button><input type="checkbox" id="aiSearch" style="display:none"></div>
+        <div class="row"><input id="aiKey" type="password" placeholder="Gemini APIキー（この端末にだけ保存）" style="flex:1 1 260px"></div>
+        <div class="hint">キーは <b>aistudio.google.com/apikey</b> で無料で作れます。ファイルには書き込まれず、この端末の保存領域にだけ残ります。AI返信がONのとき、直近の会話を読んで返事を作ります。検索をONにすると、調べ物にはGoogle検索の結果を使って答えます。失敗したときは決まり文句に戻ります。</div>
         <div class="hint">同じ人には20秒に1回までしか返しません。自分の投稿と、開いた直後に流れてくる過去の投稿には反応しません。</div>
       </div>
       <div class="card">
@@ -313,6 +321,71 @@
     return pick(RA) + "。" + pick(RF) + "。" + pick(RG);
   }
 
+  /* ---------- スイッチの表示と記憶 ---------- */
+  function swBind(id, btnId, key, dflt, onText, offText) {
+    var el = $(id), btn = $(btnId);
+    try { var v = localStorage.getItem(key); el.checked = (v === null) ? dflt : (v === "1"); } catch (e) { el.checked = dflt; }
+    function paint() {
+      btn.textContent = el.checked ? onText : offText;
+      btn.className = "bigsw" + (el.checked ? " on" : "");
+    }
+    btn.addEventListener("click", function () {
+      el.checked = !el.checked;
+      paint();
+      try { localStorage.setItem(key, el.checked ? "1" : "0"); } catch (e) {}
+    });
+    paint();
+  }
+  swBind("bOn", "bOnBtn", "chat_tools_bot_on", false,
+         "ボット：動作中（押すと止まる）", "ボット：停止中（押すと動き出す）");
+  swBind("bDry", "bDryBtn", "chat_tools_bot_dry", true,
+         "練習モード：ON（投稿せず画面に出すだけ）", "練習モード：OFF（本当に投稿する）");
+  swBind("aiOn", "aiBtn", "chat_tools_ai_on", false,
+         "AI返信：ON（会話を読んで考える）", "AI返信：OFF（決まり文句で返す）");
+  swBind("aiSearch", "aiSearchBtn", "chat_tools_ai_search", false,
+         "検索：ON（調べてから答える）", "検索：OFF（AIの知識だけで答える）");
+
+  /* ---------- AI返信（Gemini） ---------- */
+  var AI_SKIP = ["名前を聞かれた", "100文字以上", "連投・スパム", "自分の投稿", "名前にink", "変更の話"];
+  function aiEligible(label) { return $("aiOn").checked && AI_SKIP.indexOf(label) < 0; }
+  var convo = [];
+  function recordMsg(who, text) {
+    convo.push({ who: who, text: String(text) });
+    if (convo.length > 24) convo.shift();
+  }
+  try { var k0 = localStorage.getItem("chat_tools_ai_key"); if (k0) $("aiKey").value = k0; } catch (e) {}
+  $("aiKey").addEventListener("change", function () {
+    try { localStorage.setItem("chat_tools_ai_key", $("aiKey").value.trim()); } catch (e) {}
+  });
+  var AI_PERSONA =
+    "あなたは『インクボット』という名前のチャットボットです。ink3という人物の分身という設定で、" +
+    "そっけなく短い口調で話します。敬語は使いません。1〜2文、長くても60文字以内で返します。" +
+    "絵文字と記号の連打は使いません。自分がAIであることをわざわざ説明しません。" +
+    "分からないことは素直に分からないと言います。";
+  function aiReply(who, text) {
+    var key = $("aiKey").value.trim();
+    if (!key) return Promise.reject(new Error("キーがありません"));
+    var lines = convo.slice(-12).map(function (m) { return m.who + "：" + m.text; }).join("\n");
+    var prompt = AI_PERSONA + "\n\nここまでの会話：\n" + lines +
+      "\n\n" + who + " の発言『" + text + "』に返事してください。返事の本文だけを書いてください。";
+    var body = { contents: [{ parts: [{ text: prompt }] }] };
+    if ($("aiSearch").checked) body.tools = [{ google_search: {} }];
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(key);
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error("HTTP " + r.status + " " + t.slice(0, 200)); });
+      return r.json();
+    }).then(function (j) {
+      var parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+      var out = parts.map(function (p) { return p.text || ""; }).join("").trim();
+      if (!out) throw new Error("空の返事");
+      return out.replace(/\s+/g, " ").slice(0, 300);
+    });
+  }
+
   /* ---------- 会話に合わせた返事 ---------- */
   function P(a){ return a[Math.floor(Math.random()*a.length)]; }
   var TOPICS = [
@@ -376,6 +449,7 @@
   function botSay(text) {
     var nm = $("bName").value.trim() || "インクボット";
     if ($("bDry").checked) { add(nm + "（練習）", text, new Date().toISOString(), "bot"); return; }
+    recordMsg(nm, text);
     if (post(text, nm)) add(nm, text, new Date().toISOString(), "bot");
   }
   function decide(who, text) {
@@ -396,15 +470,34 @@
     var now = Date.now();
     var noCool = /チャボ|ちゃぼ|ﾁｬﾎﾞ/.test(String(who));
     if (!noCool && lastReplyAt[who] && now - lastReplyAt[who] < 20000) return;
+    recordMsg(who, text);
     var r = decide(who, text);
     lastTextOf[who] = String(text).trim();
     if (!r[1]) return;
     lastReplyAt[who] = now;
+    if (aiEligible(r[0])) {
+      aiReply(who, text).then(function (out) {
+        botSay(out);
+      }).catch(function (e) {
+        add("システム", "AI返信に失敗：" + e.message + "（決まり文句で返します）", new Date().toISOString(), "sys");
+        botSay(r[1]);
+      });
+      return;
+    }
     setTimeout(function () { botSay(r[1]); }, 600);
   }
   $("tRun").onclick = function () {
-    var r = decide($("tName").value.trim() || "テスト太郎", $("tText").value);
+    var who = $("tName").value.trim() || "テスト太郎";
+    var r = decide(who, $("tText").value);
     $("tOut").textContent = "判定：" + r[0] + " ／ 返事：" + (r[1] || "返さない");
+    if (aiEligible(r[0])) {
+      $("tOut").textContent = "判定：" + r[0] + " ／ AIが考え中…";
+      aiReply(who, $("tText").value).then(function (out) {
+        $("tOut").textContent = "判定：" + r[0] + "（AI） ／ 返事：" + out;
+      }).catch(function (e) {
+        $("tOut").textContent = "AI失敗：" + e.message + " ／ 代わりの返事：" + (r[1] || "なし");
+      });
+    }
   };
 
   /* 日付が変わった瞬間 */
