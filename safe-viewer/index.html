@@ -74,6 +74,15 @@ a:hover{text-decoration:underline}
 }
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast b{font-weight:500;color:#8ab4f8}
+/* 検索対象の切り替え（Google と同じ下線タブ） */
+.tabs{display:flex;gap:2px;margin:10px 0 0 4px}
+.tab{
+  font:inherit;font-size:13.5px;color:var(--dim);background:none;border:0;
+  padding:7px 12px 9px;border-bottom:3px solid transparent;border-radius:0;
+  cursor:pointer;transition:color .15s,border-color .15s
+}
+.tab:hover{color:var(--fg)}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:500}
 
 
 /* 全画面：上のバーを完全に消して、中のページだけ表示 */
@@ -98,10 +107,14 @@ body.fs #exit:hover,body.fs #exit:active,body:fullscreen #exit:hover,body:fullsc
     <button id="go">開く</button>
     <button id="fs" title="全画面表示 / 解除（Esc で戻る）" aria-label="全画面表示">⛶</button>
   </div>
+  <div class="tabs" role="tablist">
+    <button class="tab on" id="tabWeb" role="tab" aria-selected="true">ウェブ</button>
+    <button class="tab" id="tabYt" role="tab" aria-selected="false">YouTube</button>
+  </div>
 </header>
 <main>
   <div id="msg"></div>
-  <iframe id="f" hidden sandbox="allow-scripts allow-forms allow-modals allow-same-origin allow-popups" referrerpolicy="no-referrer" title="安全ビューア内のページ"></iframe>
+  <iframe id="f" hidden sandbox="allow-scripts allow-forms allow-modals allow-same-origin allow-popups" allow="fullscreen; encrypted-media; picture-in-picture; autoplay" referrerpolicy="strict-origin-when-cross-origin" title="安全ビューア内のページ"></iframe>
 </main>
 <button id="exit" title="全画面をやめる（Esc）">✕ 解除</button>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -120,6 +133,24 @@ function normUrl(v){
 }
 function gsearch(v){
   return 'https://www.google.com/search?igu=1&hl=ja&gl=jp&q='+encodeURIComponent(v.trim());
+}
+/* YouTube：通常の視聴ページは他サイト内に表示できない（X-Frame-Options: SAMEORIGIN）。
+   埋め込み専用 URL（/embed/<ID>）なら表示できるので、動画 URL を自動で変換する。 */
+function ytEmbed(v){
+  var t=v.trim(),m=null,id=null,list=null;
+  if((m=t.match(/(?:youtube\.com|youtube-nocookie\.com)\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)([\w-]{11})/i))) id=m[1];
+  else if((m=t.match(/youtu\.be\/([\w-]{11})/i))) id=m[1];
+  if((m=t.match(/[?&]list=([\w-]+)/i))) list=m[1];
+  if(!id && list) return 'https://www.youtube.com/embed/videoseries?list='+encodeURIComponent(list)+'&hl=ja';
+  if(!id) return null;
+  var u='https://www.youtube.com/embed/'+id+'?hl=ja&rel=0&playsinline=1';
+  if(list) u+='&list='+encodeURIComponent(list);
+  return u;
+}
+/* YouTube で検索：検索結果ページ（/results）は他サイト内に表示できないので、
+   埋め込みプレイヤーの検索モード（listType=search）で中に出す。 */
+function ytSearch(v){
+  return 'https://www.youtube.com/embed?listType=search&hl=ja&list='+encodeURIComponent(v.trim());
 }
 function fail(url,title,body){
   f.hidden=true;msg.hidden=false;
@@ -155,10 +186,44 @@ function load(url,ms){
     fail(url,'このサイトは中で開けません','相手のサイトが「他のページの中には表示しない」と設定しているためです（よくある設定）。URL 自体が危険とは限りませんが、ダウンロードを止める保護は効きません。');
   }, ms||4500);
 }
+var scope='web';
+var tabWeb=document.getElementById('tabWeb'),tabYt=document.getElementById('tabYt');
+function setScope(s0){
+  scope=s0;
+  var yt=(scope==='yt');
+  tabWeb.classList.toggle('on',!yt); tabYt.classList.toggle('on',yt);
+  tabWeb.setAttribute('aria-selected',String(!yt));
+  tabYt.setAttribute('aria-selected',String(yt));
+  q.placeholder = yt ? 'YouTube で検索' : '検索、または URL を貼り付け';
+  q.focus();
+}
+tabWeb.onclick=function(){ setScope('web'); };
+tabYt.onclick=function(){ setScope('yt'); };
+
 function open_(v){
   v=(v||'').trim();
   if(!v){q.focus();return;}
-  if(looksUrl(v)) load(normUrl(v)); else load(gsearch(v),7000);
+  if(scope==='yt' && !looksUrl(v)){
+    load(ytSearch(v),9000);
+    toast('<b>YouTube で検索中</b><br>結果はこの中で再生できます（ダウンロードは止まったまま）');
+    return;
+  }
+  if(looksUrl(v)){
+    var src=normUrl(v);
+    var yt=ytEmbed(src);
+    if(yt){
+      load(yt,9000);
+      toast('<b>YouTube をこの中で再生します</b><br>ダウンロードは止まったままです');
+      return;
+    }
+    if(/youtube\.com|youtu\.be/i.test(src)){
+      fail(src,'このページは表示できません','YouTube のトップページ・チャンネル・検索結果は、他サイト内に表示できない仕様です。<b>動画の URL</b>（watch?v=… / youtu.be/… / shorts/…）を貼ると、この中で再生できます。');
+      return;
+    }
+    load(src);
+    return;
+  }
+  load(gsearch(v),7000);
 }
 document.getElementById('go').onclick=function(){open_(q.value);};
 q.addEventListener('keydown',function(e){
